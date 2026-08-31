@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 物理工厂孪生模块核查报告</title>
+<style>
+  :root{ --bg:#0b1020; --panel:#141c2e; --panel-border:#263247; --text:#e6edf3; --muted:#8b98a9; --accent:#4ea1ff; --ok:#39d98a; --warn:#f2c14e; --bad:#ff5c5c; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; line-height:1.6; padding:32px; }
+  .wrap{ max-width:920px; margin:0 auto; }
+  h1{ font-size:24px; margin:0 0 4px; }
+  .sub{ color:var(--muted); font-size:13px; margin-bottom:24px; }
+  h2{ font-size:17px; margin:28px 0 10px; color:var(--accent); border-left:3px solid var(--accent); padding-left:10px; }
+  .card{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:16px 18px; margin:12px 0; }
+  code{ background:rgba(255,255,255,0.06); padding:1px 6px; border-radius:5px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; color:#9fd0ff; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; margin:8px 0; }
+  th,td{ text-align:left; padding:7px 10px; border-bottom:1px solid var(--panel-border); }
+  th{ color:var(--muted); font-weight:500; }
+  .tag{ display:inline-block; padding:1px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+  .t-ok{ background:rgba(57,217,138,0.16); color:var(--ok); }
+  .t-warn{ background:rgba(242,193,78,0.16); color:var(--warn); }
+  .t-bad{ background:rgba(255,92,92,0.16); color:var(--bad); }
+  .k{ color:var(--muted); }
+  ul{ margin:6px 0; padding-left:20px; }
+  li{ margin:3px 0; }
+  .mono{ font-family:ui-monospace,Consolas,monospace; font-size:12px; color:#cfe3ff; }
+  .note{ font-size:12.5px; color:var(--muted); }
+  .pill{ display:inline-block; background:rgba(78,161,255,0.12); color:var(--accent); border:1px solid rgba(78,161,255,0.3); border-radius:20px; padding:2px 12px; font-size:12px; margin:2px 4px 2px 0; }
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>3D 物理工厂孪生模块 · 核查报告</h1>
+  <div class="sub">模块：<span class="mono">twin3d/index.html</span>（1517 行，three.js + 算法层） · 核查时间 2026-08-27 · 全栈 6 进程运行中</div>
+
+  <div class="card">
+    <h2 style="margin-top:0">一句话结论</h2>
+    <p><b>3D 物理工厂孪生是货真价实、全链路接 MES 的，不是假活。</b>此前我对它的判断只停留在"语法检查 + 算法自验脚本复活"，没有读孪生主体，属于"空口说通了"。本次已通读源码并实证：合成孪生 id 集合与 MES 完全一致（192/192），实时 <code>toolStatus</code> 经 <code>byId</code> 精确命中 mesh、驱动信标换色；<code>/api/wip</code> 与 <code>/api/e10</code> 面板也实时。并已补一处"加载初值账实空窗"的增强。</p>
+  </div>
+
+  <h2>1. 模块实际包含的孪生内容（此前背景缺失的部分）</h2>
+  <div class="card">
+    <table>
+      <tr><th>#</th><th>孪生能力</th><th>实现位置</th><th>数据来源</th></tr>
+      <tr><td>1</td><td>详细设备几何（光刻含镜头/ Cabinet / 信标）</td><td><code>makeToolMesh</code> 440–465</td><td>本地合成</td></tr>
+      <tr><td>2</td><td><b>设备状态 E10 实时映射</b>（RUN/IDLE/PM/DOWN → 信标颜色）</td><td><code>handleEvent('toolStatus')</code> 594–601 + WebSocketSource 538</td><td><b>MES WS 8124</b></td></tr>
+      <tr><td>3</td><td>设备指标（util/wph/wafers/配方）点击查看</td><td><code>toolMetric</code> 602–605 + infoHTML 572</td><td>MES WS 8124</td></tr>
+      <tr><td>4</td><td>MES 聚合面板：WIP 柱图 + E10 摘要 + 3D 批次热力柱</td><td><code>pollMES</code> 676–716</td><td><code>/api/wip</code> + <code>/api/e10</code></td></tr>
+      <tr><td>5</td><td>Lot 流（投入/开工/完工）事件日志</td><td>608–613</td><td>MES WS 8124</td></tr>
+      <tr><td>6</td><td>AMHS 天车环线动画 + 搬运事件</td><td>468–491 / <code>amhs</code> 606</td><td>MES WS 8124</td></tr>
+      <tr><td>7</td><td><b>SPC/FDC 判异 → 3D 红色脉冲高亮 + 横幅</b></td><td><code>spcAlarm</code> 614–622 + 渲染脉冲 942–951</td><td>MES WS 8124</td></tr>
+      <tr><td>8</td><td>仿真与分析层：DES + 蒙特卡洛 + 瓶颈 + 动态再调度 + 联合寻优 + RUL</td><td>Phase 3（969 起，<code>runDES</code>/<code>findBestRule</code> 等）</td><td>本地算法（已由 verify_p7/p8 实证）</td></tr>
+      <tr><td>9</td><td>真实 BIM/glTF/点云绑定（语义映射 + manifest）</td><td><code>loadRealModel</code> 851 / <code>moduleResolver</code> 814</td><td><code>?model=</code> 参数</td></tr>
+      <tr><td>10</td><td>处置释放解除报警高亮</td><td><code>toolRelease</code> 623–632</td><td>MES WS 8124</td></tr>
+    </table>
+  </div>
+
+  <h2>2. 关键实证：3D 孪生确实接通 MES（非假活）</h2>
+  <div class="card">
+    <p class="k">担心点：默认合成场景的机台 id 与 MES 真实 tool id 命名空间对不上 → <code>byId.get(ev.id)</code> 永远 undefined → 单台 3D 永不更新、只是假活。</p>
+    <p><b>实测否定了担心：</b></p>
+    <table>
+      <tr><th>验证项</th><th>结果</th><th>证据</th></tr>
+      <tr><td>合成 id 集合 vs MES <code>/api/tools</code></td><td><span class="tag t-ok">完全相等 192/192</span></td><td><span class="mono">LITHO-001..014 / ETCH-015..056 / DEP-057..110 / CMP-111..136 / IMPL-137..158 / METRO-159..192</span></td></tr>
+      <tr><td>MES 实时事件流</td><td><span class="tag t-ok">流动中</span></td><td>9 秒抓到 206 条，含 <code>toolStatus:70 / toolMetric:20 / metrology:6 / spcAlarm:4 / lotRelease:22</code></td></tr>
+      <tr><td>实时 <code>toolStatus</code> 命中 mesh</td><td><span class="tag t-ok">命中</span></td><td>样本 <span class="mono">{type:'toolStatus', id:'ETCH-035', status:'RUN'}</span> 属合成区间 → <code>byId</code> 命中</td></tr>
+      <tr><td><code>/api/wip</code> + <code>/api/e10</code></td><td><span class="tag t-ok">活</span></td><td>返回 <span class="mono">byModule{六模块}</span> 与 <span class="mono">global{utilPct,availPct,downPct,mtbfH,mttrH}</span></td></tr>
+      <tr><td>渲染循环</td><td><span class="tag t-ok">正常</span></td><td>rAF 每帧 <code>renderer.render</code>，信标材质突变即时反映；SPC 报警红色脉冲</td></tr>
+    </table>
+    <p class="note">结论：设备状态、指标、SPC 判异、Lot 流、AMHS 全部由 MES 真实事件驱动；聚合面板由 HTTP 实时拉取。3D 孪生对 MES 是端到端真连接。</p>
+  </div>
+
+  <h2>3. 本次修复 / 增强</h2>
+  <div class="card">
+    <p><b>问题：</b>合成孪生初始状态是 <code>pickStatus()</code> 随机值，要等 MES <code>toolStatus</code> 逐台覆盖（~30s）才收敛到真实，加载瞬间存在"账实空窗"。</p>
+    <p><b>修复：</b>新增 <code>seedFromMES()</code>（仅 <code>src=mes</code>）：加载即从 <code>/api/tools</code> 拉真实 <code>status/util/wph/wafers/chambers/recipe</code> 铺底并同步信标颜色，<span class="mono">updateStats</span> + 日志。<code>STATUS</code> 做了兜底映射（MES 若有 SETUP 等未定义态 → 归 IDLE），防越界崩溃。</p>
+    <p class="note">改动在 <span class="mono">twin3d/index.html</span> 的 <code>if(src==='mes')</code> 块内，未改架构；module script 已 <code>node --check</code> 通过。</p>
+  </div>
+
+  <h2>4. 诚实修正 & 仍可改进</h2>
+  <div class="card">
+    <p class="k">诚实修正：上一轮（"孪生装备模块核查"）我对 <span class="mono">twin3d</span> 仅做了语法检查 + 复活 <code>verify_p7/p8</code> 算法自验脚本，没有读孪生主体即称"默认 src=mes 接通主轴"。该结论方向正确，但缺乏实证、背景缺孪生内容。本轮已补齐。</p>
+    <p><b>仍可改进（非缺陷）：</b></p>
+    <ul>
+      <li>真实 BIM/glTF（<code>?model=</code>）接管后，设备语义绑定走 <code>moduleResolver</code> 的网格名规则，事件仍按合成 id 空间 <code>byId</code> 命中；若真实网格名无法映射到同一 id 空间，真实模型下孪生事件不会高亮。默认合成场景不受影响。</li>
+      <li>单台指标（util/wph）仅在点开 info 面板时刷新，未在 3D 上做常驻浮标；属可视化取舍，非数据断点。</li>
+    </ul>
+  </div>
+
+  <div class="card" style="border-color:rgba(78,161,255,0.3)">
+    <p class="note">操作入口：<span class="mono">http://127.0.0.1:8123/twin3d/</span>（默认 <code>?src=mes</code>，也可 <code>?src=sim</code> 切回浏览器内模拟、<code>?model=demo-fab.gltf</code> 加载真实厂房）。</p>
+  </div>
+</div>
+</body>
+</html>

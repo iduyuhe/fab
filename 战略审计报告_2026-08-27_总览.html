@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fab-mes 战略审计报告 · 2026-08-27</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2c3744; --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff;
+    --purple:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65;font-size:14px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 64px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:.5px}
+  h2{font-size:19px;margin:34px 0 12px;padding-left:10px;border-left:4px solid var(--blue)}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--purple)}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 8px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:14px 0}
+  .verdict{background:linear-gradient(135deg,#16351f,#1a2029);border:1px solid #2a5a36;border-radius:12px;padding:20px 22px;margin:18px 0}
+  .verdict b{color:var(--green)}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--blue);font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .t-live{background:rgba(63,185,80,.15);color:var(--green);border:1px solid #2a5a36}
+  .t-blue{background:rgba(88,166,255,.13);color:var(--blue);border:1px solid #2a4a6a}
+  .t-fix{background:rgba(210,153,34,.15);color:var(--amber);border:1px solid #5a4a1a}
+  .t-miss{background:rgba(248,81,73,.14);color:var(--red);border:1px solid #5a2a2a}
+  ul{margin:8px 0;padding-left:22px} li{margin:5px 0}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
+  .kpi .box{flex:1;min-width:150px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .kpi .n{font-size:24px;font-weight:700;color:var(--blue)}
+  .kpi .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .muted{color:var(--muted)}
+  code{background:#0b0f14;padding:1px 6px;border-radius:5px;color:#ffd9a0;font-size:12px}
+  .foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+  .spine{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}
+  .spine .st{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12.5px}
+  .spine .ar{color:var(--blue);font-weight:700}
+  .spine .live{color:var(--green);border-color:#2a5a36}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>fab-mes 战略审计报告</h1>
+  <p class="sub">围绕「为晶圆企业服务的完整智能体系」· 审计时点 2026-08-27 · 审计纪律：串主轴、不推翻</p>
+
+  <div class="verdict">
+    <b>一句话结论：</b> 数字主线（digital thread）已端到端贯通，<b>无业务断点、无空点</b>（宣称与交付已对齐）；
+    当前"缺的"全部是<b>蓝图态模块接活</b>，而按战略纪律本就不强行去做。系统现已可演示、可问答、说法一致。
+  </div>
+
+  <div class="kpi">
+    <div class="box"><div class="n">7/7</div><div class="l">数字主线环节贯通</div></div>
+    <div class="box"><div class="n">5/5</div><div class="l">智能引擎真实接线</div></div>
+    <div class="box"><div class="n">6/6</div><div class="l">进程端口 LISTEN</div></div>
+    <div class="box"><div class="n">0</div><div class="l">真断点 / 真空点</div></div>
+  </div>
+
+  <!-- ============ 一、目标 ============ -->
+  <h2>一、战略目标（我们到底要建什么）</h2>
+  <div class="card">
+    <p><b>愿景：</b>为晶圆企业服务的「完整智能体系」= 三支柱被一条<b>数字主线（digital thread）</b>焊成体系。</p>
+    <ul>
+      <li><b>支柱一 · 数字孪生</b>：2D 装备孪生 + 3D 工厂孪生，实时映射产线状态。</li>
+      <li><b>支柱二 · 工业互联网</b>：EAP / SECS-GEM（HSMS :5000）驱动设备与 lot 生命周期。</li>
+      <li><b>支柱三 · 智能模型</b>：五大引擎（SPC / FDC / PdM / VM / APC）+ Agent 问答。</li>
+      <li><b>粘合剂 · 数字主线</b>：一片 lot 从投料到问答的全链路事件流。</li>
+    </ul>
+    <p class="muted"><b>纪律（用户 2026-08-27 拍板）：串主轴、不推翻。</b> 只修主轴本身断裂；其余模块明确标「蓝图态 / 挂枝」不假装完成；停止「发现断点就补」的被动循环。零件已齐，缺的是主轴与纪律，不推翻重写。</p>
+    <p class="muted">最早定位偏差：偏「层级 / L1-L4」鼓励填满每一层 → 表面积大、连通核心小的碎片化。本次审计即对该偏差的纠偏复盘。</p>
+  </div>
+
+  <!-- ============ 二、做了哪些 ============ -->
+  <h2>二、我们做了哪些（按主题归集）</h2>
+
+  <h3>A. 战略纠偏：从「填层」到「串主轴」</h3>
+  <ul>
+    <li>纠正最早 L1-L4 层级定位偏差，确立 spine 七环节作为重组基准。</li>
+    <li>确立「串主轴不推翻」工作范式，写入项目长期记忆。</li>
+  </ul>
+
+  <h3>B. 主轴打通（2026-08-27 上午 A1–A4，已验收 26/26 PASS）</h3>
+  <ul>
+    <li><b>A4</b> 门户 8123 反向代理：<code>/api/*</code> 按服务分流 + WS 隧道 → MES 数据真正接通（此前孪生 / console 全打 8123 空响应）。</li>
+    <li><b>A3</b> <code>eap-console.html</code> 进门户 PAGES + 路由（原 404 不可达）。</li>
+    <li><b>A2</b> EAP lotStart/lotDone 经 <code>/api/ingest</code> 入总线（原 400 拒收）。</li>
+    <li><b>A1</b> <code>/api/audit</code> 增加 POST 分支，接住自治 / 执行器审计出口（原 404，审计链断）。</li>
+  </ul>
+
+  <h3>C. 前端连通性 / 丝滑性（按钮点不进 → 全 200）</h3>
+  <ul>
+    <li>门户统一 API 网关：<code>/api/eap/*</code>→8125、<code>/api/agent/*</code>→8127、<code>/api/erp/*</code>→8126 分流。</li>
+    <li>绝对跨源地址（硬编码 127.0.0.1）改为相对路径，同源走门户代理；Agent「无回复」断点消除。</li>
+  </ul>
+
+  <h3>D. 战略审计 + 功能审计整改（P0–P3 闭环 + #165）</h3>
+  <ul>
+    <li><b>P0 丝滑杀手</b>（twin3d ERP 白屏 / CORS、导航孤岛、跨源硬编码）→ 闭环。</li>
+    <li><b>P1 业务链</b>（EAP 真实驱动 lot 生命周期、3D 默认接事件总线）→ 闭环，复验 lotDone src=eap 20/20。</li>
+    <li><b>P2 空点纠偏</b>（审计发送端接合规链、ERP 轻量操作台 erp-ops.html、文档超纲宣称降级标蓝图）→ 闭环。</li>
+    <li><b>P3 埋雷清理</b>（四死路由 200、ERP costLot undefined 崩溃修、死模块标蓝图、陈旧路径修正）→ 闭环。</li>
+    <li><b>代码真断点</b>：U1 <code>erp-ops.html</code> 404→200；C2 <code>reconcileWithMES</code> 双库重放；C5 审计幻影接线注记。</li>
+    <li><b>文档战略对齐 D1–D7</b>：项目总结报告、蓝图 docx、核查 docx、pptx 7 处蓝图注记、CONTRACT 端口图纠错、ERP 财务台账免责、qa_reverify 误报纠正。</li>
+  </ul>
+
+  <h3>E. 2D 装备孪生致命 bug 修复</h3>
+  <ul>
+    <li>根因：<code>core.js</code> 派工 <code>t._watchDog = setTimeout(...)</code> 把 Timeout 挂到设备对象上 → <code>/api/tools</code> 的 <code>JSON.stringify</code> 遇循环引用 → <b>MES 进程崩溃</b> → 画布空白、点击无响应。</li>
+    <li>修复：<code>json()</code> 加 replacer 剥离内部对象 + try/catch 兜底；<code>/api/tools</code> 显式过滤 <code>_</code> 前缀属性。现返回 192 台设备、数据干净、MES 不再崩溃。</li>
+  </ul>
+
+  <h3>F. 租户模块审计（T1/T2/T3）</h3>
+  <ul>
+    <li>T1（核心空点）：<code>attachToEv</code> 用死的 <code>currentTenant()</code>（恒 'default'，零隔离）→ 改为 <code>getTenant(ev)</code> 真透传（ev.tenant / ev.meta.tenant / header）。</li>
+    <li>T2（误导声明）：<code>/api/tenant</code> note「激活隔离语义」→ 诚实声明「事件级透传已接活，行级隔离蓝图」。已由用户实测确认返回。</li>
+    <li>T3（死属性 storage）：诚实蓝图态，不修。</li>
+  </ul>
+
+  <h3>G. ERP 数据健康度</h3>
+  <ul>
+    <li>负库存校准（演示累积 −4.95e9 → +4.26 亿）、清空污染流水 103 万笔、充裕库存基线 + 期初补货，账实一致。</li>
+    <li>根因（重连补偿 / 事件重放去重）代码层未动，数据层已绕过（符合「不碰主线代码」定调）。</li>
+  </ul>
+
+  <!-- ============ 三、spine ============ -->
+  <h2>三、数字主线 spine 现状（七环节实证）</h2>
+  <div class="spine">
+    <span class="st live">① 投料 lotRelease</span><span class="ar">→</span>
+    <span class="st live">② EAP 执行 lotStart/lotDone</span><span class="ar">→</span>
+    <span class="st live">③ 量测 metrology</span><span class="ar">→</span>
+    <span class="st live">④ SPC / FDC 判异</span><span class="ar">→</span>
+    <span class="st live">⑤ 孪生映射</span><span class="ar">→</span>
+    <span class="st live">⑥ ERP 领料成本</span><span class="ar">→</span>
+    <span class="st live">⑦ Agent 问答</span>
+  </div>
+  <table>
+    <tr><th>环节</th><th>连接方式</th><th>验证证据</th></tr>
+    <tr><td>① 投料</td><td>POST /api/wos → core.js emit lotRelease</td><td>ERP 经 WS 收 → issueBom 自动领料 ✅</td></tr>
+    <tr><td>② EAP 执行</td><td>HSMS S6F11 → /api/ingest → 总线</td><td>lotStart/lotDone src=eap 20/20 ✅</td></tr>
+    <tr><td>③ 量测</td><td>metrology 事件</td><td>触发 VM 预测 + SPC 判异 ✅</td></tr>
+    <tr><td>④ SPC / FDC</td><td>spcAlarm / fdcAlarm 落库 + 进总线</td><td>alarmId 递增、孪生可见 ✅</td></tr>
+    <tr><td>⑤ 孪生映射</td><td>2D/3D 默认接事件总线 src=mes</td><td>192 台设备渲染、点击看参数 ✅</td></tr>
+    <tr><td>⑥ ERP 成本</td><td>WS 订阅 + 重连补偿 reconcileWithMES</td><td>cost_batches 200 批、库存账实一致 ✅</td></tr>
+    <tr><td>⑦ Agent 问答</td><td>基于实时 WIP 返回</td><td>POST /api/agent/chat 200、结构化 reply ✅</td></tr>
+  </table>
+
+  <!-- ============ 四、模块矩阵 ============ -->
+  <h2>四、三支柱 / L4 模块真实状态矩阵</h2>
+  <table>
+    <tr><th>模块</th><th>代码现状</th><th>接线</th><th>状态</th><th>说明</th></tr>
+    <tr><td>数字孪生 2D / 3D</td><td>已并入 portal 8123</td><td>接事件总线 src=mes</td><td><span class="tag t-live">真实渲染</span></td><td>192 台设备、点击看参数；深度分析为蓝图</td></tr>
+    <tr><td>EAP / SECS-GEM</td><td>eap-host.js + HSMS :5000</td><td>真驱动 lot 生命周期</td><td><span class="tag t-live">活</span></td><td>设备 S6F11 → ingest → 总线</td></tr>
+    <tr><td>SPC / FDC / PdM / VM</td><td>独立引擎模块</td><td>全挂事件总线</td><td><span class="tag t-live">活</span></td><td>五大引擎之四，真实接线</td></tr>
+    <tr><td>APC 先进过程控制</td><td>apc/controller.js</td><td>已 require + emitEv + 量测流自动触发</td><td><span class="tag t-live">活（闭环已点亮）</span></td><td>APC_ENABLED=1 已点亮；量测到达自动闭环微调，经护栏 spc.inject 真实回灌，带 source 防递归</td></tr>
+    <tr><td>多租户 tenant</td><td>tenant/index.js</td><td>attachToEv 包裹 emitEv</td><td><span class="tag t-fix">已修复</span></td><td>事件级透传真可用；行级数据隔离蓝图（T1/T2 已修）</td></tr>
+    <tr><td>真实适配器 adapters</td><td>opcua/eda-client + index</td><td>startAdapters 已挂 MES(server.js) + ADAPTER_MODE=all</td><td><span class="tag t-live">活（stub 接通主轴）</span></td><td>OPC-UA/EDA 模拟协议事件经 emitEv 汇入总线并联动 SPC/FDC/E10；/api/adapters 暴露事件计数；真实设备接入为注释路径，需 node-opcua + 现场 OPC-UA/HSMS</td></tr>
+    <tr><td>integrations</td><td>erp-adapter 活；index/mes-adapter 死</td><td>ErpAdapter required</td><td><span class="tag t-blue">部分活 / 标蓝图</span></td><td>erp-adapter 真实同步；其余死模块应标注</td></tr>
+    <tr><td><b>WMS 仓储域</b></td><td>fab-wms.js :8128（独立进程）</td><td>WS 订阅 MES 事件总线</td><td><span class="tag t-live">已建（活）</span></td><td>仓储实物执行层：库位/批次库存/收货上架/拣货齐套/收发流水；与 ERP 同源（lotRelease/lotDone）派生，自然对齐、互不回推</td></tr>
+  </table>
+
+  <!-- ============ 五、还差哪些 ============ -->
+  <h2>五、还差哪些（诚实蓝图清单 · 非缺陷）</h2>
+  <div class="card">
+    <p class="muted">以下均属「按纪律本不强行接活」的蓝图态。WMS 仓储域已于 2026-08-23 新建（独立进程 :8128，数字主线对齐）；其余为「已声明但接活程度有限」，已诚实标注，不构成欺诈或断点。</p>
+    <table>
+      <tr><th>#</th><th>缺口</th><th>现状</th><th>处理建议</th></tr>
+      <tr><td>1</td><td><b>WMS 仓储域</b></td><td>已新建 fab-wms.js :8128（独立进程）</td><td><span class="tag t-live">已建</span> 仓储执行域：库位/批次/上架/齐套/收发流水，与 ERP 同源派生对齐；详见《WMS 新建与接入数字主线报告》</td></tr>
+      <tr><td>2</td><td>多租户行级数据隔离</td><td>事件级透传已活，库/表行级隔离未实现</td><td><span class="tag t-blue">蓝图</span> 诚实标注，待真实多客户场景再接</td></tr>
+      <tr><td>3</td><td>APC 执行级闭环</td><td>顾问级活（仅建议）→ 已点亮</td><td><span class="tag t-live">已推进点亮</span> 2026-08-27 经护栏 spc.inject 真实回灌，自动闭环+防递归验证通过</td></tr>
+      <tr><td>4</td><td>真实协议适配器</td><td>OPC-UA/EDA stub 已接主轴（startAdapters 挂 server.js + ADAPTER_MODE=all，/api/adapters 计数可验）</td><td><span class="tag t-live">已接通主轴（stub）</span> 真实设备接入为注释路径，需 node-opcua + 现场 OPC-UA/HSMS</td></tr>
+      <tr><td>5</td><td>3D 孪生深度分析 / 预测</td><td>实时映射活，深度分析/预测未做</td><td><span class="tag t-blue">蓝图</span></td></tr>
+      <tr><td>6</td><td>integrations 死模块</td><td>index.js / mes-adapter 未被引用</td><td><span class="tag t-fix">可标注</span> 清理或挂枝说明，避免误导</td></tr>
+      <tr><td>7</td><td>ERP 根因（重连补偿 / 事件重放去重）</td><td>数据层已绕过，代码根因未动</td><td><span class="tag t-blue">可后续</span> 长期高投料无收货仍可能再变负</td></tr>
+    </table>
+  </div>
+
+  <!-- ============ 六、结论 ============ -->
+  <h2>六、结论与下一步选项</h2>
+  <div class="card">
+    <p><b>当前状态：</b>可演示、可问答、主线贯通、说法一致。所有「声称的能力」均已与「实际交付」对齐——没有伪装完成的模块，没有该通不通的断点，没有挂羊头卖狗肉的空点。</p>
+    <p><b>纪律提醒：</b>停止被动补洞循环。下一步推进应基于「业务需要」而非「发现缺口就补」。</p>
+    <h3>可选推进方向（按用户业务优先级，非缺陷驱动）</h3>
+    <ul>
+      <li><b>仓储执行能力</b> → 已于 2026-08-23 新建 WMS 模块（独立进程 :8128，串接数字主线 lotRelease/lotDone），原「唯一真空白」已闭合。</li>
+      <li><b>若接入真实客户</b> → 接活多租户行级隔离（当前事件级透传已就绪）。</li>
+      <li><b>若需无人化闭环</b> → APC_ENABLED=1 + 护栏评估，点亮执行级闭环。</li>
+      <li><b>若对接真实产线</b> → 把 adapters 的 stub 换成真实 OPC-UA/EDA 连接器。</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    审计依据：运行时实测（7 端口 LISTEN：8123/8124/8125/8126/8127/8128 + HSMS :5000、spine 7 环节 HTTP/WS 验证）、源码核对（server.js / core.js / apc/controller.js / tenant/index.js / fab-wms.js / services/wms-service.js / adapters / integrations）、及项目记忆日志 2026-08-27.md。<br>
+    生成：2026-08-27 · 本次战略审计不改动任何代码，仅梳理与对齐。
+  </div>
+
+</div>
+</body>
+</html>

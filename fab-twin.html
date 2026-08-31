@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>晶圆厂智能制造平台 · 2D 厂房孪生</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a30; --panel2:#0f1730; --line:#22304f;
+    --txt:#e6edf7; --sub:#93a3c2; --accent:#4ea1ff; --warn:#ffb02e; --bad:#ff4d5e; --ok:#39d98a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif}
+  body{display:flex;flex-direction:column;overflow:hidden}
+  header{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(90deg,#0e1730,#0b1020);
+    border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px}
+  header .tag{font-size:12px;color:var(--sub)}
+  header .nav{margin-left:auto;display:flex;gap:8px}
+  header .nav a{color:var(--accent);text-decoration:none;font-size:12px;padding:5px 10px;border:1px solid var(--line);
+    border-radius:6px;background:var(--panel)}
+  header .nav a:hover{background:#1a2547}
+  .wrap{flex:1 1 auto;min-height:0;display:flex}
+  .stage{flex:1;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .side{width:330px;background:var(--panel2);border-left:1px solid var(--line);padding:14px;overflow-y:auto}
+  .side h2{font-size:13px;color:var(--sub);margin:0 0 10px;text-transform:uppercase;letter-spacing:1px}
+  .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+  .kcard .big{font-size:26px;font-weight:700;color:var(--txt)}
+  .kcard .lbl{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ln{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-bottom:8px;cursor:pointer}
+  .ln:hover{background:#1a2547}
+  .ln .t{display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+  .ln .b{font-size:11px;color:var(--sub);margin-top:3px}
+  .bar{height:6px;border-radius:4px;background:#1a2547;overflow:hidden;margin-top:5px}
+  .bar>i{display:block;height:100%}
+  .legend{position:absolute;right:14px;top:12px;background:rgba(10,16,32,.8);border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;font-size:11px;color:var(--sub)}
+  .legend .it{display:flex;align-items:center;gap:6px;margin:3px 0}
+  .legend .sw{width:14px;height:6px;border-radius:2px;display:inline-block}
+  .hint{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--sub);background:rgba(10,16,32,.7);
+    padding:6px 10px;border-radius:6px;border:1px solid var(--line)}
+  .stat{position:absolute;left:14px;top:12px;background:rgba(10,16,32,.8);border:1px solid var(--line);
+    border-radius:8px;padding:8px 12px;font-size:11px;color:var(--sub)}
+  /* 显隐面板开关：常驻右下角，不被隐藏；快捷键 H 同效 */
+  #hud-toggle{position:absolute;right:14px;bottom:12px;z-index:50;font:12px/1 system-ui,'Segoe UI',sans-serif;
+    color:var(--txt);background:rgba(78,161,255,.16);border:1px solid rgba(78,161,255,.4);
+    border-radius:8px;padding:7px 11px;cursor:pointer;transition:background .15s}
+  #hud-toggle:hover{background:rgba(78,161,255,.32);color:#fff}
+  .hud-hidden .stat,.hud-hidden .legend,.hud-hidden .hint{display:none !important}
+  #errOverlay{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:9999;
+    background:rgba(200,30,30,.92);color:#fff;padding:8px 16px;border-radius:8px;font:12px/1.5 monospace;
+    max-width:80vw;word-break:break-all;display:none;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line,#1f2b45)}
+  .nav a{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid var(--line,#1f2b45);color:var(--muted,#6b7a94);text-decoration:none}
+  .nav a:hover{color:var(--accent,#4ea1ff);border-color:var(--accent,#4ea1ff)}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+<header>
+  <h1>工厂级数字孪生</h1>
+  <span class="tag">Fab → Line → Equipment｜厂级 KPI 总览 + AMHS 天车物流</span>
+
+</header>
+<div class="wrap">
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="stat" id="stat"></div>
+    <div class="legend">
+      <div class="it"><span class="sw" style="background:#39d98a"></span>负荷 &lt;60%</div>
+      <div class="it"><span class="sw" style="background:#ffb02e"></span>负荷 60–85%</div>
+      <div class="it"><span class="sw" style="background:#ff4d5e"></span>负荷 &gt;85% / 瓶颈</div>
+      <div class="it"><span class="sw" style="background:#4ea1ff"></span>AMHS 天车物流</div>
+    </div>
+    <div class="hint">滚轮缩放 · 拖拽平移 · 点击产线下钻 · 天车沿路径实时搬运 FOUP</div>
+    <button id="hud-toggle" title="隐藏所有数据浮层，只留工厂图 (快捷键 H)">🙈 隐藏面板</button>
+    <div id="errOverlay"></div>
+  </div>
+  <aside class="side" id="side">
+    <h2>厂级总览</h2>
+    <div class="grid2">
+      <div class="kcard"><div class="big" id="k-cap">—</div><div class="lbl">总产能 wph</div></div>
+      <div class="kcard"><div class="big" id="k-wip">—</div><div class="lbl">在制批次</div></div>
+      <div class="kcard"><div class="big" id="k-util">—</div><div class="lbl">平均负荷率</div></div>
+      <div class="kcard"><div class="big" id="k-bottle">—</div><div class="lbl">瓶颈产线</div></div>
+    </div>
+    <h2 style="margin-top:6px">产线下钻</h2>
+    <div id="lines"></div>
+  </aside>
+</div>
+<script>
+const cv=document.getElementById('cv'); const ctx=cv.getContext('2d');
+const side=document.getElementById('side'); const linesEl=document.getElementById('lines');
+const stat=document.getElementById('stat');
+let TOPO=null,APS=null,TOOLS=[];
+let view={scale:1,ox:0,oy:0,dragging:false,lx:0,ly:0};
+let layLines=[];          // 工厂俯视布局（产线矩形 + 设备点坐标）
+let toolPos={};           // id -> {x,y}
+let amhsCars=[];          // 天车动画
+const MOD_COLOR={LITHO:'#4ea1ff',DEP:'#39d98a',ETCH:'#b98bff',CMP:'#ffb02e',IMPL:'#ff7ab6',METRO:'#5fd0e0'};
+const MOD_NAME={LITHO:'光刻',DEP:'沉积',ETCH:'刻蚀',CMP:'CMP',IMPL:'注入',METRO:'量测'};
+
+function loadAll(){
+  Promise.all([
+    fetch('/api/topo').then(r=>r.json()),
+    fetch('/api/aps?horizon=24').then(r=>r.json()),
+    fetch('/api/tools').then(r=>r.json()),
+  ]).then(([topo,aps,tools])=>{ TOPO=topo;APS=aps;TOOLS=tools.tools||[]; buildLayout(); renderSide(); draw(); })
+    .catch(e=>{ showErr('loadAll 失败: '+e.message); console.warn('loadAll',e); });
+}
+function refresh(){ fetch('/api/aps?horizon=24').then(r=>r.json()).then(a=>{APS=a;renderSide();draw();}).catch(e=>showErr('refresh: '+e.message)); }
+
+function lineStat(k){ return { l:(APS.lines||[]).find(x=>x.key===k), bn:(APS.lineBottleneck||[]).find(x=>x.line===k) }; }
+function heat(p){ return p>=85?'#ff4d5e':p>=60?'#ffb02e':p>=30?'#9ad36a':'#39d98a'; }
+
+// 工厂俯视：3 产线矩形并排，内部分 bay 块 + 设备点阵（与 line-twin 同布局逻辑）
+function buildLayout(){
+  const lines=TOPO.lines; const W=cv.width/view.scale, H=cv.height/view.scale;
+  if(W<10 || H<10){ showErr('canvas 尺寸异常: '+cv.width+'x'+cv.height+' (需等布局完成)'); return; }
+  const pad=70,gap=46,top=90;
+  const colW=Math.min(460,(W-pad*2-gap*(lines.length-1))/lines.length);
+  layLines=lines.map((ln,i)=>{
+    const x=pad+i*(colW+gap);
+    const tools=TOOLS.filter(t=>t.line===ln.key);
+    const bays=ln.bays; const h=380;
+    const byTop=top+92; const bayH=(h-92-14)/bays.length;
+    const pts=[];
+    const bayBlocks=bays.map((by,bi)=>{
+      const bt=tools.filter(t=>t.bay===by);
+      const bx=x+12,bw=colW-24,byy=byTop+bi*bayH;
+      const cols=12,gx=10,gy=10;
+      const dw=(bw-16-(cols-1)*gx)/cols;
+      const dh=Math.min(dw,(bayH-30-Math.ceil(bt.length/cols)*gy)/Math.ceil(bt.length/cols));
+      bt.forEach((t,ti)=>{ const cx=bx+8+(ti%cols)*(dw+gx),cy=byy+22+Math.floor(ti/cols)*(dh+gy);
+        const p={x:cx+dw/2,y:cy+dh/2,tool:t}; pts.push(p); toolPos[t.id]=p; });
+      return {bay:by,x:bx,y:byy,w:bw,h:bayH,tools:bt};
+    });
+    return {key:ln.key,name:ln.name,x,y:top,w:colW,h,bays:bayBlocks,stats:lineStat(ln.key),toolPts:pts};
+  });
+}
+
+function resize(){ const r=cv.getBoundingClientRect(); const dpr=window.devicePixelRatio||1;
+  cv.width=r.width*dpr; cv.height=r.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  view.W=r.width; view.H=r.height;
+  if(TOPO && r.width>10 && r.height>10) buildLayout();
+  draw();
+}
+
+function draw(){
+  if(!TOPO) return; ctx.clearRect(0,0,view.W,view.H);
+  ctx.save(); ctx.translate(view.ox,view.oy); ctx.scale(view.scale,view.scale);
+  layLines.forEach(drawLine); drawCars(); ctx.restore();
+}
+function drawLine(L){
+  const pct=L.stats.l?L.stats.l.loadPct:0;
+  const isB=L.stats.bn&&L.stats.bn.line===L.key&&(L.stats.bn.loadPct>=85||L.stats.bn.status==='BOTTLENECK');
+  ctx.fillStyle='rgba(255,255,255,.03)'; ctx.strokeStyle=isB?'#ff4d5e':(L.key===selLine?'#4ea1ff':'#22304f');
+  ctx.lineWidth=isB?2.5:1.5; roundRect(L.x,L.y,L.w,L.h,12); ctx.fill(); ctx.stroke();
+  // 标题栏
+  ctx.fillStyle=heat(pct); roundRect(L.x,L.y,L.w,34,12); ctx.fill();
+  ctx.fillStyle='#0b1020'; ctx.font='600 14px Segoe UI'; ctx.textBaseline='middle';
+  ctx.fillText(L.key,L.x+12,L.y+17); ctx.font='12px Segoe UI';
+  ctx.fillText(Math.round(pct)+'%',L.x+L.w-30,L.y+17);
+  if(isB){ ctx.fillStyle='#2a1020'; ctx.fillText('瓶颈',L.x+L.w-68,L.y+17); }
+  // 厂级总吞吐条（底部）
+  ctx.fillStyle='#93a3c2'; ctx.font='11px Segoe UI';
+  ctx.fillText('运行 '+(L.stats.l?L.stats.l.run:0)+'/'+ (L.stats.l?L.stats.l.tools:0)+' · 产能 '+(L.stats.l?Math.round(L.stats.l.cap24):0)+'wph',L.x+12,L.y+54);
+  L.bays.forEach(bk=>{
+    ctx.fillStyle='rgba(255,255,255,.04)'; roundRect(bk.x,bk.y,bk.w,bk.h-8,8); ctx.fill();
+    ctx.fillStyle='#93a3c2'; ctx.font='10px Segoe UI';
+    const mm=Object.keys(MOD_COLOR).find(m=>TOPO.moduleLine[m]&&TOPO.moduleLine[m].bay===bk.bay);
+    ctx.fillText(bk.bay+(mm?' · '+MOD_NAME[mm]:''),bk.x+8,bk.y+12);
+    bk.tools.forEach(t=>{ const p=toolPos[t.id]; if(!p)return;
+      ctx.fillStyle=MOD_COLOR[t.module]||'#4ea1ff';
+      ctx.globalAlpha=t.status==='DOWN'?0.3:(t.status==='RUN'?1:0.6);
+      ctx.fillRect(p.x-3,p.y-3,6,6); ctx.globalAlpha=1;
+      if(t.status==='DOWN'){ctx.strokeStyle='#ff4d5e';ctx.lineWidth=1;ctx.strokeRect(p.x-4,p.y-4,8,8);}
+    });
+  });
+}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+// AMHS 天车动画
+function spawnCar(from,to,foup){
+  const a=toolPos[from],b=toolPos[to]; if(!a||!b)return;
+  amhsCars.push({a,b,foup,t:0,life:1});
+}
+function drawCars(){
+  for(let i=amhsCars.length-1;i>=0;i--){ const c=amhsCars[i];
+    c.t+=0.012; if(c.t>=1){ amhsCars.splice(i,1); continue; }
+    const x=c.a.x+(c.b.x-c.a.x)*c.t, y=c.a.y+(c.b.y-c.a.y)*c.t;
+    ctx.strokeStyle='rgba(78,161,255,.35)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(c.a.x,c.a.y); ctx.lineTo(c.b.x,c.b.y); ctx.stroke();
+    ctx.fillStyle='#4ea1ff'; ctx.beginPath(); ctx.arc(x,y,5,0,7); ctx.fill();
+    ctx.fillStyle='#cfe6ff'; ctx.font='9px Segoe UI'; ctx.fillText(c.foup,x+7,y-5);
+  }
+}
+let selLine=null;
+cv.addEventListener('click',e=>{ const r=cv.getBoundingClientRect();
+  const mx=(e.clientX-r.left-view.ox)/view.scale, my=(e.clientY-r.top-view.oy)/view.scale;
+  const hit=layLines.find(L=>mx>=L.x&&mx<=L.x+L.w&&my>=L.y&&my<=L.y+L.h);
+  if(hit) window.location.href='/line-twin.html';
+});
+cv.addEventListener('wheel',e=>{e.preventDefault(); const f=e.deltaY<0?1.1:0.9; view.scale=Math.max(0.4,Math.min(3,view.scale*f)); draw();},{passive:false});
+cv.addEventListener('mousedown',e=>{view.dragging=true;view.lx=e.clientX;view.ly=e.clientY;});
+window.addEventListener('mouseup',()=>view.dragging=false);
+window.addEventListener('mousemove',e=>{if(!view.dragging)return;view.ox+=e.clientX-view.lx;view.oy+=e.clientY-view.ly;view.lx=e.clientX;view.ly=e.clientY;draw();});
+
+function renderSide(){
+  if(!TOPO||!APS)return;
+  const k=APS.kpi||{};
+  document.getElementById('k-cap').textContent=Math.round((APS.lines||[]).reduce((s,l)=>s+(l.cap24||0),0));
+  document.getElementById('k-wip').textContent=k.wip!=null?k.wip:'—';
+  document.getElementById('k-util').textContent=(k.avgLoadPct!=null?Math.round(k.avgLoadPct):'—')+'%';
+  const bn=(APS.lineBottleneck||[])[0];
+  document.getElementById('k-bottle').textContent=bn?bn.line:'—';
+  linesEl.innerHTML='';
+  TOPO.lines.forEach(ln=>{ const {l,bn}=lineStat(ln.key); if(!l)return;
+    const pct=l.loadPct; const isB=bn&&bn.line===ln.key;
+    const d=document.createElement('div'); d.className='ln';
+    d.innerHTML=`<div class="t"><span>${ln.key}</span><span style="color:${heat(pct)}">${Math.round(pct)}%</span></div>
+      <div class="b">运行 ${l.run}/${l.tools} · 在制 ${l.needCount} · ${isB?'<b style="color:#ff4d5e">瓶颈</b>':l.status}</div>
+      <div class="bar"><i style="width:${Math.min(100,pct)}%;background:${heat(pct)}"></i></div>`;
+    d.onclick=()=>window.location.href='/line-twin.html';
+    linesEl.appendChild(d);
+  });
+  stat.textContent='AMHS 活动天车: '+amhsCars.length+' · 设备总数: '+TOOLS.length;
+}
+
+let wsTry=0;
+function showErr(msg){ const el=document.getElementById('errOverlay'); if(el){el.textContent=msg;el.style.display='block';setTimeout(()=>{el.style.display='none';},8000);}}
+window.onerror=function(m,s,l,c,err){showErr('JS错误: '+m+' ('+s+':'+l+')');};
+window.addEventListener('unhandledrejection',function(e){showErr('Promise错误: '+e.reason);});
+function connectWS(){ try{
+  const ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
+  ws.onmessage=ev=>{ let m;try{m=JSON.parse(ev.data);}catch(_){return;}
+    if(m.type==='amhs') spawnCar(m.from,m.to,m.foup);
+  };
+  ws.onclose=()=>{ if(wsTry++<10) setTimeout(connectWS,3000); };
+  ws.onerror=()=>{};
+}catch(e){} }
+
+function animate(){ draw(); requestAnimationFrame(animate); }
+window.addEventListener('resize',resize);
+
+// ===== HUD 面板显隐开关（按钮 + 快捷键 H）=====
+(function(){
+  const btn=document.getElementById('hud-toggle');
+  if(!btn) return;
+  function toggleHud(){
+    const hidden=document.body.classList.toggle('hud-hidden');
+    btn.textContent = hidden ? '👁 显示面板' : '🙈 隐藏面板';
+    btn.title = hidden ? '显示所有数据浮层 (快捷键 H)' : '隐藏所有数据浮层，只留工厂图 (快捷键 H)';
+  }
+  btn.addEventListener('click', toggleHud);
+  window.addEventListener('keydown', e=>{
+    const t=e.target;
+    if((e.key==='h'||e.key==='H') && t && t.tagName!=='INPUT' && t.tagName!=='TEXTAREA' && t.tagName!=='SELECT') toggleHud();
+  });
+})();
+
+// 双 RAF 确保浏览器完成布局（含 unav 注入）后再初始化 canvas 和数据
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  resize();
+  loadAll(); refresh(); setInterval(refresh,5000); connectWS(); animate();
+}));
+</script>
+</body>
+</html>

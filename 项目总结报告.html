@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能制造平台 · 项目总结报告</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#30363d;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#4ea1ff; --run:#39d98a;
+    --pm:#ffba49; --down:#ff5c5c; --purple:#b083ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);line-height:1.7;padding:0 0 60px}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  header{background:linear-gradient(135deg,#1a2740,#0d1117);border-bottom:1px solid var(--line);padding:48px 0 36px;margin-bottom:32px}
+  header .wrap{padding-top:0;padding-bottom:0}
+  h1{font-size:30px;font-weight:700;letter-spacing:.5px}
+  h1 .sub{display:block;font-size:15px;font-weight:400;color:var(--muted);margin-top:8px}
+  h2{font-size:21px;margin:38px 0 16px;padding-left:12px;border-left:4px solid var(--accent)}
+  h3{font-size:16px;margin:22px 0 10px;color:var(--accent)}
+  p{color:#c9d1d9;margin:10px 0}
+  .meta{display:flex;gap:24px;flex-wrap:wrap;margin-top:18px;color:var(--muted);font-size:13px}
+  .meta b{color:var(--txt)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--accent);font-weight:600}
+  tr:nth-child(even){background:rgba(255,255,255,.02)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .card .k{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .card .v{font-size:24px;font-weight:700}
+  .card .v.run{color:var(--run)} .card .v.pm{color:var(--pm)} .card .v.down{color:var(--down)} .card .v.ac{color:var(--accent)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;margin:2px 4px 2px 0;background:rgba(78,161,255,.15);color:var(--accent)}
+  .tag.done{background:rgba(57,217,138,.15);color:var(--run)}
+  .tag.warn{background:rgba(255,186,73,.15);color:var(--pm)}
+  .flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:18px 0}
+  .flow .node{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;white-space:nowrap}
+  .flow .arrow{color:var(--muted);padding:0 10px;font-size:18px}
+  .ok{color:var(--run)} .bad{color:var(--down)}
+  ul{margin:10px 0 10px 22px} li{margin:6px 0;color:#c9d1d9}
+  code{background:var(--panel2);padding:1px 6px;border-radius:4px;font-size:12.5px;color:var(--purple)}
+  .note{background:rgba(255,186,73,.08);border:1px solid rgba(255,186,73,.3);border-radius:8px;padding:14px 18px;margin:16px 0;font-size:13.5px}
+  .note b{color:var(--pm)}
+  .arch{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin:16px 0}
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:40px;border-top:1px solid var(--line);padding-top:24px}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<header><div class="wrap">
+  <h1>智能制造平台 · 项目总结报告
+    <span class="sub">Fab MES / Digital Twin / EAP / ERP —— 以数字孪生为中枢的事件驱动智能制造系统</span>
+  </h1>
+  <div class="meta">
+    <span>报告日期：<b>2026-08-22</b></span>
+    <span>项目代号：<b>Fab-MES 升级计划</b></span>
+    <span>总阶段：<b>S1–S5 + APS + ERP + 3D 联动</b></span>
+    <span>当前服务：<b>默认编排 6 进程在线（portal/MES/EAP/ERP/Agent/WMS + HSMS 网关 5000）；3D 孪生已并入门户，经 bin/start-community.sh 一键拉起</b></span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<div class="note"><b>⚠ 状态更新（2026-08-29）：</b>本报告为 2026-08-22 历史快照。当前平台已扩展为 <b>6 进程常驻</b>（新增 WMS 仓储执行域 :8128，与 ERP 财务台账分工）；NPI 设计→流片主线已上线（npi-ops.html）；多租户行级隔离、SAP/用友真实 ERP、OPC-UA/EDA 适配器当前仍为蓝图态（默认关）。其余指标与本报告一致。</div>
+
+<h2>一、项目背景与目标</h2>
+<p>起点是一个由 <b>数字孪生（3D 厂房）+ MES（制造执行）+ EAP（设备协议网关）</b> 三系统组成的雏形平台，已具备设备状态展示、基础派工、SECS/GEM 通信能力。但存在四项关键数据缺口：工单/批次无持久化、缺乏主数据服务、无质量数据源、无 Historian 历史。</p>
+<p><b>升级目标</b>：以"事件驱动"为骨架，将该平台从"三系统演示"升级为覆盖 <b>设备层 → 执行层 → 质量层 → 预测层 → 计划层 → 企业层</b> 的全链路智能制造平台，每一层均具备可验证的数据闭环。</p>
+
+<h2>二、总体架构</h2>
+<div class="arch">
+<div class="flow">
+  <span class="node">🔌 EAP (8125)<br><small style="color:var(--muted)">SECS/GEM · 设备协议（已纳入默认启动编排）</small></span>
+  <span class="arrow">→</span>
+  <span class="node">🏭 MES (8124)<br><small style="color:var(--muted)">WIP引擎 · SPC · 量测</small></span>
+  <span class="arrow">→</span>
+  <span class="node">📡 WS 事件总线<br><small style="color:var(--muted)">实时广播</small></span>
+  <span class="arrow">→</span>
+  <span class="node">🏢 ERP (8126)<br><small style="color:var(--muted)">库存·成本·应收应付（财务台账，非仓储 WMS）</small></span>
+</div>
+<div class="flow">
+  <span class="node">🧠 智能引擎<br><small style="color:var(--muted)">PdM · VM · APS</small></span>
+  <span class="arrow">→</span>
+  <span class="node">🖥️ 数字孪生 3D<br><small style="color:var(--muted)">twin3d 已并入 fab-mes，由门户统一托管</small></span>
+  <span class="arrow">→</span>
+  <span class="node">👥 角色工作台<br><small style="color:var(--muted)">6 类用户视图</small></span>
+</div>
+<p style="margin-top:14px;color:var(--muted);font-size:13px">所有子系统通过 <b>WebSocket 事件流</b> 解耦联动，MES 为事件源，ERP/孪生/门户为订阅方，无点对点接口依赖。</p>
+</div>
+
+<h2>三、交付内容（分阶段）</h2>
+<table>
+  <tr><th>阶段</th><th>模块</th><th>核心交付</th><th>关键验证指标</th></tr>
+  <tr><td><b>S1</b><br>数据底座</td><td>落库 / 主数据 / Historian</td><td>SQLite <code>wos/lots/lot_hist</code> 三表双写；<code>meta_*</code> 主数据服务；<code>/api/meta</code>、<code>/api/history/events</code></td><td>DB 直查 wos 5 / lots 21 / lot_hist 49 行；重启数据不丢</td></tr>
+  <tr><td><b>S2</b><br>感知扩展</td><td>量测数据流 / E87/E90</td><td>lot 完成 METRO 自动产生 CD/THK/OVL 量测；<code>metrology</code> 表 + <code>/api/metrology</code>（含 CPK）；S14F1/F2 载具、S18F1/F2 过程跟踪</td><td>CD mean 17.96 / CPK 4.05（按产品分组修复失真）</td></tr>
+  <tr><td><b>S3</b><br>智能引擎</td><td>PdM / VM</td><td>设备风险评分（利用率+磨损+故障史+停机+状态）；EWMA 虚拟量测预测器</td><td>PdM 高风险 ETCH-022 risk 0.91；<b>VM MAPE = 1.87%，±3% 命中 80%</b></td></tr>
+  <tr><td><b>S4</b><br>智能应用</td><td>SPC 自动停线 / FDC</td><td>Western Electric 判异规则；报警→自动 HOLD 设备+批次；<code>release</code> 恢复；FDC 性能退化检测</td><td>注入 CD=30 → toolHold → 释放 toolRelease 全闭环</td></tr>
+  <tr><td><b>S5</b><br>门户协同</td><td>角色工作台</td><td>门户升级为 5 视图（总览/厂长/工艺/设备/操作员），聚合 15 路 API，4s 轮询</td><td>五视图切换、实时联动、数据聚合正确</td></tr>
+  <tr><td><b>APS</b><br>产能计划</td><td>负荷 / 瓶颈 / 排程</td><td>无状态实时引擎：模块产能、负荷率、瓶颈 Top3、工单前推排程（ETC/交期）</td><td>LITHO 正确识别为天然瓶颈；大单 N2×40 due=6h → LATE 判定</td></tr>
+  <tr><td><b>ERP</b><br>原生制造</td><td>库存 / 采购 / 销售 / 成本</td><td>独立服务(8126)+独立DB；WS 订阅 MES 事件；BOM 领料、成品入库、PO→AP、SO→AR、批次成本归集（财务台账视图，与 WMS 仓储执行域 :8128 分工清晰）</td><td>N2 批均成本 70,902 / A16 60,804；AP 85万 / AR 380万</td></tr>
+  <tr><td><b>3D 联动</b></td><td>SPC 报警可视化</td><td>孪生页面订阅 spcAlarm → 异常设备红色脉冲 + 顶部横幅；toolRelease 解除</td><td>注入 2 台报警 → 横幅显示；释放 → 横幅消失（浏览器实拍）</td></tr>
+</table>
+
+<h2>四、关键指标与成效</h2>
+<div class="grid">
+  <div class="card"><div class="k">虚拟量测精度 MAPE</div><div class="v ac">1.87%</div></div>
+  <div class="card"><div class="k">SPC 自动停线闭环</div><div class="v run">✓ 打通</div></div>
+  <div class="card"><div class="k">批次成本核算</div><div class="v">N2 70,902<br><small style="font-size:12px;color:var(--muted)">A16 60,804 元</small></div></div>
+  <div class="card"><div class="k">角色工作台视图</div><div class="v">6 类</div></div>
+  <div class="card"><div class="k">默认编排在线</div><div class="v run">5 进程</div></div>
+  <div class="card"><div class="k">稳定性压力测试</div><div class="v run">289 req<br><small style="font-size:12px;color:var(--muted)">零超时</small></div></div>
+</div>
+
+<h2>五、五大闭环</h2>
+<table>
+  <tr><th>闭环</th><th>触发</th><th>动作</th><th>价值</th></tr>
+  <tr><td>执行闭环</td><td>工单释放</td><td>MES 自动派工 → 批次流转 → 完工</td><td>WIP 实时可控</td></tr>
+  <tr><td>质量闭环</td><td>量测判异</td><td>SPC 报警 → 自动停线 HOLD → 处置释放</td><td>缺陷不流出</td></tr>
+  <tr><td>预测闭环</td><td>设备/工艺数据</td><td>PdM 风险排行 + VM 虚拟量测预测</td><td>预测性维护、减少实物量测</td></tr>
+  <tr><td>计划闭环</td><td>在制 + 工单</td><td>APS 负荷/瓶颈/排程 → 交期承诺</td><td>产能可视、交期可信</td></tr>
+  <tr><td>企业闭环</td><td>lot 事件</td><td>ERP 领料/入库/成本/应收应付</td><td>料单钱一体、成本实时归集</td></tr>
+</table>
+
+<h2>六、关键技术决策与坑</h2>
+<h3>6.1 原生 ERP 而非接口</h3>
+<p>用户明确旧 ERP 陈旧，决定<b>不做接口、做原生</b>。验证可行：独立进程 + 独立 DB 订阅 MES 事件流，零翻译零耦合，制造核心四模块（库存/采购/销售/成本）全部事件驱动联动。</p>
+
+<h3>6.2 稳定性三连坑（已根治）</h3>
+<ul>
+  <li><b>静态页面异步读超时</b> → 改为启动读入内存缓存</li>
+  <li><b>逐事件同步写 SQLite 阻塞事件循环</b> → 改为批量队列 + 800ms flush</li>
+  <li><b>BEGIN/COMMIT 事务与业务写同连接锁冲突 → database is locked 崩溃</b> → 启用 <b>WAL 模式 + busy_timeout</b>，flush 失败丢弃不重试；并加事件循环心跳诊断</li>
+</ul>
+
+<h3>6.3 其他修正</h3>
+<ul>
+  <li>VM/成本计价：加速模式下 durH 为模拟秒 → 改用标准工艺步时表（与 core modAvgH 同源）</li>
+  <li>SPC 演示设备需真实存在（METRO 从 141 起，非 001）</li>
+  <li>SO 默认价 0 → 应收 0，改为自动取成品单价</li>
+  <li>3D 联动沿用现有 highlight/byId/WS 管线，零架构改动接入</li>
+</ul>
+
+<h2>七、服务与访问入口</h2>
+<table>
+  <tr><th>服务</th><th>端口</th><th>入口</th><th>状态</th></tr>
+  <tr><td>统一门户（角色工作台）</td><td>8123</td><td><code>http://127.0.0.1:8123/portal.html</code></td><td class="ok">✓ 在线</td></tr>
+  <tr><td>MES 控制台（含智能面板）</td><td>8124</td><td><code>http://127.0.0.1:8124/</code></td><td class="ok">✓ 在线</td></tr>
+  <tr><td>EAP 协议网关（SECS/GEM）</td><td>8125</td><td><code>http://127.0.0.1:8125/</code></td><td class="ok">✓ 默认随 start-community.sh 常驻（HSMS 经 :5000 驱动 lot 生命周期）</td></tr>
+  <tr><td>原生 ERP 服务</td><td>8126</td><td><code>http://127.0.0.1:8126/api/erp/health</code></td><td class="ok">✓ 在线</td></tr>
+  <tr><td>数字孪生 3D（SPC 联动）</td><td>8123 托管</td><td><code>http://127.0.0.1:8123/twin3d/</code></td><td class="ok">✓ 已并入 fab-mes/twin3d/，由门户 8123 统一托管</td></tr>
+</table>
+
+<h2>八、后续可扩展方向</h2>
+<div class="note">
+<b>主线已收官，以下为可选增强：</b>
+<ul style="margin-top:8px">
+  <li><b>ERP 轻量财务</b>：在制造核心四模块之上加简单利润汇总（不碰总账借贷）</li>
+  <li><b>APS 滚动优化</b>：接实时 SPC/HOLD 状态动态重排，实现闭环排程</li>
+  <li><b>孪生-报警深度联动</b>：点击 3D 报警设备直接穿透到 SPC 监控组 / PdM 风险详情</li>
+  <li><b>多工厂/多产品线</b>：当前为单 fab 模型，可扩展为产线级拓扑</li>
+  <li><b>对外数据开放</b>：以 /api 形式向 BI 工具开放，替代旧报表系统</li>
+</ul>
+</div>
+
+<h2>九、结论</h2>
+<p>本项目将初始的"三系统演示"升级为 <b>覆盖设备层到企业层的事件驱动智能制造平台</b>。五大闭环（执行/质量/预测/计划/企业）全部以真实数据验证：虚拟量测 MAPE 1.87%、SPC 自动停线闭环、批次成本实时归集、APS 瓶颈与交期承诺、3D SPC 报警联动。系统经 289 次请求压力测试零超时，六进程稳定运行。</p>
+<p>核心经验：<b>以事件总线为骨架、各子系统独立进程 + 独立 DB 订阅联动</b>，既避免单点耦合，又彻底规避了数据库锁冲突类稳定性问题——这是该平台可继续横向扩展（更多智能模块）的架构基础。</p>
+
+</div>
+<footer>
+  智能制造平台项目总结 · 生成于 2026-08-22 · Fab-MES / Digital Twin / EAP / ERP
+</footer>
+</body>
+</html>

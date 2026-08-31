@@ -1,0 +1,2091 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>晶圆厂智能制造平台 · 3D 数字孪生</title>
+<style>
+  :root{
+    --panel: rgba(17,24,33,0.80);
+    --panel-border: rgba(255,255,255,0.12);
+    --text: #e6edf3;
+    --muted: #9aa7b4;
+    --accent: #4ea1ff;
+    --nav-h: 40px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#0b1020;color:var(--text);}
+  #app{position:fixed;top:var(--nav-h);left:0;right:0;bottom:0;overflow:hidden;}
+  canvas{display:block;}
+  .panel{position:absolute;background:var(--panel);border:1px solid var(--panel-border);border-radius:12px;backdrop-filter:blur(8px);padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,0.35);}
+  #header{top:calc(16px + var(--nav-h));left:16px;max-width:330px;}
+  #header h1{font-size:15px;margin:0 0 4px;font-weight:600;}
+  #header p{font-size:12px;margin:0;color:var(--muted);line-height:1.5;}
+  .ctl{display:flex;gap:8px;align-items:center;margin-top:10px;}
+  #src-label{font-size:12px;color:var(--muted);}
+  .hintline{font-size:11px;color:#6b7886;margin-top:8px;}
+  code{background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:11px;}
+  button{font-family:inherit;font-size:12px;color:var(--text);background:rgba(255,255,255,0.06);border:1px solid var(--panel-border);border-radius:8px;padding:4px 12px;cursor:pointer;}
+  button:hover{background:rgba(255,255,255,0.12);}
+  #legend{top:calc(16px + var(--nav-h));right:96px;width:210px;}
+  /* 显隐面板开关：常驻右上角，不被隐藏；快捷键 H 同效 */
+  #hud-toggle{position:fixed;top:calc(12px + var(--nav-h));right:12px;z-index:999;
+    font:13px/1.5 system-ui,'Segoe UI',sans-serif;color:var(--text);white-space:nowrap;
+    background:rgba(78,161,255,0.22);border:1.5px solid rgba(78,161,255,0.55);
+    border-radius:8px;padding:8px 14px;cursor:pointer;transition:background .15s;
+    box-shadow:0 2px 12px rgba(0,0,0,0.4);}
+  #hud-toggle:hover{background:rgba(78,161,255,0.4);color:#fff;}
+  /* 隐藏模式：收起所有数据面板/卡片（含仿真分析面板），只留 3D 模型、报警横幅与“仿真分析”唤出按钮 */
+  .hud-hidden #header,.hud-hidden #legend,.hud-hidden #eventlog,.hud-hidden #stats,
+  .hud-hidden #info,.hud-hidden #spc-legend,.hud-hidden .hint,
+  .hud-hidden #viewbar,.hud-hidden #sim-panel{display:none !important;}
+  #legend h2{font-size:13px;margin:0 0 8px;font-weight:600;}
+  .leg-row{display:flex;align-items:center;gap:8px;font-size:12px;margin:6px 0;cursor:pointer;user-select:none;}
+  .sw{width:14px;height:14px;border-radius:3px;flex:0 0 auto;}
+  .leg-row.off{opacity:0.35;}
+  #eventlog{top:calc(170px + var(--nav-h));left:16px;width:330px;max-height:230px;display:flex;flex-direction:column;}
+  #eventlog h2{font-size:13px;margin:0 0 6px;font-weight:600;}
+  #event-log{overflow-y:auto;max-height:185px;padding-right:4px;}
+  #event-log span{line-height:1.4;}
+  #stats{bottom:16px;left:16px;width:240px;font-size:12px;}
+  #stats .row{display:flex;justify-content:space-between;margin:4px 0;}
+  #stats .big{font-size:20px;font-weight:600;}
+  #stats .rec{display:flex;gap:6px;align-items:center;margin-top:8px;color:var(--muted);flex-wrap:wrap;}
+  #info{bottom:16px;right:16px;width:290px;display:none;}
+  #info h2{font-size:13px;margin:0 0 8px;font-weight:600;}
+  #info .kv{display:flex;justify-content:space-between;font-size:12px;margin:5px 0;color:var(--muted);}
+  #info .kv b{color:var(--text);font-weight:500;}
+  .hint{position:absolute;bottom:62px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);background:var(--panel);padding:6px 12px;border-radius:20px;border:1px solid var(--panel-border);white-space:nowrap;z-index:18;}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+  #info .close{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--muted);font-size:14px;}
+  /* 视角预设导航条（车间/产线游走） */
+  #viewbar{bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 12px;z-index:18;}
+  #viewbar .vb-title{font-size:11px;color:var(--muted);margin-right:2px;white-space:nowrap;}
+  #viewbar button{font:12px/1 system-ui,'Segoe UI',sans-serif;color:var(--text);background:rgba(78,161,255,0.14);border:1px solid rgba(78,161,255,0.35);border-radius:8px;padding:6px 10px;cursor:pointer;transition:background .15s,border-color .15s,color .15s;}
+  #viewbar button:hover{background:rgba(78,161,255,0.30);color:#fff;}
+  #viewbar button.active{background:rgba(78,161,255,0.45);border-color:#7fd1ff;color:#fff;}
+  /* SPC 报警联动：对应工艺区按钮红点闪烁 */
+  #viewbar button.alarm{background:rgba(255,92,92,0.22);border-color:#ff5c5c;color:#ffd9d9;position:relative;}
+  #viewbar button.alarm::after{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:#ff3b3b;box-shadow:0 0 6px #ff3b3b;animation:vbBlink .8s ease-in-out infinite;}
+  @keyframes vbBlink{0%,100%{opacity:1;}50%{opacity:.2;}}
+  /* 详情面板真实数据区 */
+  #info-live{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.14);}
+  #info-live .live-loading,#info-live .live-err{font-size:11px;color:var(--muted);}
+  #info-live .live-err{color:#ff9a9a;}
+  #info-live .live-list{margin:4px 0 2px;display:flex;flex-direction:column;gap:3px;}
+  #info-live .li{font-size:11px;color:var(--text);background:rgba(255,255,255,0.05);border-radius:6px;padding:4px 7px;font-family:ui-monospace,Consolas,monospace;line-height:1.35;word-break:break-all;}
+  #info-live .li.warn{color:#ffb3b3;background:rgba(255,92,92,0.12);}
+  #info-live .li .muted{color:var(--muted);}
+  /* ===== 逐腔室真实遥测（焊入主轴：chamberUpdate 事件/REST）===== */
+  #chamber-block{margin-top:6px;}
+  .ch-grid{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px;}
+  .ch-mini{width:96px;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 7px;background:rgba(255,255,255,.04);font-size:10.5px;}
+  .ch-mini .ch-m-h{font-family:ui-monospace,Consolas,monospace;font-weight:700;font-size:11px;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center;gap:4px;}
+  .ch-mini .ch-m-row{display:flex;justify-content:space-between;color:var(--muted);}
+  .ch-mini .ch-m-row b{color:var(--text);font-family:ui-monospace,Consolas,monospace;font-weight:600;}
+  .ch-mini.ch-run{border-color:rgba(57,217,138,.45);background:rgba(57,217,138,.12);}
+  .ch-mini.ch-warn{border-color:rgba(255,153,0,.55);background:rgba(255,153,0,.16);}
+  .ch-mini.ch-down{border-color:rgba(255,92,92,.55);background:rgba(255,92,92,.16);}
+  .ch-mini.ch-idle{opacity:.7;}
+  .ch-badge{font-size:9px;color:#ffb347;font-weight:600;white-space:nowrap;}
+  /* ===== Phase 3 仿真分析 ===== */
+  #sim-toggle{position:absolute;top:calc(16px + var(--nav-h));left:50%;transform:translateX(-50%);border:none;cursor:pointer;font-weight:600;color:var(--text);}
+  #sim-panel{position:absolute;top:var(--nav-h);right:0;height:calc(100% - var(--nav-h));width:484px;background:rgba(11,16,32,0.95);border-left:1px solid var(--panel-border);backdrop-filter:blur(10px);padding:18px;overflow-y:auto;display:none;z-index:20;box-sizing:border-box;}
+  #sim-panel.open{display:block;}
+  #sim-panel h2{font-size:14px;margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+  #sim-panel .close{font-size:18px;cursor:pointer;color:var(--muted);}
+  .sec{margin-bottom:18px;border-top:1px solid var(--panel-border);padding-top:12px;}
+  .sec h3{font-size:13px;margin:0 0 8px;color:var(--accent);font-weight:600;}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .kpi{background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);border-radius:10px;padding:10px;}
+  .kpi .v{font-size:18px;font-weight:600;}
+  .kpi .l{font-size:11px;color:var(--muted);}
+  .kpi .c{font-size:10px;color:#6b7886;}
+  .ctl-row{display:flex;align-items:center;justify-content:space-between;margin:7px 0;font-size:12px;gap:8px;}
+  .ctl-row label{color:var(--muted);flex:1;}
+  .ctl-row input[type=range]{width:170px;}
+  .ctl-row .val{color:var(--text);width:44px;text-align:right;flex:0 0 auto;}
+  .ctl-row input[type=number]{width:56px;background:rgba(255,255,255,0.06);color:var(--text);border:1px solid var(--panel-border);border-radius:6px;padding:2px 6px;font-family:inherit;}
+  .run-btn{width:100%;padding:10px;font-size:13px;font-weight:600;background:linear-gradient(90deg,#1f6feb,#4ea1ff);border:none;color:#fff;cursor:pointer;border-radius:10px;margin-top:12px;}
+  .run-btn:disabled{opacity:0.55;cursor:wait;}
+  .btn-row{display:flex;gap:8px;margin-top:12px;}
+  .btn-row .run-btn{margin-top:0;}
+  .run-btn.ghost{background:transparent;border:1px solid #3a4757;color:#9aa7b4;}
+  .hybrid-box{margin:8px 0 4px;padding:10px 11px;border:1px solid var(--panel-border);border-radius:10px;background:rgba(30,111,235,0.07);}
+  .hybrid-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;}
+  .hybrid-title .muted{font-weight:400;color:var(--muted);font-size:10.5px;}
+  .muted{color:var(--muted);}
+  .ctl-row.col{display:block;}
+  .ctl-row.col label{display:block;margin-bottom:5px;}
+  .chk-inline{display:flex;flex-wrap:wrap;gap:6px 12px;}
+  .chk-inline label{display:inline-flex;align-items:center;gap:4px;color:var(--text);font-size:11.5px;cursor:pointer;flex:0 0 auto;}
+  .chk-inline input{accent-color:#4ea1ff;}
+  canvas.chart{width:100%;display:block;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--panel-border);margin-top:4px;}
+  .mc-table{width:100%;border-collapse:collapse;font-size:11px;}
+  .mc-table th,.mc-table td{border-bottom:1px solid var(--panel-border);padding:4px 6px;text-align:left;color:var(--muted);}
+  .mc-table td b{color:var(--text);}
+  .tag{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;background:rgba(255,92,92,0.18);color:#ff8a8a;}
+  .chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:8px;cursor:pointer;}
+  /* ===== SPC 报警 3D 联动 ===== */
+  #spc-banner{position:absolute;top:calc(16px + var(--nav-h));left:50%;transform:translateX(-50%);display:none;z-index:30;max-width:70%;padding:10px 18px;border-radius:12px;border:1px solid rgba(255,92,92,0.55);background:rgba(80,16,16,0.88);box-shadow:0 8px 30px rgba(255,0,0,0.25);backdrop-filter:blur(8px);}
+  #spc-banner.show{display:block;animation:spcPulse 1s ease-in-out infinite;}
+  @keyframes spcPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,92,92,0.45);}50%{box-shadow:0 0 0 10px rgba(255,92,92,0);}}
+  #spc-banner .t{font-size:13px;font-weight:600;color:#ffb3b3;margin-bottom:4px;}
+  #spc-banner .d{font-size:12px;color:#ffd9d9;}
+  #spc-banner .d .mono{font-family:ui-monospace,Consolas,monospace;color:#fff;}
+  #spc-legend{position:absolute;top:calc(64px + var(--nav-h));left:50%;transform:translateX(-50%);display:none;font-size:11px;color:#ffb3b3;background:rgba(80,16,16,0.7);padding:3px 10px;border-radius:20px;border:1px solid rgba(255,92,92,0.4);z-index:30;}
+  #spc-legend.show{display:block;}
+</style>
+<script>
+/* 全局错误浮层：把模块的静默失败（含 WebGL 不可用 / 导入失败 / 运行期异常）直接显示出来，
+   避免"只有背景、没有工厂"这类无法诊断的空白页。必须在模块脚本之前注册。 */
+(function(){
+  function showErr(msg, detail){
+    var el = document.getElementById('err-overlay');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'err-overlay';
+      el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(11,16,32,0.97);' +
+        'color:#ff9b9b;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;padding:28px 32px;overflow:auto;white-space:pre-wrap;';
+      (document.body || document.documentElement).appendChild(el);
+    }
+    el.textContent = '⚠ 3D 孪生页面运行出错（已拦截静默失败）:\n\n' + msg + (detail ? '\n\n' + detail : '');
+  }
+  window.addEventListener('error', function(e){
+    var m = e.message || (e.error && e.error.message) || '未知错误';
+    var d = (e.error && e.error.stack) || ('@ ' + (e.filename||'') + ':' + (e.lineno||'') + ':' + (e.colno||''));
+    showErr(m, d);
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var r = e.reason; showErr('未处理的 Promise 拒绝: ' + (r && r.message ? r.message : String(r)), r && r.stack);
+  });
+})();
+</script>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+<div id="app"></div>
+
+<div id="header" class="panel">
+  <h1>晶圆厂数字孪生 · 物理工厂</h1>
+  <p>Phase 1–3 原型（物理工厂 + 实时数据层 + 仿真分析）· 对标台积电 N2 / A16 智能工厂。</p>
+  <div class="ctl">
+    <span id="src-label">数据源：模拟 EAP</span>
+    <button id="btn-pause">暂停</button>
+  </div>
+  <div class="hintline">真实几何：<code>?model=demo-fab.gltf</code> 加载 BIM/glTF 并自动绑定设备；<code>?pcd=plant.pcd</code> 加载点云</div>
+</div>
+
+<div id="viewbar" class="panel"><span class="vb-title">视角</span><div id="viewbar-btns" style="display:flex;gap:6px;flex-wrap:wrap;"></div></div>
+
+<div id="legend" class="panel">
+  <h2>工艺模块（点击筛选）</h2>
+  <div id="legend-rows"></div>
+</div>
+
+<div id="eventlog" class="panel">
+  <h2>实时事件流 (EAP / MES)</h2>
+  <div id="event-log"></div>
+</div>
+
+<div id="stats" class="panel">
+  <div class="row"><span>设备总数</span><span class="big" id="stat-total">0</span></div>
+  <div class="row"><span>运行中 RUN</span><span id="stat-run">0</span></div>
+  <div class="row"><span>空闲 IDLE</span><span id="stat-idle">0</span></div>
+  <div class="row"><span>维护 PM / 故障 DOWN</span><span id="stat-down">0</span></div>
+  <div class="rec"><span class="status-dot" style="background:#39d98a"></span>绿=运行
+    <span class="status-dot" style="background:#9aa7b4;margin-left:6px"></span>灰=空闲
+    <span class="status-dot" style="background:#f2c14e;margin-left:6px"></span>黄=维护
+    <span class="status-dot" style="background:#ff5c5c;margin-left:6px"></span>红=故障</div>
+</div>
+
+<div id="info" class="panel">
+  <span class="close" id="info-close">×</span>
+  <h2 id="info-title">设备</h2>
+  <div id="info-body"></div>
+  <div id="info-live" class="live"></div>
+</div>
+
+<div class="hint">左键拖拽旋转 · 右键平移 · 滚轮缩放 · 点击设备查看详情</div>
+
+<div id="spc-banner">
+  <div class="t">⚠ SPC 质量报警 — 设备自动停线</div>
+  <div class="d" id="spc-banner-detail"></div>
+</div>
+<div id="spc-legend">🔴 红色脉冲 = SPC 判异停线设备</div>
+
+<button id="sim-toggle" class="panel">▶ 仿真分析 (Phase 3)</button>
+
+<button id="hud-toggle" title="隐藏所有数据面板，只留 3D 模型 (快捷键 H)">🙈 隐藏面板</button>
+
+<div id="sim-panel" class="panel">
+  <h2>仿真与分析层 · Phase 3 <span class="close" id="sim-close">×</span></h2>
+
+  <div class="sec">
+    <h3>What-if 参数（离散事件仿真 + 蒙特卡洛）</h3>
+    <div class="ctl-row"><label>到达率 λ (lots/hr)</label><input type="range" id="p-lambda" min="2" max="40" step="1" value="18"><span class="val" id="v-lambda">18</span></div>
+    <div class="ctl-row"><label>重入次数 (passes)</label><input type="range" id="p-passes" min="1" max="5" step="1" value="3"><span class="val" id="v-passes">3</span></div>
+    <div class="ctl-row"><label>工序时间波动 CV</label><input type="range" id="p-cv" min="0" max="0.4" step="0.05" value="0.15"><span class="val" id="v-cv">0.15</span></div>
+    <div class="ctl-row"><label>仿真时长 (hr)</label><input type="range" id="p-horizon" min="48" max="480" step="24" value="168"><span class="val" id="v-horizon">168</span></div>
+    <div class="ctl-row"><label>蒙特卡洛次数</label><input type="range" id="p-reps" min="1" max="12" step="1" value="6"><span class="val" id="v-reps">6</span></div>
+    <div class="ctl-row"><label>派工规则</label>
+      <select id="p-rule">
+        <option value="FIFO">FIFO 先到先服务</option>
+        <option value="SPT">SPT 最短工序优先</option>
+        <option value="CR">CR 关键比率</option>
+        <option value="EDD">EDD 最早交期</option>
+        <option value="BN">BN 瓶颈优先 (光刻)</option>
+        <option value="HYBRID" selected>HYBRID 混合 (瓶颈BN/其余FIFO · 贴近真实MES)</option>
+      </select>
+    </div>
+    <div class="hybrid-box" id="hybrid-box">
+      <div class="hybrid-title">混合派工配置 <span class="muted">(仅 HYBRID 生效)</span></div>
+      <div class="ctl-row"><label>瓶颈用规则</label>
+        <select id="p-hbn-rule">
+          <option value="BN" selected>BN 剩余步最少</option>
+          <option value="SPT">SPT 最短工序</option>
+          <option value="CR">CR 关键比率</option>
+          <option value="EDD">EDD 最早交期</option>
+          <option value="FIFO">FIFO</option>
+        </select>
+      </div>
+      <div class="ctl-row"><label>其余用规则</label>
+        <select id="p-hother-rule">
+          <option value="FIFO" selected>FIFO 先到先服务</option>
+          <option value="SPT">SPT 最短工序</option>
+          <option value="CR">CR 关键比率</option>
+          <option value="EDD">EDD 最早交期</option>
+          <option value="BN">BN 剩余步最少</option>
+        </select>
+      </div>
+      <div class="ctl-row col"><label>瓶颈模块</label>
+        <div class="chk-inline" id="hybrid-bn-mods"></div>
+      </div>
+    </div>
+    <div class="hybrid-box" id="dyn-box" style="border-color:rgba(87,214,166,0.45);background:rgba(87,214,166,0.06);">
+      <div class="hybrid-title">Phase 7 · 动态再调度 <span class="muted">(运行时自适应 MES)</span></div>
+      <label class="chk"><input type="checkbox" id="p-dyn" checked> 启用动态再调度</label>
+      <label class="chk"><input type="checkbox" id="p-dnd" checked> 动态瓶颈检测（每 2h 按 队列/可用机台 重判瓶颈集合）</label>
+      <label class="chk"><input type="checkbox" id="p-dndue" checked> 交期风险升级（临期 lot 动态插队，模拟赶工）</label>
+      <div class="ctl-row"><label>非计划停机强度 (台/2h)</label><input type="range" id="p-bdint" min="0" max="5" step="0.5" value="1"><span class="val" id="v-bdint">1</span></div>
+    </div>
+    <div id="tool-delta"></div>
+    <label class="chk"><input type="checkbox" id="p-heat" checked> 在 3D 工厂上叠加瓶颈热力</label>
+    <div class="btn-row">
+      <button class="run-btn" id="btn-run">运行仿真</button>
+      <button class="run-btn ghost" id="btn-cmp">对比派工规则</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3>核心 KPI（蒙特卡洛均值 ± 95% CI）</h3>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <div class="sec">
+    <h3>各模块设备利用率 (%)</h3>
+    <canvas class="chart" id="chart-util" height="170"></canvas>
+  </div>
+
+  <div class="sec">
+    <h3>各模块平均排队等待 (hr)</h3>
+    <canvas class="chart" id="chart-queue" height="150"></canvas>
+  </div>
+
+  <div class="sec">
+    <h3>派工规则对比（吞吐 / 周期 / WIP）</h3>
+    <canvas class="chart" id="chart-cmp" height="180"></canvas>
+    <div id="cmp-out" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+  </div>
+
+  <div class="sec">
+    <h3>模块汇总</h3>
+    <table class="mc-table" id="tbl-mod"></table>
+  </div>
+
+  <div class="sec">
+    <h3>预测性维护 (RUL 估算)</h3>
+    <div id="pm-out" style="font-size:12px;color:var(--muted);"></div>
+  </div>
+
+  <div class="sec">
+    <h3>FDC / APC 虚拟量测控制图</h3>
+    <canvas class="chart" id="chart-spc" height="150"></canvas>
+    <div id="spc-out" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+  </div>
+
+  <div class="sec">
+    <h3>Phase 7 · 再调度事件与瓶颈漂移</h3>
+    <canvas class="chart" id="chart-bn" height="110"></canvas>
+    <div id="resched-out" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+  </div>
+
+  <div class="sec" id="mes-sec" style="display:none;">
+    <h3>MES 实时 WIP（自研后端 ?src=mes）</h3>
+    <canvas class="chart" id="chart-wip" height="140"></canvas>
+    <div id="mes-out" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+  </div>
+
+  <div class="sec">
+    <h3>Phase 4+8 · AI 优化闭环（联合寻优）</h3>
+    <div class="ctl-row"><label>目标吞吐 (lots/hr)</label><input type="number" id="o-target" value="22" min="5" max="60" step="1"><span class="val" id="o-target-v"></span></div>
+    <div style="font-size:11px;color:var(--muted);margin:4px 0 8px;">对 6 种派工规则 ×（瓶颈扩产 + 投料率）网格搜索，达标前提下最小化「机台成本 + 电费」；应用方案时同步回灌最优规则。</div>
+    <button class="run-btn" id="btn-opt">运行联合优化</button>
+    <div id="opt-out" style="font-size:12px;color:var(--muted);margin-top:10px;"></div>
+    <button class="run-btn" id="btn-apply" style="display:none;background:linear-gradient(90deg,#16a34a,#57d6a6);">应用方案 · 回灌物理层</button>
+  </div>
+
+  <div class="sec">
+    <h3>能耗与良率孪生</h3>
+    <div class="kpis" id="ekpis"></div>
+    <canvas class="chart" id="chart-energy" height="150" style="margin-top:8px;"></canvas>
+    <div id="ey-out" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './vendor/OrbitControls.js';
+
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+const rnd = (a,b)=>Math.random()*(b-a)+a;
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+
+// ---------- 模块与状态定义 ----------
+const MODULES = [
+  { key:'LITHO', name:'光刻 Litho (EUV/ArF)', color:0xff5c8a, count:14 },
+  { key:'ETCH',  name:'刻蚀 Etch',           color:0x4ea1ff, count:42 },
+  { key:'DEP',   name:'薄膜沉积 Dep',        color:0x57d6a6, count:54 },
+  { key:'CMP',   name:'CMP',                 color:0xf2c14e, count:26 },
+  { key:'IMPL',  name:'离子注入 Implant',    color:0xb98cff, count:22 },
+  { key:'METRO', name:'量测/检测 Metrology', color:0xff9f5c, count:34 },
+];
+const STATUS = {
+  RUN:  { name:'运行中', color:0x39d98a },
+  IDLE: { name:'空闲',   color:0x9aa7b4 },
+  PM:   { name:'维护',   color:0xf2c14e },
+  DOWN: { name:'故障',   color:0xff5c5c },
+};
+function pickStatus(){
+  const r=Math.random();
+  if(r<0.70) return 'RUN';
+  if(r<0.86) return 'IDLE';
+  if(r<0.95) return 'PM';
+  return 'DOWN';
+}
+
+// ---------- 生成合成设备布局 ----------
+const tools = [];
+const byId = new Map();
+const zones = [];
+const zoneW = 56, zoneGap = 8;
+const totalW = MODULES.length*zoneW + (MODULES.length-1)*zoneGap;
+let startX = -totalW/2;
+let uid = 0;
+
+MODULES.forEach((mod, zi)=>{
+  const zx = startX + zi*(zoneW+zoneGap) + zoneW/2;
+  const perRow = Math.max(1, Math.round(Math.sqrt(mod.count)));
+  const rows = Math.ceil(mod.count/perRow);
+  const cellW = zoneW/perRow, cellD = 10;
+  const depth = rows*cellD + (rows-1)*4;
+  zones.push({ mod, zx, depth });
+
+  let placed = 0;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<perRow && placed<mod.count;c++){
+      const x = zx - zoneW/2 + cellW*(c+0.5);
+      const z = -depth/2 + cellD*(r+0.5) + 4*r;
+      const status = pickStatus();
+      uid++;
+      const t = {
+        id:`${mod.key}-${String(uid).padStart(3,'0')}`,
+        module:mod.key, modName:mod.name, color:mod.color, status,
+        x, z,
+        wph: Math.round(rnd(20,180)),
+        util: Math.round(rnd(45,98)),
+        chambers: Math.round(rnd(1,6)),
+        wafers: Math.round(rnd(2000,60000)),
+        recipe:`R${Math.round(rnd(100,999))}`,
+      };
+      tools.push(t); byId.set(t.id, t);
+      placed++;
+    }
+  }
+});
+
+// ---------- 场景 ----------
+const app = document.getElementById('app');
+/* 动态测量 unav 高度，防止换行时遮挡 */
+(function(){
+  const unav = document.querySelector('.unav');
+  if(!unav) return;
+  const sync = ()=> document.documentElement.style.setProperty('--nav-h', unav.offsetHeight + 'px');
+  sync();
+  window.addEventListener('resize', sync);
+})();
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1020);
+scene.fog = new THREE.Fog(0x0b1020, 240, 520);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 2000);
+camera.position.set(0, 70, 140);
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+} catch(err) {
+  throw new Error('WebGL 初始化失败：' + (err && err.message ? err.message : err) +
+    '。请确认浏览器已启用硬件加速 / WebGL（地址栏访问 chrome://gpu 查看），或换用 Chrome/Edge 最新版。');
+}
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+app.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 0, 0);
+controls.maxPolarAngle = Math.PI*0.49;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x33405a, 0.9));
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+dir.position.set(60, 130, 70);
+dir.castShadow = true;
+dir.shadow.mapSize.set(2048, 2048);
+dir.shadow.camera.left = -200;
+dir.shadow.camera.right = 200;
+dir.shadow.camera.top = 150;
+dir.shadow.camera.bottom = -100;
+dir.shadow.camera.near = 10;
+dir.shadow.camera.far = 350;
+dir.shadow.bias = -0.002;
+scene.add(dir);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(640, 420),
+  new THREE.MeshStandardMaterial({ color:0x101724, roughness:0.92 })
+);
+floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(640, 64, 0x223047, 0x18202e);
+grid.position.y = 0.02;
+scene.add(grid);
+
+// 装饰层（区底板 + 标签），BIM 模式下隐藏
+const decorGroup = new THREE.Group();
+scene.add(decorGroup);
+function makeLabel(text){
+  const c = document.createElement('canvas'); c.width=256; c.height=64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(230,237,243,0.95)';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 34);
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false }));
+  sp.scale.set(30, 7.5, 1);
+  return sp;
+}
+// 设备编号标签（悬浮于信标上方）
+function makeIdLabel(idText){
+  const c = document.createElement('canvas'); c.width=128; c.height=48;
+  const ctx = c.getContext('2d');
+  // 半透明深底
+  ctx.fillStyle = 'rgba(11,16,32,0.78)';
+  roundRect(ctx, 2, 2, 124, 44, 6);
+  ctx.fill();
+  // 边框
+  ctx.strokeStyle = 'rgba(78,161,255,0.5)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, 2, 2, 124, 44, 6);
+  ctx.stroke();
+  // 文字
+  ctx.fillStyle = '#e6edf3';
+  ctx.font = 'bold 20px "Segoe UI",system-ui,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(idText, 64, 26);
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false }));
+  sp.scale.set(4.8, 1.8, 1);
+  return sp;
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.lineTo(x,y+h-r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+zones.forEach(z=>{
+  const pad = new THREE.Mesh(
+    new THREE.PlaneGeometry(z.zoneW, z.depth),
+    new THREE.MeshBasicMaterial({ color:z.mod.color, transparent:true, opacity:0.10 })
+  );
+  pad.rotation.x = -Math.PI/2;
+  pad.position.set(z.zx, 0.03, 0);
+  decorGroup.add(pad);
+  z.pad = pad;
+  const lab = makeLabel(z.mod.name);
+  lab.position.set(z.zx, 12, -z.depth/2 - 6);
+  decorGroup.add(lab);
+});
+// 模块间通道标记（增强工厂布局辨识度）
+const aisleMat = new THREE.MeshBasicMaterial({ color:0x1a2538, transparent:true, opacity:0.45 });
+const sortedZones = [...zones].sort((a,b) => a.zx - b.zx);
+for(let i=0; i<sortedZones.length-1; i++){
+  const z1 = sortedZones[i], z2 = sortedZones[i+1];
+  const midX = (z1.zx + z1.zoneW/2 + z2.zx - z2.zoneW/2) / 2;
+  const aisle = new THREE.Mesh(new THREE.PlaneGeometry(3, Math.max(z1.depth, z2.depth)), aisleMat);
+  aisle.rotation.x = -Math.PI/2;
+  aisle.position.set(midX, 0.035, 0);
+  decorGroup.add(aisle);
+}
+
+// ---------- 设备（机台） ----------
+const toolGroup = new THREE.Group();    // 合成机台容器
+toolGroup.castShadow = true;
+scene.add(toolGroup);
+const spawnGroup = new THREE.Group();   // 闭环扩容新增机台（始终可见）
+scene.add(spawnGroup);
+const toolMeshes = [];                  // 可拾取对象（点击 / 悬停）
+// —— 共享几何体（详细机台造型，降低 DrawCall）——
+const geoBase       = new THREE.BoxGeometry(5.0, 0.6, 5.4);
+const geoCabinet    = new THREE.BoxGeometry(4.4, 4.2, 4.8);
+const geoCabinetTall= new THREE.BoxGeometry(4.8, 5.6, 5.0);
+const geoTop        = new THREE.BoxGeometry(3.8, 0.9, 3.8);
+const geoPort       = new THREE.BoxGeometry(2.2, 2.4, 1.0);
+const geoLens       = new THREE.CylinderGeometry(0.9, 0.9, 1.6, 20);
+const geoPole       = new THREE.CylinderGeometry(0.12, 0.12, 0.7, 8);
+const geoBeacon     = new THREE.SphereGeometry(0.45, 16, 16);
+const matBase  = new THREE.MeshStandardMaterial({ color:0x8a97a4, metalness:0.4, roughness:0.7 });
+const matTop   = new THREE.MeshStandardMaterial({ color:0x6f7d8c, metalness:0.5, roughness:0.5 });
+const matPort  = new THREE.MeshStandardMaterial({ color:0xcfd8e3, roughness:0.6 });
+const matSteel = new THREE.MeshStandardMaterial({ color:0x4a5662, metalness:0.6, roughness:0.4 });
+const matEdge  = new THREE.LineBasicMaterial({ color:0x2a3544, transparent:true, opacity:0.35 });
+const geoEdgeCabinet    = new THREE.EdgesGeometry(geoCabinet);
+const geoEdgeCabinetTall= new THREE.EdgesGeometry(geoCabinetTall);
+
+// 构建一台详细机台；parent 决定归属（toolGroup 合成 / spawnGroup 扩容 / realGroup 真实模型）
+function makeToolMesh(t, parent){
+  const isLitho = t.module === 'LITHO';
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(geoBase, matBase); base.position.y = 0.3; base.castShadow = true; base.receiveShadow = true;
+  const cabH = isLitho ? 5.6 : 4.2;
+  const body = new THREE.Mesh(isLitho ? geoCabinetTall : geoCabinet,
+    new THREE.MeshStandardMaterial({ color:t.color, metalness:0.35, roughness:0.55 }));
+  body.position.y = 0.6 + cabH/2; body.castShadow = true;
+  // 机柜轮廓边缘线（增强立体辨识度）
+  const edges = new THREE.LineSegments(isLitho ? geoEdgeCabinetTall : geoEdgeCabinet, matEdge);
+  edges.position.copy(body.position);
+  g.add(edges);
+  const top = new THREE.Mesh(geoTop, matTop); top.position.y = 0.6 + cabH + 0.45; top.castShadow = true;
+  const port = new THREE.Mesh(geoPort, matPort); port.position.set(0, 1.6, (isLitho ? 2.7 : 2.5)); port.castShadow = true;
+  if(isLitho){ const lens = new THREE.Mesh(geoLens, matSteel); lens.position.y = 0.6 + cabH + 1.4; lens.castShadow = true; g.add(lens); }
+  // 状态信标（独立材质，便于实时更新）
+  const beaconMat = new THREE.MeshStandardMaterial({ color:STATUS[t.status].color, emissive:STATUS[t.status].color, emissiveIntensity:0.9 });
+  const pole = new THREE.Mesh(geoPole, matSteel); pole.position.y = 0.6 + cabH + 1.0;
+  const beacon = new THREE.Mesh(geoBeacon, beaconMat); beacon.position.y = pole.position.y + 0.55;
+  g.add(base, body, top, port, pole, beacon);
+  // 设备编号标签（悬浮于信标上方）
+  const idLabel = makeIdLabel(t.id);
+  idLabel.position.y = beacon.position.y + 1.0;
+  g.add(idLabel);
+  g.position.set(t.x, 0, t.z);
+  g.userData.tool = t;
+  parent.add(g);
+  body.userData = { tool:t };
+  toolMeshes.push(body);
+  t._vis = g;            // 显隐控制对象
+  t._beaconMat = beaconMat; // 状态着色对象
+  t._main = body;        // 选中高亮对象
+  return g;
+}
+tools.forEach(t=> makeToolMesh(t, toolGroup));
+
+// ============================================================
+//  仓储实体（接 WMS 真库存）+ 真实物流搬运 + 工艺步骤进度
+//  —— 把「晶圆进厂→产线→成品出厂」实物主轴在 3D 里真实呈现
+// ============================================================
+function makeWhLabel(name){
+  const c=document.createElement('canvas'); c.width=256; c.height=96;
+  const tex=new THREE.CanvasTexture(c); tex.anisotropy=4;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  sp.scale.set(34,12.75,1); sp.userData={canvas:c,tex};
+  drawWhLabel(sp,name,'…'); return sp;
+}
+function drawWhLabel(sp,name,inv){
+  const c=sp.userData.canvas, ctx=c.getContext('2d');
+  ctx.clearRect(0,0,256,96);
+  ctx.fillStyle='rgba(11,16,32,0.82)'; roundRect(ctx,2,2,252,92,8); ctx.fill();
+  ctx.strokeStyle='rgba(120,150,190,0.6)'; ctx.lineWidth=2; roundRect(ctx,2,2,252,92,8); ctx.stroke();
+  ctx.fillStyle='#e6edf3'; ctx.font='bold 26px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(name,128,30);
+  ctx.fillStyle='#9fd0ff'; ctx.font='20px sans-serif';
+  ctx.fillText(inv,128,68);
+  sp.userData.tex.needsUpdate=true;
+}
+function makeFoupLabel(text){
+  const c=document.createElement('canvas'); c.width=160; c.height=40;
+  const tex=new THREE.CanvasTexture(c); tex.anisotropy=4;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  sp.scale.set(12,3,1); sp.visible=false; sp.userData={canvas:c,tex};
+  setFoupLabel(sp,text); return sp;
+}
+function setFoupLabel(sp,text){
+  const c=sp.userData.canvas, ctx=c.getContext('2d');
+  ctx.clearRect(0,0,160,40);
+  ctx.fillStyle='rgba(11,16,32,0.85)'; roundRect(ctx,2,2,156,36,6); ctx.fill();
+  ctx.strokeStyle='#4ea1ff'; ctx.lineWidth=2; roundRect(ctx,2,2,156,36,6); ctx.stroke();
+  ctx.fillStyle='#e6edf3'; ctx.font='bold 18px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text||'FOUP',80,20);
+  sp.userData.tex.needsUpdate=true;
+}
+const WAREHOUSES = [
+  { id:'WH-RAW',  name:'晶圆/原材料仓', x:-160, z:-58, color:0x4ea1ff, kind:'原材料立库' },
+  { id:'RCV-01',  name:'收货暂存区',    x:-105, z:-58, color:0x8aa0b8, kind:'暂存' },
+  { id:'STAGE-A', name:'产线暂存 A',    x:-160, z: 58, color:0x39d98a, kind:'产线暂存' },
+  { id:'STAGE-B', name:'产线暂存 B',    x: 160, z: 58, color:0x39d98a, kind:'产线暂存' },
+  { id:'WH-FIN',  name:'成品仓',        x: 160, z:-58, color:0xf2c14e, kind:'成品库' },
+];
+const warehouseList = [];
+const whMeshes = [];
+function makeWarehouse(def){
+  const g=new THREE.Group();
+  const W=34,D=22,H=16;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(W,H,D),
+    new THREE.MeshStandardMaterial({color:def.color,transparent:true,opacity:0.20,metalness:0.2,roughness:0.85}));
+  body.position.y=H/2; body.castShadow=true; body.receiveShadow=true;
+  const frame=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W,H,D)),
+    new THREE.LineBasicMaterial({color:def.color,transparent:true,opacity:0.8}));
+  frame.position.y=H/2;
+  const shelfMat=new THREE.MeshStandardMaterial({color:def.color,metalness:0.4,roughness:0.5});
+  const shelves=new THREE.Group();
+  for(let i=1;i<4;i++){ const sh=new THREE.Mesh(new THREE.BoxGeometry(W*0.92,0.4,D*0.92),shelfMat); sh.position.y=H*i/4; shelves.add(sh); }
+  const label=makeWhLabel(def.name); label.position.y=H+6;
+  g.add(body,frame,shelves,label);
+  g.position.set(def.x,0,def.z);
+  scene.add(g);
+  const w=Object.assign({},def,{_vis:g,_label:label,isWarehouse:true});
+  body.userData.wh=w;
+  whMeshes.push(body);
+  byId.set(def.id,w);
+  warehouseList.push(w);
+  return w;
+}
+WAREHOUSES.forEach(makeWarehouse);
+
+// 节点世界坐标（设备与仓库统一），供 AMHS 搬运寻路
+function posOf(id){
+  const t=byId.get(id);
+  if(!t) return null;
+  const g=t._vis||null;
+  if(g) return new THREE.Vector3(g.position.x,0,g.position.z);
+  return new THREE.Vector3(t.x||0,0,t.z||0);
+}
+function lerp(a,b,k){ return a+(b-a)*k; }
+// 搬运轨迹：起点升起→高空平移→终点降落（天车 overhead 搬运语义）
+function transportPos(from,to,k){
+  const lift=8;
+  if(k<0.18){ const a=k/0.18; return new THREE.Vector3(from.x,lerp(2,lift,a),from.z); }
+  if(k<0.82){ const a=(k-0.18)/0.64; return new THREE.Vector3(lerp(from.x,to.x,a),lift,lerp(from.z,to.z,a)); }
+  const a=(k-0.82)/0.18; return new THREE.Vector3(to.x,lerp(lift,2,a),to.z);
+}
+function enqueueTransport(ev){
+  const v=vehicles.find(v=>!v.userData.task);
+  if(!v) return;
+  const from=posOf(ev.from), to=posOf(ev.to);
+  if(!from||!to) return;
+  if(!v.userData.foupLabel){ v.userData.foupLabel=makeFoupLabel(''); v.add(v.userData.foupLabel); }
+  setFoupLabel(v.userData.foupLabel, ev.foup||'FOUP');
+  v.userData.foupLabel.visible=true;
+  v.userData.task={from,to,t:0,dur:3+Math.random()*1.5};
+}
+
+// 工艺步骤进度条（每台在制设备上方），由 MES WIP 真实 lot.step/rem 驱动
+tools.forEach(t=>{
+  const grp=new THREE.Group();
+  const bg=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.4,0.4),new THREE.MeshBasicMaterial({color:0x223047}));
+  const fg=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.5,0.5),new THREE.MeshBasicMaterial({color:0x39d98a}));
+  fg.position.x=-1.3;
+  grp.add(bg,fg); grp.position.set(t.x,8.5,t.z); grp.visible=false;
+  scene.add(grp);
+  t._progGrp=grp; t._progFg=fg; t._progFrac=0;
+});
+function refreshLotProgress(){
+  const base=location.origin;
+  fetch(base+'/api/lots?status=WIP').then(r=>r.json()).then(j=>{
+    const map={};
+    (j.lots||[]).forEach(l=>{ if(l.curTool && l.step!=null && (l.step+l.rem)>0) map[l.curTool]=l.step/(l.step+l.rem); });
+    tools.forEach(t=>{ const f=map[t.id]; if(f!=null){ t._progFrac=f; t._progGrp.visible=true; } else { t._progGrp.visible=false; } });
+  }).catch(()=>{});
+}
+setInterval(refreshLotProgress,4000); refreshLotProgress();
+
+// 仓库实时库存（走 portal 同源代理 /api/wms/*）
+function refreshWarehouseInv(){
+  fetch(location.origin+'/api/wms/inventory').then(r=>r.json()).then(j=>{
+    const loc={}; (j.byLocation||[]).forEach(b=>{ loc[b.loc]=b; });
+    warehouseList.forEach(w=>{
+      const b=loc[w.id];
+      const inv=b?`SKU ${b.skus} · 数量 ${Math.max(0,Math.round(b.qty))}`:'在库 0';
+      drawWhLabel(w._label,w.name,inv);
+    });
+  }).catch(()=>{});
+}
+setInterval(refreshWarehouseInv,5000); refreshWarehouseInv();
+
+function focusWarehouse(obj){
+  const p=obj.getWorldPosition(new THREE.Vector3());
+  flyTo(new THREE.Vector3(p.x,42,p.z+46), new THREE.Vector3(p.x,0,p.z),1.0);
+}
+function selectWarehouse(obj){
+  if(selected && selected.userData.tool) highlight(selected,false);
+  selected=obj;
+  const w=obj.userData.wh;
+  info.style.display='block';
+  infoTitle.textContent=w.name+' ('+w.id+')';
+  refreshWarehouseLive(w);
+  focusWarehouse(obj);
+}
+async function refreshWarehouseLive(w){
+  const live=document.getElementById('info-live');
+  live.style.display='block';
+  live.innerHTML=`<div class="live-loading">⟳ 正在拉取 ${w.name} 库存…</div>`;
+  try{
+    const base=location.origin;
+    const [inv,locs]=await Promise.all([
+      fetch(base+'/api/wms/inventory').then(r=>r.json()),
+      fetch(base+'/api/wms/locations').then(r=>r.json()),
+    ]);
+    const b=(inv.byLocation||[]).find(x=>x.loc===w.id);
+    let html=`<div class="kv"><span>库位类型</span><b>${w.kind}</b></div>`;
+    if(b){ html+=`<div class="kv"><span>在库 SKU</span><b>${b.skus}</b></div><div class="kv"><span>在库数量</span><b>${Math.max(0,Math.round(b.qty))}</b></div>`; }
+    else html+=`<div class="kv"><span>在库</span><b>0</b></div>`;
+    const rows=(inv.inventory||[]).filter(r=>r.loc_code===w.id).slice(0,8);
+    if(rows.length){ html+=`<div class="live-list">`+rows.map(r=>`<div class="li">${r.material} ×${Math.round(r.qty)} <span class="muted">${r.status||''}</span></div>`).join('')+`</div>`; }
+    html+=`<div class="kv" style="margin-top:6px"><span>库位编码</span><b>${w.id}</b></div>`;
+    live.innerHTML=html;
+  }catch(e){ live.innerHTML=`<div class="live-err">库存拉取失败：${e.message||e}</div>`; }
+}
+
+// ---------- AMHS 天车环线 ----------
+const hw = totalW/2 + 16, hd = 70, yh = 8;
+const railPts = [
+  new THREE.Vector3(-hw, yh, -hd), new THREE.Vector3(0, yh, -hd), new THREE.Vector3(hw, yh, -hd),
+  new THREE.Vector3(hw, yh, 0),   new THREE.Vector3(hw, yh, hd),  new THREE.Vector3(0, yh, hd),
+  new THREE.Vector3(-hw, yh, hd), new THREE.Vector3(-hw, yh, 0),
+];
+const rail = new THREE.CatmullRomCurve3(railPts, true, 'catmullrom', 0.0);
+const railLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(rail.getPoints(240)),
+  new THREE.LineBasicMaterial({ color:0x3a6ea5, transparent:true, opacity:0.6 })
+);
+scene.add(railLine);
+
+const vehicles = [];
+const vehGeo = new THREE.BoxGeometry(3.2, 1.6, 4.2);
+const vehMat = new THREE.MeshStandardMaterial({ color:0x4ea1ff, emissive:0x163b66, emissiveIntensity:0.5 });
+for(let i=0;i<14;i++){
+  const v = new THREE.Mesh(vehGeo, vehMat);
+  v.userData.offset = i/14;
+  v.userData.speed = 0.012 + Math.random()*0.006;
+  scene.add(v);
+  vehicles.push(v);
+}
+
+// ============================================================
+//  数据层（连接与数据层抽象）—— Phase 2
+//  默认：模拟 EAP/MES 推送；预留：WebSocketSource（真实接入）
+// ============================================================
+class DataSource {
+  constructor(){ this.subs = []; this.running = false; }
+  subscribe(cb){ this.subs.push(cb); return ()=>{ this.subs = this.subs.filter(f=>f!==cb); }; }
+  emit(ev){ this.subs.forEach(f=>f(ev)); }
+  start(){} stop(){}
+}
+function transition(s){
+  const table = {
+    RUN:['RUN','RUN','IDLE','PM'],
+    IDLE:['IDLE','RUN','RUN'],
+    PM:['PM','RUN'],
+    DOWN:['DOWN','PM','RUN'],
+  };
+  const opts = table[s] || ['RUN'];
+  return opts[Math.floor(Math.random()*opts.length)];
+}
+class SimulatedEAP extends DataSource {
+  constructor(tools, opts={}){ super(); this.tools = tools; this.rate = opts.rate ?? 600; this.timer = null; }
+  start(){ if(this.running) return; this.running = true; this.timer = setInterval(()=>this.tick(), this.rate); }
+  stop(){ this.running = false; clearInterval(this.timer); this.timer = null; }
+  tick(){
+    const n = 1 + Math.floor(Math.random()*3);
+    for(let i=0;i<n;i++){
+      const t = this.tools[Math.floor(Math.random()*this.tools.length)];
+      if(Math.random()<0.5){
+        const next = transition(t.status);
+        if(next!==t.status){ t.status = next; this.emit({type:'toolStatus', id:t.id, status:next}); }
+      } else {
+        t.util = clamp(t.util + Math.round(rnd(-3,3)), 30, 99);
+        t.wafers += Math.round(rnd(5,120));
+        t.wph = clamp(t.wph + Math.round(rnd(-4,4)), 15, 200);
+        this.emit({type:'toolMetric', id:t.id, util:t.util, wafers:t.wafers, wph:t.wph});
+      }
+    }
+  }
+}
+class WebSocketSource extends DataSource {
+  constructor(url){ super(); this.url = url; this.ws = null; this._retry = 0; }
+  start(){
+    if(this.running) return; this.running = true;
+    try{
+      this.ws = new WebSocket(this.url);
+      this.ws.onmessage = (e)=>{ try{ this.emit(JSON.parse(e.data)); }catch(_){} };
+      this.ws.onopen = ()=>{ this._retry = 0; if(typeof logEvent==='function') logEvent('已连接自研 MES 后端 '+this.url, 0x39d98a); };
+      this.ws.onclose = ()=>{
+        this.running = false; this.ws = null;
+        if(this._retry < 10){ this._retry++; setTimeout(()=>this.start(), 2000); }
+      };
+    }catch(err){ console.warn('WebSocket 连接失败，回退模拟源', err); }
+  }
+  stop(){ this.running = false; if(this.ws){ this.ws.onclose = null; this.ws.close(); this.ws = null; } }
+}
+
+// ---------- 事件处理 + UI ----------
+const info = document.getElementById('info');
+const infoTitle = document.getElementById('info-title');
+const infoBody = document.getElementById('info-body');
+const logEl = document.getElementById('event-log');
+let selected = null, hovered = null;
+
+function logEvent(text, colorHex=0x9aa7b4, isAmhs=false){
+  const ts = new Date().toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.style.cssText = 'display:flex;gap:6px;align-items:center;padding:2px 0;';
+  line.innerHTML = `<span style="color:#5f6b78;flex:0 0 auto">${ts}</span>`
+    + `<span style="width:7px;height:7px;border-radius:50%;background:${hex(colorHex)};display:inline-block;flex:0 0 auto"></span>`
+    + `<span style="color:${isAmhs?'#9fd0ff':'#cfd8e3'}">${text}</span>`;
+  logEl.prepend(line);
+  while(logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+}
+function infoHTML(t){
+  const alarm = spcAlerts.get(t.id);
+  return `
+    <div class="kv"><span>工艺模块</span><b>${t.modName}</b></div>
+    <div class="kv"><span>状态</span><b><span class="status-dot" style="background:${hex(STATUS[t.status].color)}"></span>${STATUS[t.status].name}</b></div>
+    ${alarm ? `<div class="kv"><span>SPC 报警</span><b style="color:#ff8a8a">⚠ ${alarm.param}=${alarm.value} [${alarm.rules.join(',')}]</b></div>` : ''}
+    <div class="kv"><span>产能 (wph)</span><b>${t.wph}</b></div>
+    <div class="kv"><span>利用率</span><b>${t.util}%</b></div>
+    <div class="kv"><span>腔体数</span><b>${t.chambers}</b></div>
+    <div class="kv"><span>累计晶圆</span><b>${t.wafers.toLocaleString()}</b></div>
+    <div class="kv"><span>当前配方</span><b>${t.recipe}</b></div>
+    <div class="kv"><span>坐标 (x,z)</span><b>${t.x.toFixed(1)}, ${t.z.toFixed(1)}</b></div>
+  `;
+}
+function refreshInfo(t){ infoBody.innerHTML = infoHTML(t); }
+
+// ---------- 详情面板接入 MES 真实数据（在制 lot / 模块 MTBF-MTTR / 最近 SPC 判异 / 逐腔室遥测）----------
+const _e10Cache = { ts: 0, data: null };
+let selectedChambers = null;   // 选中设备逐腔室真实遥测（随 chamberUpdate 事件就地刷新）
+
+// 逐腔室遥测块（腔温/RF/气流量/真空度 + 退化标记），数据来自 /api/chambers 或 chamberUpdate 事件
+function chamberBlockHTML(chs){
+  if(!chs || !chs.length) return '';
+  const rows = chs.map(c=>{
+    const cls = c.state==='RUN'?'ch-run':c.state==='WARN'?'ch-warn':c.state==='DOWN'?'ch-down':'ch-idle';
+    const badge = c.fault>0 ? `<span class="ch-badge">退化Lv${c.fault}·${c.dev.toFixed(0)}%</span>` : '';
+    const pr = c.press>=1 ? c.press.toFixed(0) : c.press.toFixed(3);
+    return `<div class="ch-mini ${cls}">
+      <div class="ch-m-h">${c.ch}${badge}</div>
+      <div class="ch-m-row"><span>温</span><b>${c.temp.toFixed(1)}°</b></div>
+      <div class="ch-m-row"><span>RF</span><b>${c.rf>0?Math.round(c.rf)+'W':'—'}</b></div>
+      <div class="ch-m-row"><span>气</span><b>${c.gas>0?c.gas.toFixed(0):'—'}</b></div>
+      <div class="ch-m-row"><span>压</span><b>${pr}</b></div>
+    </div>`;
+  }).join('');
+  return `<div class="kv"><span>逐腔室真实遥测</span><b>${chs.length} 腔</b></div><div class="ch-grid">${rows}</div>`;
+}
+// chamberUpdate 事件 → 仅当选中设备时就地刷新腔室块
+function updateChamberBlock(ev){
+  const el = document.getElementById('chamber-block');
+  if(!el) return;
+  el.innerHTML = chamberBlockHTML(ev.chambers);
+}
+async function getE10(){
+  const now = Date.now();
+  if(_e10Cache.data && now - _e10Cache.ts < 15000) return _e10Cache.data;
+  const d = await (await fetch(`location.origin/api/e10`)).json();
+  _e10Cache.ts = now; _e10Cache.data = d; return d;
+}
+async function refreshInfoLive(t){
+  const live = document.getElementById('info-live');
+  if(!live) return;
+  live.style.display = 'block';
+  live.innerHTML = `<div class="live-loading">⟳ 正在从 MES 拉取真实数据…</div>`;
+  try{
+    const base = `location.origin`;
+    const [e10, spc, lots, chambers] = await Promise.all([
+      getE10(),
+      fetch(base + '/api/spc/alarms').then(r=>r.json()),
+      fetch(base + '/api/lots?status=WIP').then(r=>r.json()),
+      fetch(base + '/api/chambers?tool=' + encodeURIComponent(t.id)).then(r=>r.json()).catch(()=>null),
+    ]);
+    const dev = e10.byTool && e10.byTool[t.id];
+    const mod = e10.byModule && e10.byModule[t.module];
+    const spcRows = (spc.alarms || []).filter(a => a.tool === t.id).slice(0, 5);
+    const active = (lots.lots || []).filter(l => l.curTool === t.id);
+    const chs = (chambers && chambers.chambers) || [];
+    selectedChambers = chs;
+    let html = '';
+    if(dev){
+      html += `<div class="kv"><span>本机 MTBF</span><b>${dev.mtbfH}h</b></div>`;
+      html += `<div class="kv"><span>本机 MTTR</span><b>${dev.mttrH}h</b></div>`;
+    } else if(mod){
+      html += `<div class="kv"><span>模块 MTBF</span><b>${mod.mtbfH}h</b></div>`;
+      html += `<div class="kv"><span>模块 MTTR</span><b>${mod.mttrH}h</b></div>`;
+    }
+    html += `<div class="kv"><span>本机在制批次</span><b>${active.length} 批</b></div>`;
+    if(active.length){
+      html += `<div class="live-list">` + active.slice(0, 4).map(l => {
+        const rem = (l.rem != null) ? `· 剩${l.rem}步` : '';
+        return `<div class="li">${l.id} · ${l.product || ''} · 步${l.step != null ? l.step : '?'} ${rem}</div>`;
+      }).join('') + `</div>`;
+    }
+    if(spcRows.length){
+      html += `<div class="kv"><span>最近 SPC 判异</span><b style="color:#ff8a8a">${spcRows.length} 条</b></div>`;
+      html += `<div class="live-list">` + spcRows.map(a => {
+        const ts = a.ts ? new Date(a.ts).toLocaleTimeString() : '';
+        const rules = Array.isArray(a.rules) ? a.rules.join(',') : (a.rules || '');
+        return `<div class="li warn">${a.param}=${a.value}${a.mean != null ? `(μ${a.mean})` : ''} [${rules}] <span class="muted">${ts}</span></div>`;
+      }).join('') + `</div>`;
+    } else {
+      html += `<div class="kv"><span>最近 SPC 判异</span><b style="color:#7ee0a3">无</b></div>`;
+    }
+    html += '<div id="chamber-block">' + chamberBlockHTML(chs) + '</div>';
+    live.innerHTML = html;
+  }catch(e){
+    live.innerHTML = `<div class="live-err">真实数据拉取失败：${e.message || e}</div>`;
+  }
+}
+
+// ---------- SPC 报警联动：导航条对应工艺区按钮红点闪烁 ----------
+function refreshZoneAlarms(){
+  const mods = new Set();
+  spcAlerts.forEach((a, id) => { const t = byId.get(id); if(t) mods.add(t.module); });
+  document.querySelectorAll('#viewbar-btns button').forEach(b => {
+    const v = b.dataset.view; if(v === 'overview') return;
+    b.classList.toggle('alarm', mods.has(v));
+  });
+}
+function updateStats(){
+  document.getElementById('stat-total').textContent = tools.length;
+  document.getElementById('stat-run').textContent  = tools.filter(t=>t.status==='RUN').length;
+  document.getElementById('stat-idle').textContent = tools.filter(t=>t.status==='IDLE').length;
+  document.getElementById('stat-down').textContent = tools.filter(t=>t.status==='PM'||t.status==='DOWN').length;
+}
+
+function handleEvent(ev){
+  if(ev.type === 'toolStatus'){
+    const t = byId.get(ev.id); if(!t) return;
+    t.status = ev.status;
+    if(t._beaconMat){ t._beaconMat.color.set(STATUS[ev.status].color); t._beaconMat.emissive.set(STATUS[ev.status].color); }
+    if(selected && selected.userData.tool.id === ev.id) refreshInfo(t);
+    logEvent(`${ev.id} → ${STATUS[ev.status].name}`, STATUS[ev.status].color);
+    updateStats();
+  } else if(ev.type === 'toolMetric'){
+    const t = byId.get(ev.id); if(!t) return;
+    t.util = ev.util; t.wafers = ev.wafers; t.wph = ev.wph;
+    if(selected && selected.userData.tool.id === ev.id) refreshInfo(t);
+  } else if(ev.type === 'chamberUpdate'){
+    // 腔室级真实遥测上事件总线 → 选中设备就地刷新（焊入主轴）
+    if(selected && selected.userData.tool.id === ev.id){
+      selectedChambers = ev.chambers;
+      updateChamberBlock(ev);
+    }
+  } else if(ev.type === 'amhs'){
+    enqueueTransport(ev);
+    logEvent(`AMHS ${ev.foup||'FOUP'}: ${ev.from} → ${ev.to}`, 0x4ea1ff, true);
+  } else if(ev.type === 'lotRelease'){
+    logEvent(`Lot ${ev.lot} 投入 ${ev.mod} (${ev.wo})`, 0x4ea1ff);
+  } else if(ev.type === 'lotStart'){
+    logEvent(`Lot ${ev.lot} 开工: ${ev.mod} @ ${ev.tool}`, 0x9fd0ff);
+  } else if(ev.type === 'lotDone'){
+    logEvent(`Lot ${ev.lot} 完工 (${ev.cycleH}h)`, 0x39d98a);
+  } else if(ev.type === 'spcAlarm'){
+    // SPC 判异报警 → 3D 高亮异常设备（红色脉冲）
+    const t = byId.get(ev.tool); if(!t) return;
+    spcAlerts.set(ev.tool, { param: ev.param, value: ev.value, mean: ev.mean, rules: ev.rules || [], ts: ev.ts || Date.now() });
+    if(t._main) highlight(t._main, true, 0xff3b3b);
+    if(t._beaconMat){ t._beaconMat.color.set(0xff3b3b); t._beaconMat.emissive.set(0xff3b3b); }
+    logEvent(`⚠ SPC ${ev.param}=${ev.value}@${ev.tool} [${(ev.rules||[]).join(',')}]`, 0xff5c5c);
+    updateSpcBanner();
+    refreshZoneAlarms();
+    updateStats();
+  } else if(ev.type === 'toolRelease'){
+    // 处置释放 → 解除 3D 报警高亮
+    const t = byId.get(ev.id); if(!t) return;
+    if(spcAlerts.has(ev.id)){
+      spcAlerts.delete(ev.id);
+      if(t._main) highlight(t._main, false);
+      if(t._beaconMat){ t._beaconMat.color.set(STATUS[t.status] ? STATUS[t.status].color : 0x9aa7b4); t._beaconMat.emissive.set(0); }
+      logEvent(`✅ ${ev.id} 处置释放，解除报警`, 0x39d98a);
+      updateSpcBanner();
+      refreshZoneAlarms();
+    }
+  }
+}
+// SPC 报警状态集（toolId -> 报警详情）与横幅
+const spcAlerts = new Map();
+function updateSpcBanner(){
+  const b = document.getElementById('spc-banner'), lg = document.getElementById('spc-legend');
+  if(spcAlerts.size === 0){ b.classList.remove('show'); lg.classList.remove('show'); return; }
+  lg.classList.add('show');
+  const list = [...spcAlerts.entries()].map(([id, a]) =>
+    `<span class="mono">${id}</span> ${a.param}=${a.value} [${a.rules.join(',')}]`).join(' &nbsp;·&nbsp; ');
+  document.getElementById('spc-banner-detail').innerHTML = `在制报警 <b>${spcAlerts.size}</b> 台：${list}`;
+  b.classList.add('show');
+}
+
+// 默认数据源：模拟 EAP（浏览器内）；?src=mes 切自研 MES 后端；?src=eap 切 EAP Host（协议链路视角）
+const urlParams = new URLSearchParams(location.search);
+const src = urlParams.get('src') || 'mes';  // 默认接入 MES 真实事件总线（?src=sim 仍可切回浏览器内模拟）
+document.getElementById('src-label').textContent =
+  src === 'mes' ? '数据源：自研 MES 后端 (经门户 ws:8123→8124)'
+  : src === 'eap' ? '数据源：EAP Host 协议链路 (ws:8125)'
+  : '数据源：浏览器内模拟 EAP';
+let ds;
+if(src === 'mes') ds = new WebSocketSource(`((location.protocol==='https:')?'wss':'ws')+'://'+location.host`);
+else if(src === 'eap') ds = new WebSocketSource(`ws://${location.hostname || '127.0.0.1'}:8125`);
+else ds = new SimulatedEAP(tools, { rate:600 });
+ds.subscribe(handleEvent);
+ds.start();
+
+// ---------- 真实模型接管标志（前置声明，避免 TDZ：顶层初始化逻辑会在 L706 先访问 realMode）----------
+let realMode = false;        // 真实模型已接管
+
+// ---------- MES 实时面板（?src=mes）：WIP 柱状图 + E10 摘要 + 3D lot 热力柱 ----------
+if(src === 'mes'){
+  const mesSec = document.getElementById('mes-sec');
+  if(mesSec) mesSec.style.display = 'block';
+  let lotBars = [];
+  if(!realMode && typeof zones !== 'undefined'){
+    zones.forEach(z=>{
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(3, 1, 3),
+        new THREE.MeshStandardMaterial({ color:0x4ea1ff, transparent:true, opacity:0.55 })
+      );
+      bar.position.set(z.zx, 0.6, z.depth/2 + 10);
+      scene.add(bar); lotBars.push({ bar, zone:z });
+    });
+  }
+  const pollMES = async () => {
+    try{
+      const base = `location.origin`;
+      const [wip, e10] = await Promise.all([
+        fetch(base + '/api/wip').then(r=>r.json()),
+        fetch(base + '/api/e10').then(r=>r.json()),
+      ]);
+      const cv = document.getElementById('chart-wip');
+      if(cv){
+        const {ctx,w,h} = setupCanvas(cv, 140);
+        const mods = MODULES.map(m=>({ label:m.key, q:wip.byModule[m.key].queue, p:wip.byModule[m.key].processing, color:m.color }));
+        const maxV = Math.max(1, ...mods.map(x=>x.q + x.p));
+        const bw = w / mods.length, padB = 18;
+        mods.forEach((x,i)=>{
+          const total = x.q + x.p, hh = Math.max(2, total/maxV * (h - padB - 10));
+          const hex = '#' + x.color.toString(16).padStart(6,'0');
+          ctx.fillStyle = hex; ctx.globalAlpha = 0.9;
+          ctx.fillRect(i*bw + 2, h - padB - hh, bw - 4, hh);
+          ctx.globalAlpha = 0.45;
+          ctx.fillRect(i*bw + 2, h - padB - (x.q/maxV)*(h-padB-10), bw - 4, (x.q/maxV)*(h-padB-10));
+          ctx.globalAlpha = 1;
+        });
+        ctx.fillStyle = '#cfd8e3'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        mods.forEach((x,i)=> ctx.fillText(`${x.label} ${x.q}/${x.p}`, i*bw + bw/2, h - 4));
+      }
+      const g = e10.global;
+      const out = document.getElementById('mes-out');
+      if(out) out.innerHTML =
+        `E10/E58：利用率 <b style="color:#39d98a">${g.utilPct}%</b> · 可用率 <b>${g.availPct}%</b> · 待机 ${g.standbyPct}% · 维护 ${g.pmPct}% · 停机 ${g.downPct}% · MTBF ${g.mtbfH}h / MTTR ${g.mttrH}h<br>` +
+        `WIP <b>${wip.wip}</b> · 完成 ${wip.done} · 流转 ${wip.moves} · 规则 <b>${wip.rule}</b> · 产品 ${Object.entries(wip.byProduct||{}).map(([k,v])=>`${k}:${v}`).join(' ') || '—'}`;
+      lotBars.forEach(({bar, zone})=>{
+        const d = wip.byModule[zone.mod.key];
+        const v = d ? d.queue + d.processing : 0;
+        bar.scale.y = Math.max(0.2, Math.min(v * 1.5, 25));
+        bar.position.y = 0.6 + bar.scale.y / 2;
+        bar.material.color.set(v > 6 ? 0xff5c5c : (v > 3 ? 0xf2c14e : 0x4ea1ff));
+      });
+    }catch(e){ /* 后端未启动时静默，保持模拟源 */ }
+  };
+  // 初始状态从 MES 真实快照铺底（避免加载时先显示随机状态、等事件逐步覆盖）
+  const seedFromMES = async () => {
+    try {
+      const d = await (await fetch(`location.origin/api/tools`)).json();
+      let n = 0;
+      for (const mt of (d.tools || [])) {
+        const t = byId.get(mt.id);
+        if (!t) continue;
+        const st = STATUS[mt.status] ? mt.status : 'IDLE';
+        t.status = st; t.util = mt.util; t.wph = mt.wph;
+        t.wafers = mt.wafers; t.chambers = mt.chambers; t.recipe = mt.recipe;
+        if (t._beaconMat) {
+          t._beaconMat.color.set(STATUS[st].color);
+          t._beaconMat.emissive.set(STATUS[st].color);
+        }
+        n++;
+      }
+      updateStats();
+      logEvent(`已从 MES 同步初始设备状态（${n} 台，账实一致）`, 0x57d6a6);
+    } catch (e) { /* 后端未启动则保持模拟源随机初值 */ }
+  };
+  seedFromMES();
+  pollMES();
+  setInterval(pollMES, 3000);
+}
+
+// 控制：暂停/继续
+let paused = false;
+const btnPause = document.getElementById('btn-pause');
+btnPause.onclick = ()=>{
+  paused = !paused;
+  if(paused){ ds.stop(); btnPause.textContent = '继续'; logEvent('数据馈送已暂停', 0xf2c14e); }
+  else { ds.start(); btnPause.textContent = '暂停'; logEvent('数据馈送已恢复', 0x39d98a); }
+};
+
+// ---------- 交互：拾取 / 悬停 ----------
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function setNdc(e){
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+}
+function pick(){
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects([...toolMeshes, ...whMeshes], false);
+  return hits.length ? hits[0].object : null;
+}
+function highlight(obj, on, color){
+  if(!obj) return;
+  obj.material.emissive.set(on ? color : 0x000000);
+  obj.material.emissiveIntensity = on ? 0.6 : 0;
+}
+let downPos = null;
+renderer.domElement.addEventListener('pointerdown', e=>{ downPos = { x:e.clientX, y:e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e=>{
+  if(!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  if(moved > 5) return;
+  setNdc(e);
+  const obj = pick();
+  if(!obj) return;
+  if(obj.userData.wh) selectWarehouse(obj);
+  else selectTool(obj);
+});
+renderer.domElement.addEventListener('pointermove', e=>{
+  setNdc(e);
+  const obj = pick();
+  const tool = obj && obj.userData.tool ? obj : null;
+  const wh = obj && obj.userData.wh ? obj : null;
+  if(tool !== hovered){
+    if(hovered && hovered !== selected) highlight(hovered, false);
+    hovered = tool;
+    if(hovered && hovered !== selected) highlight(hovered, true, 0x222222);
+  }
+  renderer.domElement.style.cursor = (tool || wh) ? 'pointer' : 'default';
+});
+document.getElementById('info-close').onclick = ()=>{ info.style.display='none'; if(selected) highlight(selected,false); selected=null; };
+
+function selectTool(obj){
+  if(selected) highlight(selected, false);
+  selected = obj;
+  // SPC 报警设备保持红色高亮（选中不覆盖报警色）
+  const tid = obj.userData.tool.id;
+  highlight(selected, true, spcAlerts.has(tid) ? 0xff3b3b : 0x4ea1ff);
+  const t = obj.userData.tool;
+  info.style.display = 'block';
+  infoTitle.textContent = t.id;
+  refreshInfo(t);
+  refreshInfoLive(t);
+  focusTool(obj);
+}
+
+// ---------- 相机预设视角 + 选中飞向（车间 / 产线游走）----------
+let camTween = null;
+function flyTo(toPos, toTarget, dur=0.9){
+  controls.enabled = false;
+  camTween = {
+    fromPos: camera.position.clone(),
+    toPos: toPos.clone(),
+    fromTarget: controls.target.clone(),
+    toTarget: toTarget.clone(),
+    t: 0, dur
+  };
+}
+function frameBox(box, dur=1.0){
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * Math.PI/180;
+  const dist = (maxDim/2) / Math.tan(fov/2) * 1.4;
+  const dir = new THREE.Vector3(0.25, 0.55, 1).normalize();
+  flyTo(center.clone().add(dir.multiplyScalar(dist)), center, dur);
+}
+function flyToOverview(){
+  const maxDepth = Math.max(...zones.map(z=>z.depth));
+  const box = new THREE.Box3(
+    new THREE.Vector3(-totalW/2 - 24, 0, -maxDepth/2 - 14),
+    new THREE.Vector3( totalW/2 + 24, 34,  maxDepth/2 + 14)
+  );
+  frameBox(box, 1.1);
+  setActiveView('overview');
+}
+function flyToZone(z){
+  const box = new THREE.Box3(
+    new THREE.Vector3(z.zx - zoneW/2, 0, -z.depth/2),
+    new THREE.Vector3(z.zx + zoneW/2, 18,  z.depth/2)
+  );
+  frameBox(box, 1.0);
+  setActiveView(z.mod.key);
+}
+function focusTool(obj){
+  const p = new THREE.Vector3();
+  obj.getWorldPosition(p);
+  const dir = new THREE.Vector3(0.4, 0.5, 1).normalize();
+  flyTo(p.clone().add(dir.multiplyScalar(40)), p.clone().add(new THREE.Vector3(0, 2, 0)), 0.8);
+}
+function setActiveView(key){
+  const btns = document.querySelectorAll('#viewbar-btns button');
+  btns.forEach(b => b.classList.toggle('active', b.dataset.view === key));
+}
+function updateCamTween(dt){
+  if(!camTween) return;
+  camTween.t += dt / camTween.dur;
+  let k = Math.min(1, camTween.t);
+  k = k < 0.5 ? 4*k*k*k : 1 - Math.pow(-2*k+2, 3)/2; // easeInOutCubic
+  camera.position.lerpVectors(camTween.fromPos, camTween.toPos, k);
+  controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, k);
+  if(camTween.t >= 1){ camTween = null; controls.enabled = true; }
+}
+// 构建视角预设按钮（总览 + 各工艺区）
+(function buildViewbar(){
+  const vb = document.getElementById('viewbar-btns');
+  if(!vb) return;
+  const ov = document.createElement('button');
+  ov.textContent = '总览'; ov.dataset.view = 'overview';
+  ov.onclick = flyToOverview; vb.appendChild(ov);
+  zones.forEach(z => {
+    const b = document.createElement('button');
+    b.textContent = z.mod.key; b.dataset.view = z.mod.key;
+    b.title = z.mod.name;
+    b.onclick = () => flyToZone(z);
+    vb.appendChild(b);
+  });
+  setActiveView('overview');
+})();
+
+// ---------- 图例筛选（合成 / 真实模型通用）----------
+const legendRows = document.getElementById('legend-rows');
+function buildLegend(){
+  legendRows.innerHTML = '';
+  MODULES.forEach(m=>{
+    const row = document.createElement('div');
+    row.className = 'leg-row';
+    if(m._off) row.classList.add('off');
+    row.innerHTML = `<span class="sw" style="background:${hex(m.color)}"></span>${m.name} <span style="opacity:.55">(${m.count})</span>`;
+    row.onclick = ()=>{
+      m._off = !m._off;
+      row.classList.toggle('off', m._off);
+      tools.forEach(t=>{ if(t.module === m.key && t._vis){ t._vis.visible = !m._off; if(t._beacon) t._beacon.visible = !m._off; } });
+    };
+    legendRows.appendChild(row);
+  });
+}
+buildLegend();
+
+// ---------- 统计初始化 ----------
+document.getElementById('stat-total').textContent = tools.length;
+updateStats();
+logEvent(`数字孪生已启动 · ${src === 'mes' ? '数据源：自研 MES 后端' : src === 'eap' ? '数据源：EAP Host 协议链路' : '数据源：浏览器内模拟 EAP'}`, 0x57d6a6);
+
+// ---------- 真实 BIM / glTF / 点云加载（含语义绑定）----------
+// 用法：
+//   index.html?model=demo-fab.gltf                      —— 按网格命名约定自动绑定
+//   index.html?model=demo-fab.gltf&manifest=fab.json    —— 显式清单映射
+//   index.html?pcd=plant.pcd                            —— 点云厂房（仅可视化）
+const params = new URLSearchParams(location.search);
+let realCenterX = 0;        // 真实模型中心 X（用于扩容机台落位）
+
+// 把网格名/清单解析为 {module, wph, type}
+function moduleResolver(manifest){
+  const rules = (manifest && manifest.rules) || [];
+  const up = s => (s||'').toUpperCase();
+  return (name)=>{
+    const U = up(name);
+    for(const r of rules){ if(r.match && U.includes(up(r.match))) return { module:r.module, wph:r.wph||100, type:r.type||r.module }; }
+    const tok = U.split(/[_\- ]/)[0];
+    const map = { LITHO:'LITHO', EUV:'LITHO', SCAN:'LITHO', ETCH:'ETCH', DEP:'DEP', CVD:'DEP', PVD:'DEP',
+                  FILL:'DEP', ALD:'DEP', CMP:'CMP', POLISH:'CMP', IMPL:'IMPL', IMP:'IMPL',
+                  METRO:'METRO', MET:'METRO', INSPECT:'METRO', ALIGN:'METRO', AOI:'METRO' };
+    if(map[tok]) return { module:map[tok], wph:100 };
+    return null;
+  };
+}
+
+// 把一台真实网格注册为孪生设备（信标置于独立 beaconGroup，避免被节点缩放变形）
+function bindRealMesh(o, m, beaconGroup){
+  o.material = Array.isArray(o.material) ? o.material.map(x=>x.clone()) : o.material.clone();
+  const bbox = new THREE.Box3().setFromObject(o);
+  const beaconMat = new THREE.MeshStandardMaterial({ color:STATUS.RUN.color, emissive:STATUS.RUN.color, emissiveIntensity:0.9 });
+  const beacon = new THREE.Mesh(geoBeacon, beaconMat);
+  beacon.position.set((bbox.min.x+bbox.max.x)/2, bbox.max.y + 0.8, (bbox.min.z+bbox.max.z)/2);
+  beaconGroup.add(beacon);
+  const mod = MODULES.find(x=>x.key===m.module) || MODULES[0];
+  const t = {
+    id: o.name || ('MESH_'+tools.length), module:mod.key, modName:mod.name, color:mod.color,
+    status:'RUN', util:70+Math.round(Math.random()*20), wafers:Math.round(500+Math.random()*5000),
+    wph:m.wph||100, chambers:Math.round(1+Math.random()*4), recipe:'R'+Math.round(100+Math.random()*899)
+  };
+  o.userData.tool = t;
+  toolMeshes.push(o);
+  t._vis = o; t._beacon = beacon; t._beaconMat = beaconMat; t._main = o;
+  tools.push(t); byId.set(t.id, t); mod.count++;
+  return t;
+}
+
+let realGroup = null, beaconGroup = null;
+async function loadRealModel(modelUrl, manifestUrl){
+  const { GLTFLoader } = await import('./vendor/GLTFLoader.js');
+  logEvent('正在加载真实厂房模型: ' + modelUrl, 0x4ea1ff);
+  const loader = new GLTFLoader();
+  const gltf = await loader.loadAsync(modelUrl);
+  let manifest = null;
+  if(manifestUrl){ try{ manifest = await (await fetch(manifestUrl)).json(); }catch(e){ logEvent('清单读取失败，回退命名约定: '+(e.message||e), 0xf2c14e); } }
+  const resolve = moduleResolver(manifest);
+
+  // 清空合成工厂（保留空容器，供后续扩容机台使用）
+  while(toolGroup.children.length) toolGroup.remove(toolGroup.children[0]);
+  toolGroup.visible = true;
+  toolMeshes.length = 0; tools.length = 0; byId.clear();
+  MODULES.forEach(m=> m.count = 0);
+
+  if(!realGroup){ realGroup = new THREE.Group(); scene.add(realGroup); beaconGroup = new THREE.Group(); realGroup.add(beaconGroup); }
+  else { while(beaconGroup.children.length) beaconGroup.remove(beaconGroup.children[0]); while(realGroup.children.length){ if(realGroup.children[0]!==beaconGroup) realGroup.remove(realGroup.children[0]); } }
+
+  const root = gltf.scene;
+  root.updateMatrixWorld(true);
+  realGroup.add(root);
+  let bound = 0;
+  root.traverse(o=>{
+    if(!o.isMesh) return;
+    const m = resolve(o.name || (o.parent && o.parent.name) || '');
+    if(!m) return;
+    bindRealMesh(o, m, beaconGroup); bound++;
+  });
+
+  const wb = new THREE.Box3().setFromObject(root);
+  fitCameraTo(wb);
+  if(bound === 0){
+    logEvent('模型已加载，但未匹配到设备网格（检查命名或 manifest）。已按真实几何显示，未接管孪生设备。', 0xf2c14e);
+    decorGroup.visible = false; realMode = true; realCenterX = 0;
+    reinitAfterModelSwap(bound, modelUrl); return;
+  }
+
+  realCenterX = (wb.min.x + wb.max.x)/2;
+  decorGroup.visible = false;   // 隐藏合成区底板 / 标签
+  realMode = true;
+  reinitAfterModelSwap(bound, modelUrl);
+}
+
+// 加载真实模型后, 自动把相机框住整座厂房 (任意尺寸/多层)
+function fitCameraTo(box){
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * Math.PI/180;
+  let dist = (maxDim/2) / Math.tan(fov/2) * 1.5;
+  const dir = new THREE.Vector3(0.55, 0.6, 1).normalize();
+  camera.position.copy(center.clone().add(dir.multiplyScalar(dist)));
+  controls.target.copy(center);
+  camera.near = Math.max(0.1, dist/200);
+  camera.far  = dist*20;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+function reinitAfterModelSwap(bound, modelUrl){
+  buildLegend();
+  document.getElementById('stat-total').textContent = tools.length;
+  updateStats();
+  if(simPanel.classList.contains('open') && lastRes) renderResults(lastRes);
+  logEvent(`已加载真实厂房：${modelUrl||''} · 绑定设备 ${bound} 台 · 状态/仿真/优化已接管`, 0x39d98a);
+}
+
+// 点云厂房（可选）：按需加载 PCDLoader
+async function loadPointCloud(pcdUrl){
+  logEvent('正在加载点云: ' + pcdUrl, 0x4ea1ff);
+  let PCDLoader;
+  try { ({ PCDLoader } = await import('./vendor/PCDLoader.js')); }
+  catch { ({ PCDLoader } = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/PCDLoader.js')); }
+  const pts = await new PCDLoader().loadAsync(pcdUrl);
+  pts.material.size = 0.6; pts.material.vertexColors = false; pts.material.color = new THREE.Color(0x6f97c4);
+  scene.add(pts);
+  decorGroup.visible = false; toolGroup.visible = false;
+  logEvent('点云厂房已加载（可视化模式，未绑定设备语义）', 0x39d98a);
+}
+
+if(params.get('model')){
+  loadRealModel(params.get('model'), params.get('manifest')).catch(err=>logEvent('真实模型加载失败: '+(err.message||err), 0xff5c5c));
+} else if(params.get('pcd')){
+  loadPointCloud(params.get('pcd')).catch(err=>logEvent('点云加载失败: '+(err.message||err), 0xff5c5c));
+}
+
+// ---------- 渲染循环 ----------
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  updateCamTween(dt);
+  // SPC 报警设备红色脉冲（emissiveIntensity 呼吸）
+  const tsec = clock.elapsedTime;
+  const pulse = 0.45 + 0.45 * Math.sin(tsec * 6);
+  spcAlerts.forEach((a, id) => {
+    const t = byId.get(id);
+    if(t && t._main){
+      t._main.material.emissiveIntensity = pulse;
+      if(t._beaconMat) t._beaconMat.emissiveIntensity = 0.4 + 0.6 * pulse;
+    }
+  });
+  // 全设备信标脉冲（按状态差异化节奏）
+  const bpulse = Math.sin(tsec * 3) * 0.5 + 0.5; // 0~1 基础相位
+  tools.forEach(t => {
+    if(!t._beaconMat) return;
+    if(t.status === 'DOWN'){
+      t._beaconMat.emissiveIntensity = 0.5 + 0.5 * Math.sin(tsec * 8); // 快闪报警
+    } else if(t.status === 'PM'){
+      t._beaconMat.emissiveIntensity = 0.4 + 0.4 * Math.sin(tsec * 2); // 慢黄闪
+    } else if(t.status === 'IDLE'){
+      t._beaconMat.emissiveIntensity = 0.4 + 0.3 * Math.sin(tsec * 1.2); // 慢蓝呼吸
+    } else {
+      t._beaconMat.emissiveIntensity = 0.7 + 0.3 * Math.sin(tsec * 1.8); // RUN 稳亮微脉
+    }
+  });
+  // 工艺步骤进度条：根据真实在制 lot 进度缩放（左对齐增长）
+  tools.forEach(t=>{
+    if(t._progGrp && t._progGrp.visible){
+      const f = Math.max(0.02, t._progFrac||0);
+      t._progFg.scale.x = f;
+      t._progFg.position.x = -1.3 + 1.3*f;
+    }
+  });
+  // AMHS 天车：真实搬运任务优先，空闲时沿环线巡逻（真实模式也不再静止）
+  vehicles.forEach(v=>{
+    const task = v.userData.task;
+    if(task){
+      task.t += dt / task.dur;
+      const k = Math.min(1, task.t);
+      const p = transportPos(task.from, task.to, k);
+      v.position.copy(p);
+      if(k>=1){ v.userData.task=null; if(v.userData.foupLabel) v.userData.foupLabel.visible=false; }
+    } else {
+      v.userData.offset = (v.userData.offset + v.userData.speed*dt) % 1;
+      const p = rail.getPointAt(v.userData.offset);
+      v.position.copy(p);
+      const tan = rail.getTangentAt(v.userData.offset);
+      v.lookAt(p.clone().add(tan));
+    }
+  });
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// 延迟同步：确保 DOM 布局完成后，渲染器尺寸匹配 #app 容器实际可见区域
+requestAnimationFrame(() => {
+  if (app.clientWidth > 0 && app.clientHeight > 0) {
+    camera.aspect = app.clientWidth / app.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(app.clientWidth, app.clientHeight);
+  }
+});
+
+// ============================================================
+//  Phase 3 — 仿真与分析层
+//  离散事件仿真 (DES) + 蒙特卡洛 + 瓶颈分析 + 3D 瓶颈热力
+//  + 预测性维护 (RUL) + FDC/APC 虚拟量测控制图
+// ============================================================
+function gauss(){ let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+
+class Heap{
+  constructor(){ this.a=[]; }
+  get size(){ return this.a.length; }
+  push(item){ const a=this.a; a.push(item); let i=a.length-1; while(i>0){ const p=(i-1)>>1; if(a[p].t<=a[i].t) break; [a[p],a[i]]=[a[i],a[p]]; i=p; } }
+  pop(){ const a=this.a, top=a[0], last=a.pop(); if(a.length){ a[0]=last; let i=0; const n=a.length; while(true){ let l=2*i+1,r=2*i+2,s=i; if(l<n&&a[l].t<a[s].t)s=l; if(r<n&&a[r].t<a[s].t)s=r; if(s===i)break; [a[s],a[i]]=[a[i],a[s]]; i=s; } } return top; }
+}
+
+// 单次离散事件仿真：lot 沿重入工艺路线流动，模块含多台机台与队列
+function runDES(cfg){
+  const lambda=cfg.lambda, passes=cfg.passes, cv=cfg.cv, horizon=cfg.horizon, toolDelta=cfg.toolDelta||{};
+  const rule=cfg.rule||'FIFO', bnKey=cfg.bnKey||'LITHO';
+  // 混合派工配置（贴近真实 MES）：指定瓶颈模块集合 + 瓶颈用规则 + 非瓶颈用规则
+  const hybridBn=(cfg.hybridBn && cfg.hybridBn.length) ? cfg.hybridBn : [bnKey];
+  const hybridBnRule=cfg.hybridBnRule||'BN';
+  const hybridOtherRule=cfg.hybridOtherRule||'FIFO';
+  const mods = MODULES.map(m=>{
+    const mt=tools.filter(t=>t.module===m.key);
+    const n=Math.max(1, mt.length + (toolDelta[m.key]||0));
+    const wphAvg=mt.reduce((s,t)=>s+t.wph,0)/mt.length;
+    const basePT=25/wphAvg; // 单 lot(25片) 平均加工时间(hr)
+    return { key:m.key, name:m.name, n, wphAvg, basePT, queue:[], servers:new Array(n).fill(0), downUntil:new Array(n).fill(0), busyTime:0, maxQ:0, qWaitSum:0, arrivals:0 };
+  });
+  const modByKey=Object.fromEntries(mods.map(x=>[x.key,x]));
+  const route=[]; for(let p=0;p<passes;p++) MODULES.forEach(m=>route.push(m.key));
+  const meanBasePT=mods.reduce((s,m)=>s+m.basePT,0)/mods.length;
+  const plannedCycle=route.length*meanBasePT*3; // 宽松交期基准
+  const heap=new Heap();
+  let t=0; while(t<horizon){ t += -Math.log(1-Math.random())/lambda; if(t<horizon) heap.push({t, type:'arr', lot:{created:t, step:0, due:t+plannedCycle*(0.9+0.2*Math.random()), rem:route.length}}); }
+  // —— Phase 7 动态再调度状态 ——
+  const dynOn = !!cfg.dyn;
+  const REPLAN = 2;                                  // 再规划周期 (hr)
+  // 时间驱动再规划：预生成 replan 事件，严格每 REPLAN 小时触发一次（避免事件跳跃导致重复触发）
+  if(dynOn) for(let rt=REPLAN; rt<horizon; rt+=REPLAN) heap.push({t:rt, type:'replan'});
+  let dynBnSet = new Set(dynOn && cfg.dnDetect ? [] : hybridBn);
+  let nBnSwitch=0, nBreakdown=0, nDueEsc=0;
+  const reschedEvents=[]; const bnTimeline=[]; const pressure={};
+  if(dynOn) bnTimeline.push({ t:0, bn:[...dynBnSet] });
+
+  const ptOf=m=>Math.max(0.0005, m.basePT*(1+cv*gauss()));
+  // 派工规则：从队列选一个 lot 的下标（0 = FIFO 队首）。
+  // HYBRID 模式 = 瓶颈模块集合用 hybridBnRule，其余模块用 hybridOtherRule（默认 瓶颈BN / 其余FIFO，贴近真实 MES）
+  function isBnMod(mod){
+    if(dynOn && cfg.dnDetect) return dynBnSet.has(mod.key);  // 动态瓶颈检测：实时集合
+    return hybridBn.includes(mod.key);                       // 静态混合集合
+  }
+  function pickBy(queue, mod, r){
+    if(r==='FIFO') return 0;
+    if(r==='SPT'){ let bi=0; for(let i=1;i<queue.length;i++) if((queue[i]._pt||1e9)<(queue[bi]._pt||1e9)) bi=i; return bi; }
+    if(r==='EDD'){ let bi=0; for(let i=1;i<queue.length;i++) if((queue[i].due||0)<(queue[bi].due||0)) bi=i; return bi; }
+    if(r==='CR'){ const cr=l=>{ const rt=Math.max(0.001,(l.rem||1)*mod.basePT); return ((l.due||1e9)-now)/rt; };
+      let bi=0; for(let i=1;i<queue.length;i++) if(cr(queue[i])<cr(queue[bi])) bi=i; return bi; }
+    if(r==='BN'){ let bi=0; for(let i=1;i<queue.length;i++) if((queue[i].rem||0)<(queue[bi].rem||0)) bi=i; return bi; }
+    return 0;
+  }
+  function pickLot(queue, mod){
+    if(queue.length<=1) return 0;
+    // 交期风险升级：临期 lot 动态优先（动态再调度核心能力之一）
+    if(dynOn && cfg.dnDue){
+      let bi=-1;
+      for(let i=0;i<queue.length;i++){ const sl=(queue[i].rem||1)*mod.basePT*1.2; if(((queue[i].due||1e9)-now) < sl){ if(bi<0||(queue[i].due||0)<(queue[bi].due||0)) bi=i; } }
+      if(bi>=0){ nDueEsc++; return bi; }
+    }
+    if(rule==='HYBRID') return pickBy(queue, mod, isBnMod(mod) ? hybridBnRule : hybridOtherRule);
+    if(rule==='BN') return isBnMod(mod) ? pickBy(queue, mod, 'BN') : 0; // 仅瓶颈模块集合用 BN，其余 FIFO（原语义 + 支持多瓶颈）
+    return pickBy(queue, mod, rule); // FIFO / SPT / CR / EDD
+  }
+  function dispatch(mod){
+    while(true){
+      let si=-1; for(let i=0;i<mod.servers.length;i++){ if(mod.servers[i]<=now && mod.downUntil[i]<=now){ si=i; break; } }
+      if(si<0||mod.queue.length===0) break;
+      const idx=pickLot(mod.queue, mod);
+      const lot=mod.queue.splice(idx,1)[0];
+      mod.qWaitSum += (now - lot._enq);
+      const pt=ptOf(mod); lot._pt=pt; mod.servers[si]=now+pt; mod.busyTime+=pt;
+      heap.push({t:now+pt, type:'rel', mod, lot, si});
+    }
+  }
+  // 再规划：动态瓶颈检测 + 非计划停机注入
+  function replan(){
+    if(!dynOn) return;
+    if(cfg.dnDetect){
+      let bestKey=null, bestP=-1;
+      MODULES.forEach(m=>{
+        const mod=modByKey[m.key];
+        const qLen=mod.queue.length;
+        let down=0; for(let i=0;i<mod.downUntil.length;i++) if(mod.downUntil[i]>now) down++;
+        const avail=Math.max(1, mod.n-down);
+        const p=qLen/avail;
+        pressure[m.key]={qLen,down,avail,p};
+        if(p>bestP){ bestP=p; bestKey=m.key; }
+      });
+      const newSet=new Set();
+      if(bestKey && bestP>=1) newSet.add(bestKey);
+      bnTimeline.push({ t:+now.toFixed(1), bn:[...newSet] });
+      let changed=false;
+      if(newSet.size!==dynBnSet.size) changed=true;
+      else { for(const k of newSet) if(!dynBnSet.has(k)) changed=true; }
+      if(changed){
+        const prev=[...dynBnSet].join(',')||'—';
+        const cur=[...newSet].join(',')||'—';
+        const pr=bestKey?pressure[bestKey]:null;
+        reschedEvents.push({ t:+now.toFixed(1), type:'bn', mod:bestKey, text:`动态瓶颈切换 ${prev} → ${cur}`+(pr?` (队列 ${pr.qLen}/可用 ${pr.avail})`:'') });
+        nBnSwitch++;
+        dynBnSet=newSet;
+      }
+    } else {
+      bnTimeline.push({ t:+now.toFixed(1), bn:[...dynBnSet] });
+    }
+    if(cfg.downtimeRate>0){
+      const totalTools=mods.reduce((s,m)=>s+m.n,0);
+      const expected=cfg.downtimeRate*totalTools*REPLAN;
+      let k=Math.floor(expected); if(Math.random()<(expected-k)) k++;
+      for(let b=0;b<k;b++){
+        const freeMods=mods.filter(m=>{ for(let i=0;i<m.servers.length;i++) if(m.servers[i]<=now && m.downUntil[i]<=now) return true; return false; });
+        if(!freeMods.length) break;
+        const mod=freeMods[Math.floor(Math.random()*freeMods.length)];
+        const fi=[]; for(let i=0;i<mod.servers.length;i++) if(mod.servers[i]<=now && mod.downUntil[i]<=now) fi.push(i);
+        const i=fi[Math.floor(Math.random()*fi.length)];
+        const repair=rnd(2,8); const end=now+repair;
+        mod.servers[i]=end; mod.downUntil[i]=end;
+        heap.push({t:end, type:'bdclear', mod, i});
+        reschedEvents.push({ t:+now.toFixed(1), type:'bd', mod:mod.key, text:`${mod.key} #${i} 非计划停机 ~${repair.toFixed(1)}h` });
+        nBreakdown++;
+      }
+    }
+  }
+  let now=0, completed=0, cycSum=0, wip=0, wipArea=0, lastT=0;
+  while(heap.size){
+    const ev=heap.pop(); now=ev.t; wipArea += wip*(now-lastT); lastT=now;
+    if(ev.type==='arr'){
+      const lot=ev.lot; lot._enq=now; wip++;
+      const m=modByKey[route[lot.step]]; lot._pt=ptOf(m); m.arrivals++; m.queue.push(lot);
+      if(m.queue.length>m.maxQ) m.maxQ=m.queue.length; dispatch(m);
+    } else if(ev.type==='replan'){
+      replan();
+    } else if(ev.type==='bdclear'){
+      const {mod,i}=ev; mod.downUntil[i]=0; mod.servers[i]=0; dispatch(mod);
+    } else {
+      const {mod,lot,si}=ev; mod.servers[si]=0; lot.step++; lot.rem=(lot.rem||1)-1;
+      if(lot.step>=route.length){ completed++; cycSum+=now-lot.created; wip--; }
+      else { const m=modByKey[route[lot.step]]; lot._enq=now; lot._pt=ptOf(m); m.arrivals++; m.queue.push(lot); if(m.queue.length>m.maxQ)m.maxQ=m.queue.length; dispatch(m); }
+    }
+  }
+  wipArea += wip*(horizon-lastT);
+  const modOut={};
+  mods.forEach(m=>{ modOut[m.key]={ key:m.key, name:m.name, n:m.n, wphAvg:m.wphAvg, util:m.busyTime/(m.n*horizon), avgQueue:m.qWaitSum/(m.arrivals||1), busyTime:m.busyTime, maxQ:m.maxQ }; });
+  return { throughput: completed/horizon, avgCycle: completed?cycSum/completed:0, avgWIP: wipArea/horizon, mods: modOut,
+    resched:{ nBnSwitch, nBreakdown, nDueEsc, bnTimeline, events:reschedEvents.slice(-80) } };
+}
+
+function runMonteCarlo(cfg){
+  const reps=cfg.reps||1; const runs=[];
+  for(let r=0;r<reps;r++) runs.push(runDES(cfg));
+  const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+  const ci=a=>{ const m=mean(a); const sd=Math.sqrt(mean(a.map(v=>(v-m)**2))); return 1.96*sd/Math.sqrt(a.length); };
+  const modKeys=MODULES.map(m=>m.key), modMean={};
+  modKeys.forEach(k=>{
+    modMean[k]={ util:mean(runs.map(x=>x.mods[k].util)), utilCi:ci(runs.map(x=>x.mods[k].util)),
+                 queue:mean(runs.map(x=>x.mods[k].avgQueue)), queueCi:ci(runs.map(x=>x.mods[k].avgQueue)),
+                 busy:mean(runs.map(x=>x.mods[k].busyTime)), maxQ:mean(runs.map(x=>x.mods[k].maxQ)) };
+  });
+  let bn=null; modKeys.forEach(k=>{ if(!bn||modMean[k].util>modMean[bn].util) bn=k; });
+  const resched = {
+    nBnSwitch: mean(runs.map(x=>x.resched.nBnSwitch)),
+    nBreakdown: mean(runs.map(x=>x.resched.nBreakdown)),
+    nDueEsc: mean(runs.map(x=>x.resched.nDueEsc)),
+    bnTimeline: runs[0] ? runs[0].resched.bnTimeline : [],
+    events: runs[0] ? runs[0].resched.events : []
+  };
+  return { thr:mean(runs.map(x=>x.throughput)), thrCi:ci(runs.map(x=>x.throughput)),
+           cyc:mean(runs.map(x=>x.avgCycle)), cycCi:ci(runs.map(x=>x.avgCycle)),
+           wip:mean(runs.map(x=>x.avgWIP)), wipCi:ci(runs.map(x=>x.avgWIP)),
+           modMean, bn, reps, runs, cfg, resched };
+}
+
+function utilToColor(u){
+  u=clamp(u,0,1); const c1=[0x39,0xd9,0x8a], c2=[0xf2,0xc1,0x4e], c3=[0xff,0x5c,0x5c];
+  let r,g,b; if(u<0.5){ const k=u/0.5; r=c1[0]+(c2[0]-c1[0])*k; g=c1[1]+(c2[1]-c1[1])*k; b=c1[2]+(c2[2]-c1[2])*k; }
+  else { const k=(u-0.5)/0.5; r=c2[0]+(c3[0]-c2[0])*k; g=c2[1]+(c3[1]-c2[1])*k; b=c2[2]+(c3[2]-c2[2])*k; }
+  return (Math.round(r)<<16)|(Math.round(g)<<8)|Math.round(b);
+}
+function utilByKeyFrom(res){ const o={}; MODULES.forEach(m=>o[m.key]=res.modMean[m.key].util); return o; }
+function applyHeat(utilByKey){
+  const on=document.getElementById('p-heat').checked;
+  zones.forEach(z=>{ const pad=z.pad; if(!pad) return;
+    if(on){ const u=utilByKey[z.mod.key]||0; pad.material.color.set(utilToColor(u)); pad.material.opacity=0.45; }
+    else { pad.material.color.set(z.mod.color); pad.material.opacity=0.10; }
+  });
+}
+
+function setupCanvas(cv,h){ const dpr=window.devicePixelRatio||1; const w=cv.clientWidth||440; cv.width=w*dpr; cv.height=h*dpr; const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); return {ctx,w,h}; }
+function drawBars(cv, items, opts={}, h=160){
+  const {ctx,w,h:hh}=setupCanvas(cv,h); const padL=8,padR=8,padT=8,padB=20;
+  const maxV=opts.maxV || Math.max(...items.map(i=>i.value*(1+(i.ci||0))),1);
+  const n=items.length, bw=(w-padL-padR)/n; ctx.font='10px sans-serif';
+  items.forEach((it,i)=>{
+    const x=padL+i*bw+bw*0.15, bwidth=bw*0.7;
+    const bh=Math.max(2,(it.value/maxV)*(hh-padT-padB));
+    ctx.fillStyle=it.color||'#4ea1ff'; ctx.fillRect(x, hh-padB-bh, bwidth, bh);
+    if(it.ci){ const ey=hh-padB-bh, e=it.ci/maxV*(hh-padT-padB); ctx.strokeStyle='#cfd8e3'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x+bwidth/2,ey-e); ctx.lineTo(x+bwidth/2,ey+e); ctx.stroke(); }
+    ctx.fillStyle='#9aa7b4'; ctx.textAlign='center'; ctx.fillText(it.label, x+bwidth/2, hh-padB+13);
+  });
+}
+
+function renderPM(res){
+  const baseN={}; MODULES.forEach(m=> baseN[m.key]=tools.filter(t=>t.module===m.key).length);
+  let html='';
+  MODULES.forEach(m=>{
+    const k=m.key, d=res.modMean[k], n=baseN[k]+(res.cfg.toolDelta[k]||0);
+    const perToolBusy=d.busy/n, rate=(k==='LITHO')?0.25:0.10;
+    let atRisk=0, hs=[]; for(let i=0;i<n;i++){ const h=clamp(100 - rate*perToolBusy*(0.7+Math.random()*0.6),0,100); hs.push(h); if(h<50)atRisk++; }
+    const avgH=hs.reduce((s,v)=>s+v,0)/hs.length;
+    html+=`<div class="ctl-row"><label>${m.key} · 利用率 ${(d.util*100).toFixed(0)}%</label><span style="color:${avgH<60?'#ff8a8a':'#9aa7b4'}">健康 ${avgH.toFixed(0)}% · 风险机台 ${atRisk}</span></div>`;
+  });
+  document.getElementById('pm-out').innerHTML=html;
+}
+
+function renderSPC(){
+  const N=60, target=100, sigma=2, pts=[]; let drift=0;
+  for(let i=0;i<N;i++){ if(i>38) drift+=0.5; pts.push(target+drift+gauss()*sigma); }
+  const ucl=target+3*sigma, lcl=target-3*sigma; let ooc=0; pts.forEach(v=>{ if(v>ucl||v<lcl)ooc++; });
+  const cv=document.getElementById('chart-spc'); const {ctx,w,h}=setupCanvas(cv,150);
+  const padL=6,padR=6,padT=10,padB=14; const all=pts.concat([target,ucl,lcl]); const mn=Math.min(...all)-1, mx=Math.max(...all)+1;
+  const X=i=> padL + (i/(N-1))*(w-padL-padR), Y=v=> padT + (1-(v-mn)/(mx-mn))*(h-padT-padB);
+  ctx.strokeStyle='rgba(255,92,92,0.5)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(padL,Y(ucl)); ctx.lineTo(w-padR,Y(ucl)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(padL,Y(lcl)); ctx.lineTo(w-padR,Y(lcl)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(78,161,255,0.6)'; ctx.beginPath(); ctx.moveTo(padL,Y(target)); ctx.lineTo(w-padR,Y(target)); ctx.stroke();
+  ctx.strokeStyle='#cfd8e3'; ctx.beginPath();
+  pts.forEach((v,i)=>{ const x=X(i),y=Y(v); if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y); if(v>ucl||v<lcl){ ctx.fillStyle='#ff5c5c'; ctx.beginPath(); ctx.arc(x,y,2.6,0,7); ctx.fill(); } });
+  ctx.stroke();
+  document.getElementById('spc-out').textContent=`控制限 ±3σ = [${lcl.toFixed(0)}, ${ucl.toFixed(0)}]；越限点 ${ooc} 个 → ${ooc>0?'检测到漂移，建议触发 APC 工艺调整':'过程受控'}`;
+}
+
+function renderResults(res){
+  const bnMod=MODULES.find(m=>m.key===res.bn);
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="v">${res.thr.toFixed(1)}</div><div class="l">吞吐量 (lots/hr)</div><div class="c">±${res.thrCi.toFixed(1)}</div></div>
+    <div class="kpi"><div class="v">${res.cyc.toFixed(1)}</div><div class="l">平均周期 (hr)</div><div class="c">±${res.cycCi.toFixed(1)}</div></div>
+    <div class="kpi"><div class="v">${res.wip.toFixed(0)}</div><div class="l">平均在制 WIP</div><div class="c">±${res.wipCi.toFixed(0)}</div></div>
+    <div class="kpi"><div class="v" style="color:#ff8a8a;font-size:15px">${bnMod.key}</div><div class="l">瓶颈模块</div><div class="c">${(res.modMean[res.bn].util*100).toFixed(0)}% 利用率</div></div>`;
+  drawBars(document.getElementById('chart-util'), MODULES.map(m=>{ const d=res.modMean[m.key]; return { label:m.key, value:d.util*100, ci:d.utilCi*100, color:utilToColor(d.util) }; }), {maxV:100}, 170);
+  drawBars(document.getElementById('chart-queue'), MODULES.map(m=>{ const d=res.modMean[m.key]; return { label:m.key, value:d.queue, ci:d.queueCi, color:'#4ea1ff' }; }), {}, 150);
+  const baseN={}; MODULES.forEach(m=> baseN[m.key]=tools.filter(t=>t.module===m.key).length);
+  let rows='<tr><th>模块</th><th>机台</th><th>利用率</th><th>均排队(hr)</th><th>最大队列</th></tr>';
+  MODULES.forEach(m=>{ const d=res.modMean[m.key], isBn=m.key===res.bn; const n=baseN[m.key]+(res.cfg.toolDelta[m.key]||0);
+    rows+=`<tr><td><b>${m.key}</b>${isBn?' <span class="tag">瓶颈</span>':''}</td><td>${n}</td><td>${(d.util*100).toFixed(0)}%</td><td>${d.queue.toFixed(2)}</td><td>${d.maxQ.toFixed(0)}</td></tr>`; });
+  document.getElementById('tbl-mod').innerHTML=rows;
+  renderPM(res); renderSPC(); applyHeat(utilByKeyFrom(res)); renderEnergyYield(res); renderResched(res);
+}
+
+// Phase 7 再调度结果渲染：瓶颈漂移时间线 + 事件流
+function renderResched(res){
+  const el=document.getElementById('resched-out');
+  if(!el||!res.resched) return;
+  const r=res.resched, dur=res.cfg.horizon||168;
+  const cv=document.getElementById('chart-bn');
+  if(cv){
+    const {ctx,w,h}=setupCanvas(cv,110);
+    ctx.clearRect(0,0,w,h);
+    const padB=18, padT=16, tw=w-20;
+    ctx.font='9px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#9aa7b4';
+    ctx.fillText('瓶颈漂移时间线（色块=该时段瓶颈集合；灰=无显著瓶颈）', w/2, 10);
+    const color=k=>{ const m=MODULES.find(x=>x.key===k); return m?m.color:'#5a6b7d'; };
+    const drawSeg=(t0,t1,set)=>{
+      const x0=10+t0/dur*tw, x1=10+t1/dur*tw;
+      if(x1-x0<0.5) return;
+      if(!set||set.length===0){ ctx.fillStyle='rgba(90,107,125,0.18)'; }
+      else if(set.length===1){ ctx.fillStyle=color(set[0]); ctx.globalAlpha=0.75; }
+      else { ctx.fillStyle='#e6edf3'; ctx.globalAlpha=0.4; }
+      ctx.fillRect(x0, padT+4, x1-x0, h-padB-padT-8);
+      ctx.globalAlpha=1;
+    };
+    const tl=r.bnTimeline||[];
+    if(tl.length){
+      drawSeg(0, tl[0].t, tl[0].bn);
+      for(let i=1;i<tl.length;i++) drawSeg(tl[i-1].t, tl[i].t, tl[i-1].bn);
+      drawSeg(tl[tl.length-1].t, dur, tl[tl.length-1].bn);
+    } else { drawSeg(0, dur, r.bnStatic?[r.bnStatic]:[]); }
+    ctx.fillStyle='#9aa7b4'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+    for(let t=0;t<=dur;t+=Math.max(1,Math.ceil(dur/4))) ctx.fillText(t+'h', 10+t/dur*tw, h-3);
+  }
+  const evts=r.events||[];
+  let html=`<div style="margin-bottom:6px;">非计划停机 <b style="color:#ff8a8a">${(r.nBreakdown||0).toFixed(1)}</b> · 瓶颈切换 <b style="color:#ffd166">${(r.nBnSwitch||0).toFixed(1)}</b> · 交期升级 <b style="color:#4ea1ff">${(r.nDueEsc||0).toFixed(1)}</b> 次</div>`;
+  html+=evts.slice(-12).reverse().map(e=>
+    `<div style="color:${e.type==='bd'?'#ff8a8a':(e.type==='bn'?'#ffd166':'#9aa7b4')};">[${e.t}h] ${e.text}</div>`).join('');
+  el.innerHTML=html;
+}
+
+// ---------- Phase 3 UI 绑定 ----------
+const simPanel=document.getElementById('sim-panel');
+[['p-lambda','v-lambda'],['p-passes','v-passes'],['p-cv','v-cv'],['p-horizon','v-horizon'],['p-reps','v-reps'],['p-bdint','v-bdint']].forEach(([p,v])=>{
+  const el=document.getElementById(p), lab=document.getElementById(v);
+  el.addEventListener('input',()=>{ lab.textContent=el.value; });
+});
+const tdWrap=document.getElementById('tool-delta');
+MODULES.forEach(m=>{
+  const row=document.createElement('div'); row.className='ctl-row';
+  row.innerHTML=`<label>${m.key} 增减机台</label><input type="number" id="td-${m.key}" value="0" min="-10" max="30" step="1"><span class="val" id="tdv-${m.key}">0</span>`;
+  tdWrap.appendChild(row);
+  row.querySelector('input').addEventListener('input',e=>{ document.getElementById('tdv-'+m.key).textContent=e.target.value; });
+});
+// 动态生成混合派工的「瓶颈模块」勾选框（默认勾选光刻 LITHO）
+const hbnWrap=document.getElementById('hybrid-bn-mods');
+MODULES.forEach(m=>{
+  const lab=document.createElement('label');
+  lab.innerHTML=`<input type="checkbox" id="hbn-${m.key}" ${m.key==='LITHO'?'checked':''}> ${m.name}`;
+  hbnWrap.appendChild(lab);
+});
+// 规则切换时显示/隐藏混合配置框
+const ruleSel=document.getElementById('p-rule'), hybridBox=document.getElementById('hybrid-box');
+const syncHybrid=()=> hybridBox.style.display = (ruleSel.value==='HYBRID') ? 'block' : 'none';
+ruleSel.addEventListener('change', syncHybrid); syncHybrid();
+function readCfg(){
+  const g=id=>document.getElementById(id); const toolDelta={};
+  MODULES.forEach(m=> toolDelta[m.key]=parseInt(g('td-'+m.key).value)||0);
+  const rule=g('p-rule').value;
+  let hybridBn=null, hybridBnRule=null, hybridOtherRule=null;
+  if(rule==='HYBRID'){
+    hybridBn=MODULES.filter(m=>{ const c=g('hbn-'+m.key); return c && c.checked; }).map(m=>m.key);
+    hybridBnRule=g('p-hbn-rule').value; hybridOtherRule=g('p-hother-rule').value;
+    if(!hybridBn.length) hybridBn=['LITHO'];
+  }
+  // Phase 7 动态再调度：UI 停机强度(台/2h) → 内核停机率(台·h⁻¹·台⁻¹)，与 REPLAN=2 精确对齐
+  const dyn=g('p-dyn').checked, bdInt=+g('p-bdint').value||0;
+  return { lambda:+g('p-lambda').value, passes:+g('p-passes').value, cv:+g('p-cv').value, horizon:+g('p-horizon').value, reps:+g('p-reps').value, toolDelta, rule, hybridBn, hybridBnRule, hybridOtherRule,
+    dyn, dnDetect:dyn&&g('p-dnd').checked, dnDue:dyn&&g('p-dndue').checked, downtimeRate: dyn&&bdInt>0 ? bdInt/(tools.length*2) : 0 };
+}
+let lastRes=null;
+function runNow(){
+  const btn=document.getElementById('btn-run'); btn.disabled=true; btn.textContent='计算中…';
+  setTimeout(()=>{
+    try{
+      const cfg=readCfg(); const res=runMonteCarlo(cfg); lastRes=res;
+      renderResults(res);
+      logEvent(`仿真完成 · 吞吐 ${res.thr.toFixed(1)} lots/hr · 瓶颈 ${res.bn}`, 0x57d6a6);
+    }catch(e){ console.error(e); logEvent('仿真出错: '+(e.message||e), 0xff5c5c); }
+    btn.disabled=false; btn.textContent='运行仿真';
+  }, 30);
+}
+document.getElementById('btn-run').onclick=runNow;
+document.getElementById('sim-toggle').onclick=()=>{ simPanel.classList.add('open'); if(!lastRes) runNow(); else renderResults(lastRes); };
+document.getElementById('sim-close').onclick=()=>{ simPanel.classList.remove('open'); };
+
+// ===== HUD 面板显隐开关（按钮 + 快捷键 H）=====
+(function(){
+  const btn=document.getElementById('hud-toggle');
+  if(!btn) return;
+  function toggleHud(){
+    const hidden=document.body.classList.toggle('hud-hidden');
+    btn.textContent = hidden ? '👁 显示面板' : '🙈 隐藏面板';
+    btn.title = hidden ? '显示所有数据面板 (快捷键 H)' : '隐藏所有数据面板，只留 3D 模型 (快捷键 H)';
+  }
+  btn.addEventListener('click', toggleHud);
+  window.addEventListener('keydown', e=>{
+    const t=e.target;
+    if((e.key==='h'||e.key==='H') && t && t.tagName!=='INPUT' && t.tagName!=='TEXTAREA' && t.tagName!=='SELECT') toggleHud();
+  });
+})();
+document.getElementById('p-heat').addEventListener('change',()=>{ if(lastRes) applyHeat(utilByKeyFrom(lastRes)); });
+document.getElementById('btn-cmp').onclick=compareRules;
+
+// 派工规则对比：对 5 种规则各跑一次仿真，画吞吐量对比并标注周期/WIP
+function compareRules(){
+  const base=readCfg(); base.reps=Math.max(2,Math.min(5,base.reps||4));
+  const rules=[['FIFO','FIFO'],['SPT','SPT'],['CR','CR'],['EDD','EDD'],['BN','BN(光刻)'],['HYBRID','HYBRID']];
+  const data=rules.map(([r,label])=>{
+    const c={...base, rule:r, bnKey:'LITHO'};
+    if(r==='HYBRID'){ c.hybridBn=['LITHO']; c.hybridBnRule='BN'; c.hybridOtherRule='FIFO'; }
+    const mc=runMonteCarlo(c); return {label, thr:mc.thr, cyc:mc.cyc, wip:mc.wip, bn:mc.bn};
+  });
+  const best=Math.max(...data.map(d=>d.thr));
+  const cv=document.getElementById('chart-cmp'); const {ctx,w,h}=setupCanvas(cv,180);
+  const maxT=Math.max(...data.map(d=>d.thr),1);
+  const n=data.length, bw=(w-10)/n, padB=42, padT=12;
+  data.forEach((d,i)=>{
+    const x=5+i*bw+bw*0.12, bwid=bw*0.74;
+    const bh=Math.max(3,(d.thr/maxT)*(h-padB-padT));
+    ctx.fillStyle = (d.thr>=best-1e-9)?'#39d98a':'#4ea1ff';
+    ctx.fillRect(x, h-padB-bh, bwid, bh);
+    ctx.fillStyle='#cfd8e3'; ctx.textAlign='center'; ctx.font='10px sans-serif';
+    ctx.fillText(d.label, x+bwid/2, h-padB+12);
+    ctx.fillStyle='#e6edf3'; ctx.font='9px sans-serif';
+    ctx.fillText(d.thr.toFixed(1), x+bwid/2, h-padB-bh-4);
+    ctx.fillStyle='#9aa7b4'; ctx.font='9px sans-serif';
+    ctx.fillText('周期 '+d.cyc.toFixed(0)+'h', x+bwid/2, h-padB+24);
+    ctx.fillText('WIP '+d.wip.toFixed(0), x+bwid/2, h-padB+34);
+  });
+  const bestRule=data.find(d=>d.thr>=best-1e-9);
+  document.getElementById('cmp-out').innerHTML =
+    `绿色=最高吞吐。<b>HYBRID 混合派工</b>（瓶颈模块 BN / 其余 FIFO，可配多瓶颈）是真实 MES 的常用策略——既榨干瓶颈产能、又避免非瓶颈站点过度抢料导致 WIP 膨胀；` +
+    `其表现与 BN 接近但更稳健。交期类规则(CR/EDD)在投料逼近瓶颈时改善周期与准时率。当前最高吞吐规则：<b>${bestRule.label}</b> (${bestRule.thr.toFixed(1)} lots/hr)。`;
+}
+
+// ============================================================
+//  Phase 4 — AI 优化闭环
+//  寻优(DES 网格搜索) + 能耗/良率孪生 + 决策回灌物理层(3D/EAP)
+// ============================================================
+const POWER={LITHO:250,ETCH:30,DEP:40,CMP:35,IMPL:60,METRO:20}; // kW/台(示意)
+const getUtil=(res,k)=> (res.modMean? (res.modMean[k]?res.modMean[k].util:0) : (res.mods[k]?res.mods[k].util:0));
+function estimateYield(res){ let y=1; MODULES.forEach(m=>{ const u=getUtil(res,m.key); y*=clamp(0.999-Math.max(0,u-0.8)*0.6,0.90,0.999); }); return y; }
+function estimateEnergy(cfg,res){
+  const baseN={}; MODULES.forEach(m=> baseN[m.key]=tools.filter(t=>t.module===m.key).length);
+  let kw=0; MODULES.forEach(m=>{ const n=baseN[m.key]+(cfg.toolDelta[m.key]||0); kw+=n*POWER[m.key]*getUtil(res,m.key); });
+  return kw/1000*cfg.horizon;
+}
+function renderEnergyYield(res){
+  const cfg=res.cfg; const baseN={}; MODULES.forEach(m=> baseN[m.key]=tools.filter(t=>t.module===m.key).length);
+  let kw=0; MODULES.forEach(m=>{ const n=baseN[m.key]+(cfg.toolDelta[m.key]||0); kw+=n*POWER[m.key]*getUtil(res,m.key); });
+  const avgMW=kw/1000, energyMWh=avgMW*cfg.horizon, yld=estimateYield(res);
+  document.getElementById('ekpis').innerHTML=
+    `<div class="kpi"><div class="v">${avgMW.toFixed(1)}</div><div class="l">平均功率 (MW)</div></div>
+     <div class="kpi"><div class="v">${energyMWh.toFixed(0)}</div><div class="l">能耗 (MWh)</div></div>
+     <div class="kpi"><div class="v">${(yld*100).toFixed(1)}%</div><div class="l">预估良率</div></div>
+     <div class="kpi"><div class="v">${res.thr.toFixed(1)}</div><div class="l">吞吐 (lots/hr)</div></div>`;
+  drawBars(document.getElementById('chart-energy'), MODULES.map(m=>{ const n=baseN[m.key]+(cfg.toolDelta[m.key]||0); const e=n*POWER[m.key]*getUtil(res,m.key)/1000*cfg.horizon; return {label:m.key,value:e,color:'#b98cff'}; }), {}, 150);
+  document.getElementById('ey-out').textContent='功率：EUV ~250kW/台(最高)；良率随模块利用率>80% 后衰减。';
+}
+
+let spawnSeq=0;
+function spawnOne(mod,x,z){
+  const id=`${mod.key}-A${String(++spawnSeq).padStart(3,'0')}`;
+  const t={id,module:mod.key,modName:mod.name,color:mod.color,status:'IDLE',x,z,
+    wph:Math.round(20+Math.random()*160),util:0,chambers:Math.round(1+Math.random()*5),
+    wafers:Math.round(2000+Math.random()*58000),recipe:`R${Math.round(100+Math.random()*899)}`};
+  makeToolMesh(t, spawnGroup);   // 始终可见，闭环扩容真实可见
+  tools.push(t); byId.set(t.id,t); mod.count++;
+  return t;
+}
+function addToolToScene(modKey,count){
+  const mod=MODULES.find(m=>m.key===modKey); if(!mod) return;
+  const zone=zones.find(z=>z.mod.key===modKey);
+  if(zone && !realMode){
+    if(zone._spawn===undefined) zone._spawn=0;
+    const perRow=Math.max(1,Math.round(Math.sqrt(zone.mod.count)));
+    const cellW=zoneW/perRow;
+    for(let k=0;k<count;k++){
+      const col=zone._spawn%perRow, row=Math.floor(zone._spawn/perRow);
+      const x=zone.zx-zoneW/2+cellW*(col+0.5), z=zone.depth/2+8+row*10;
+      spawnOne(mod,x,z); zone._spawn++;
+    }
+  } else {
+    // 真实模型 / 无 zone：在模型旁成列排布
+    const baseX = realMode ? (realCenterX + 30) : 0;
+    const perRow=Math.max(1,Math.round(Math.sqrt(mod.count)));
+    for(let k=0;k<count;k++) spawnOne(mod, baseX + (k%perRow)*8, 8 + Math.floor(k/perRow)*10);
+  }
+}
+
+// Phase 8 联合寻优：派工规则 × 瓶颈扩产 × 投料率 三层网格搜索
+const RULE_SET=[
+  {rule:'FIFO', label:'FIFO'},
+  {rule:'SPT', label:'SPT'},
+  {rule:'CR', label:'CR'},
+  {rule:'EDD', label:'EDD'},
+  {rule:'BN', label:'BN·瓶颈优先'},
+  {rule:'HYBRID', label:'HYBRID·瓶颈BN/其余FIFO', hybridBn:['LITHO'], hybridBnRule:'BN', hybridOtherRule:'FIFO'},
+];
+function optimizeFab(){
+  const cfg=readCfg();
+  const target=+(document.getElementById('o-target').value)||20;
+  const costPerTool={LITHO:200,ETCH:30,DEP:40,CMP:35,IMPL:60,METRO:20}; // 单位：$M(示意)
+  const energyPrice=80; // $/MWh(示意)
+  // 寻优网格（控制总预算 ~30s）：扩产 6 档 × 投料 3 档 × 6 规则，短视界 96h 判定趋势
+  const addSteps=[0,2,4,6,8,10], fSteps=[0.8,1.0,1.2];
+  const optHorizon=Math.min(96, cfg.horizon||168), fullHorizon=cfg.horizon||168;
+  const byRule=RULE_SET.map(rs=>{
+    // 每规则下瓶颈可能不同：用 1 次蒙特卡洛探测该规则的瓶颈模块
+    const c={...cfg, rule:rs.rule, reps:1,
+      hybridBn:rs.hybridBn||cfg.hybridBn, hybridBnRule:rs.hybridBnRule||cfg.hybridBnRule, hybridOtherRule:rs.hybridOtherRule||cfg.hybridOtherRule};
+    const bn=runMonteCarlo(c).bn;
+    let best=null, bestEffort=null;
+    for(const add of addSteps){
+      for(const f of fSteps){
+        const lam=target*f;
+        const cand={...c, lambda:lam, reps:1, horizon:optHorizon, toolDelta:Object.assign({},c.toolDelta)};
+        cand.toolDelta[bn]=add;
+        const r=runDES(cand);
+        if(!bestEffort||r.throughput>bestEffort.r.throughput) bestEffort={add,lam,r};
+        if(r.throughput<target*0.98) continue;
+        const capCost=add*costPerTool[bn];
+        const energy=estimateEnergy({...cand,horizon:fullHorizon}, r); const eCost=energy*energyPrice/1000;
+        const yld=estimateYield(r); if(yld<0.90) continue;
+        const score=capCost+eCost;
+        if(!best||score<best.score) best={add,lam,r,capCost,eCost,energy,yieldP:yld,score,bn};
+      }
+    }
+    return {rule:rs.rule, label:rs.label, bn, best, bestEffort};
+  });
+  // 全局最优（可行方案中 机台+电费 成本最小）
+  let best=null, bestRule=null;
+  byRule.forEach(x=>{ if(x.best&&(!best||x.best.score<best.score)){ best=x.best; bestRule=x; } });
+  // 全局最大可达（所有规则所有扩容中的最高吞吐）
+  let bestEffort=null, bestEffortRule=null;
+  byRule.forEach(x=>{ if(x.bestEffort&&(!bestEffort||x.bestEffort.r.throughput>bestEffort.r.throughput)){ bestEffort=x.bestEffort; bestEffortRule=x; } });
+  if(best) best={...best, rule:bestRule.rule, ruleLabel:bestRule.label,
+    hybridBn:bestRule.hybridBn||null, hybridBnRule:bestRule.hybridBnRule||null, hybridOtherRule:bestRule.hybridOtherRule||null};
+  return {target, byRule, best, bestEffort, bestEffortRule};
+}
+
+let lastOpt=null;
+function renderOpt(opt){
+  const out=document.getElementById('opt-out');
+  if(opt.best){
+    const r=opt.best.r; lastOpt=opt.best;
+    const bnName=MODULES.find(m=>m.key===opt.best.bn).name;
+    out.innerHTML=`<b style="color:#57d6a6">✓ 全局最优方案（联合寻优：派工规则 × 扩产 × 投料）</b><br>`+
+      `规则 <b style="color:#ffd166">${opt.best.ruleLabel}</b> · 瓶颈 <b>${bnName}</b> 增机 <b>${opt.best.add}</b> 台 · 投料率 <b>${opt.best.lam.toFixed(1)}</b> lots/hr<br>`+
+      `预测吞吐 <b>${r.throughput.toFixed(1)}</b>（目标 ${opt.target}）· 周期 ${r.avgCycle.toFixed(1)} hr<br>`+
+      `能耗 <b>${opt.best.energy.toFixed(0)}</b> MWh · 良率 <b>${(opt.best.yieldP*100).toFixed(1)}%</b><br>`+
+      `成本 ≈ <b>$${opt.best.capCost}M</b> 机台 + $${opt.best.eCost.toFixed(0)}k 电费`;
+    out.innerHTML+=`<div style="margin-top:8px;font-size:11px;color:var(--muted);">各规则最优（成本=机台+电费，越低越好；✗=该规则下未达标）</div>`+
+      `<table class="mc-table" style="margin-top:4px;"><tr><th>规则</th><th>瓶颈</th><th>增机</th><th>吞吐</th><th>成本$M</th></tr>`+
+      opt.byRule.map(x=>{
+        const isBest=opt.best.rule===x.rule; const b=x.best;
+        return `<tr style="${isBest?'background:rgba(87,214,166,0.10)':''}"><td>${x.label}${isBest?' <span class="tag">最优</span>':''}</td>`+
+          `<td>${x.bn}</td><td>${b?b.add:(x.bestEffort?x.bestEffort.add:'—')}</td>`+
+          `<td>${b?b.r.throughput.toFixed(1):(x.bestEffort?x.bestEffort.r.throughput.toFixed(1)+' ✗':'—')}</td>`+
+          `<td>${b?b.score.toFixed(0):'—'}</td></tr>`;
+      }).join('')+`</table>`;
+    document.getElementById('btn-apply').style.display='block';
+  } else {
+    const r=opt.bestEffort.r; const rb=opt.bestEffortRule;
+    out.innerHTML=`<span style="color:#f2c14e">⚠ 所有派工规则最大扩容下均未达目标 ${opt.target}。</span><br>`+
+      `最佳尝试：<b>${rb.label}</b> 增机 ${opt.bestEffort.add} 台 → 吞吐 ${r.throughput.toFixed(1)} lots/hr。<br>建议提高最大增机数或下调目标。`;
+    lastOpt=null; document.getElementById('btn-apply').style.display='none';
+  }
+}
+function applyRecommendation(){
+  if(!lastOpt) return;
+  const bn=lastOpt.bn; addToolToScene(bn,lastOpt.add);
+  // 回灌派工规则（联合寻优的新决策维度）
+  const ruleSelEl=document.getElementById('p-rule'); ruleSelEl.value=lastOpt.rule;
+  if(lastOpt.rule==='HYBRID'){
+    if(lastOpt.hybridBnRule) document.getElementById('p-hbn-rule').value=lastOpt.hybridBnRule;
+    if(lastOpt.hybridOtherRule) document.getElementById('p-hother-rule').value=lastOpt.hybridOtherRule;
+    MODULES.forEach(m=>{ const c=document.getElementById('hbn-'+m.key); if(c) c.checked = (lastOpt.hybridBn||[]).includes(m.key) || m.key==='LITHO'; });
+  }
+  syncHybrid();
+  MODULES.forEach(m=>{ const el=document.getElementById('td-'+m.key); if(el){ el.value=0; const v=document.getElementById('tdv-'+m.key); if(v)v.textContent='0'; } });
+  const lam=Math.round(lastOpt.lam); const lamEl=document.getElementById('p-lambda'); lamEl.value=lam; document.getElementById('v-lambda').textContent=lam;
+  document.getElementById('stat-total').textContent=tools.length; updateStats();
+  logEvent(`应用联合优化方案：规则 ${lastOpt.ruleLabel} · ${bn} +${lastOpt.add} 机台 · 投料率→${lam}`,0x57d6a6);
+  document.getElementById('btn-apply').style.display='none';
+  runNow();
+}
+
+document.getElementById('btn-opt').onclick=()=>{
+  const b=document.getElementById('btn-opt'); b.disabled=true; b.textContent='寻优中…';
+  setTimeout(()=>{ try{ renderOpt(optimizeFab()); }catch(e){ console.error(e); logEvent('优化出错: '+(e.message||e),0xff5c5c); } b.disabled=false; b.textContent='运行联合优化'; },30);
+};
+document.getElementById('o-target').addEventListener('input',e=>{ document.getElementById('o-target-v').textContent=e.target.value; });
+document.getElementById('btn-apply').onclick=applyRecommendation;
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = app.clientWidth/app.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(app.clientWidth, app.clientHeight);
+  if(simPanel.classList.contains('open') && lastRes) renderResults(lastRes);
+});
+</script>
+</body>
+</html>

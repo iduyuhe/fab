@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>晶圆厂智能制造平台 · 仿真控制台</title>
+<style>
+  :root{ --bg:#0b1020;--panel:#121a30;--panel2:#0f1730;--line:#22304f;--txt:#e6edf7;--sub:#93a3c2;--accent:#4ea1ff;--warn:#ffb02e;--bad:#ff4d5e;--ok:#39d98a; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif}
+  body{display:flex;flex-direction:column;overflow:hidden}
+  header{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(90deg,#0e1730,#0b1020);border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header .tag{font-size:12px;color:var(--sub)}
+  header .nav{margin-left:auto;display:flex;gap:8px}
+  header .nav a{color:var(--accent);text-decoration:none;font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+  .wrap{flex:1 1 auto;min-height:0;display:flex}
+  .ctrl{width:360px;background:var(--panel2);border-right:1px solid var(--line);padding:14px;overflow-y:auto}
+  .main{flex:1;padding:16px;overflow-y:auto}
+  h2{font-size:13px;color:var(--sub);margin:0 0 10px;text-transform:uppercase;letter-spacing:1px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+  label{font-size:12px;color:var(--sub);display:block;margin:8px 0 4px}
+  input,select{width:100%;background:#0c1326;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px 9px;font-size:13px}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  button{background:var(--accent);color:#06122a;border:0;border-radius:7px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;margin-top:10px}
+  button:hover{filter:brightness(1.1)}
+  button.ghost{background:#1c2a4a;color:var(--txt)}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:#1c2a4a;border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:11px;margin:4px 4px 0 0}
+  .chip b{color:var(--accent)}
+  .chip .x{cursor:pointer;color:var(--bad);font-weight:700}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--sub);font-weight:600}
+  .up{color:var(--bad)} .down{color:var(--ok)} .flat{color:var(--sub)}
+  .kbig{font-size:24px;font-weight:700}
+  .klabel{font-size:11px;color:var(--sub);text-transform:uppercase}
+  .kgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+  .verdict{padding:10px 12px;border-radius:8px;font-size:13px;margin-top:10px}
+  .verdict.ok{background:#0e2a1c;color:var(--ok);border:1px solid #1d5b3e}
+  .verdict.bad{background:#2a1018;color:var(--bad);border:1px solid #5b1d2e}
+  .empty{color:var(--sub);font-size:12px;padding:20px;text-align:center}
+
+  /* 面板显隐开关 */
+  #hud-toggle{position:fixed;top:60px;right:12px;z-index:99;
+    font:12px/1.4 system-ui,'Segoe UI',sans-serif;color:var(--sub);white-space:nowrap;
+    background:rgba(78,161,255,0.18);border:1px solid rgba(78,161,255,0.4);
+    border-radius:8px;padding:6px 11px;cursor:pointer;transition:background .15s;}
+  #hud-toggle:hover{background:rgba(78,161,255,0.35);color:var(--txt);}
+  body.hud-hidden .ctrl{display:none !important;}
+
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line,#1f2b45)}
+  .nav a{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid var(--line,#1f2b45);color:var(--muted,#6b7a94);text-decoration:none}
+  .nav a:hover{color:var(--accent,#4ea1ff);border-color:var(--accent,#4ea1ff)}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+<header>
+  <h1>产能 what-if 仿真</h1>
+  <span class="tag">APS 无状态引擎 · 改输入重算 · 看瓶颈漂移</span>
+
+</header>
+<div class="wrap">
+  <div class="ctrl">
+    <h2>假设输入</h2>
+    <div class="box">
+      <label>场景名称</label>
+      <input id="scn" placeholder="例如：光刻机群故障 + 紧急加单" />
+      <label>仿真时段 (h)</label>
+      <input id="horizon" type="number" value="24" min="1" max="168" />
+      <label>停用设备（DOWN 假设）</label>
+      <div class="row">
+        <input id="downInput" placeholder="设备ID，如 LITHO-001" />
+        <select id="downPick" style="flex:.8">
+          <option value="">选模块…</option>
+          <option>LITHO</option><option>DEP</option><option>ETCH</option><option>CMP</option><option>IMPL</option><option>METRO</option>
+        </select>
+      </div>
+      <div id="downChips"></div>
+      <label>加派工单（产能压力测试）</label>
+      <div class="row">
+        <select id="woProd"><option>N2</option><option>A16</option></select>
+        <input id="woQty" type="number" value="5" min="1" max="20" />
+        <input id="woDue" type="number" value="48" min="1" max="240" title="交期(h)" />
+      </div>
+      <button id="addWo" class="ghost" style="margin-top:6px">+ 加入工单</button>
+      <div id="woChips"></div>
+      <button id="run" style="width:100%">▸ 运行仿真</button>
+      <button id="reset" class="ghost" style="width:100%">清空</button>
+    </div>
+    <div class="box" id="baseBox">
+      <h2 style="margin-bottom:6px">基准态（当前）</h2>
+      <div class="empty">运行仿真后显示基准对比</div>
+    </div>
+  </div>
+  <div class="main">
+    <h2>仿真结果</h2>
+    <div class="kgrid" id="kpi"></div>
+    <div class="verdict" id="verdict" style="display:none"></div>
+    <div class="box">
+      <h2>模块负荷率变化（基准 → 仿真）</h2>
+      <table id="modTable"><thead><tr><th>模块</th><th>基准%</th><th>仿真%</th><th>Δ</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="box">
+      <h2>瓶颈与产线影响</h2>
+      <div id="bottle"></div>
+    </div>
+  </div>
+</div>
+<button id="hud-toggle" title="隐藏/显示控制面板 (H)">🙈 隐藏面板</button>
+<script>
+let downTools=[], extraWos=[];
+const $=id=>document.getElementById(id);
+function renderChips(){
+  $('downChips').innerHTML=downTools.map((t,i)=>`<span class="chip">${t}<span class="x" data-i="${i}">✕</span></span>`).join('');
+  $('downChips').querySelectorAll('.x').forEach(x=>x.onclick=()=>{downTools.splice(+x.dataset.i,1);renderChips();});
+  $('woChips').innerHTML=extraWos.map((w,i)=>`<span class="chip">${w.product}×${w.qty}<b>${w.dueHours}h</b><span class="x" data-i="${i}">✕</span></span>`).join('');
+  $('woChips').querySelectorAll('.x').forEach(x=>x.onclick=()=>{extraWos.splice(+x.dataset.i,1);renderChips();});
+}
+$('downInput').addEventListener('change',e=>{ const v=e.target.value.trim(); if(v&&!downTools.includes(v)){downTools.push(v);e.target.value='';renderChips();} });
+$('downPick').addEventListener('change',e=>{ const v=e.target.value; if(v){ const cand=window.__toolsByMod&&window.__toolsByMod[v]; if(cand&&cand.length){ downTools.push(cand[0]); renderChips(); } } e.target.value=''; });
+$('addWo').onclick=()=>{ const product=$('woProd').value, qty=+$('woQty').value||1, dueHours=+$('woDue').value||48; extraWos.push({product,qty,dueHours}); renderChips(); };
+$('reset').onclick=()=>{ downTools=[];extraWos=[];renderChips();$('scn').value='';$('kpi').innerHTML='';$('modTable').querySelector('tbody').innerHTML='';$('bottle').innerHTML='';$('verdict').style.display='none';$('baseBox').innerHTML='<h2 style="margin-bottom:6px">基准态（当前）</h2><div class="empty">运行仿真后显示基准对比</div>'; };
+// 面板显隐开关
+(function(){ const b=document.getElementById('hud-toggle'); if(!b) return;
+  function t(){ const h=document.body.classList.toggle('hud-hidden'); b.textContent=h?'👁 显示面板':'🙈 隐藏面板'; }
+  b.addEventListener('click',t); window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) t(); }); })();
+$('run').onclick=runSim;
+
+async function runSim(){
+  $('run').textContent='计算中…';
+  try{
+    // 预拉 tools 以支撑"按模块选设备"
+    if(!window.__toolsByMod){ const t=await (await fetch('/api/tools')).json(); window.__toolsByMod={}; (t.tools||[]).forEach(x=>{(window.__toolsByMod[x.module]=window.__toolsByMod[x.module]||[]).push(x.id);}); }
+    const resp=await fetch('/api/aps/sim',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({downTools,extraWos,horizon:+$('horizon').value||24})});
+    const r=await resp.json();
+    renderResult(r);
+  }catch(e){ alert('仿真失败: '+e.message); }
+  $('run').textContent='▸ 运行仿真';
+}
+function cls(d){ return d>0.5?'up':d<-0.5?'down':'flat'; }
+function renderResult(r){
+  const b=r.baseKpi||{}, s=r.simKpi||{};
+  $('kpi').innerHTML=`
+    <div class="box"><div class="kbig">${Math.round((s.bottleneckLoad||0))}%</div><div class="klabel">瓶颈负荷率</div><div class="klabel" style="margin-top:4px">基准 ${Math.round((b.bottleneckLoad||0))}%</div></div>
+    <div class="box"><div class="kbig">${s.wip!=null?s.wip:'—'}</div><div class="klabel">在制批次</div><div class="klabel" style="margin-top:4px">基准 ${b.wip!=null?b.wip:'—'}</div></div>
+    <div class="box"><div class="kbig" style="color:${s.lateWos>0?'#ff4d5e':'#39d98a'}">${s.lateWos||0}</div><div class="klabel">逾期工单</div><div class="klabel" style="margin-top:4px">基准 ${b.lateWos||0}</div></div>`;
+  const tbody=$('modTable').querySelector('tbody');
+  tbody.innerHTML=r.modules.map(m=>`<tr><td>${m.name}</td><td>${Math.round(m.baseLoad)}</td><td>${Math.round(m.simLoad)}</td><td class="${cls(m.delta)}">${m.delta>0?'+':''}${m.delta}</td></tr>`).join('');
+  $('bottle').innerHTML=`<div style="font-size:13px;margin-bottom:6px">瓶颈模块：<b style="color:#ffb02e">${r.bottleneck&&r.bottleneck[0]?r.bottleneck[0].module:'—'}</b> · 产线：<b style="color:#ff4d5e">${r.lineBottleneck&&r.lineBottleneck[0]?r.lineBottleneck[0].line:'—'}</b></div>
+    <div style="font-size:12px;color:var(--sub)">${r.bottleneck&&r.bottleneck[0]?r.bottleneck[0].reason:'—'}</div>`;
+  const v=$('verdict'); v.style.display='block';
+  const margin=100-Math.round((s.bottleneckLoad||0));
+  if(r.simValid){ v.className='verdict ok'; v.textContent='✓ 该假设下无产能击穿（瓶颈负荷 '+Math.round((s.bottleneckLoad||0))+'%，产能余量 '+margin+'%）。注：演示投料量远低于设计产能，数值反映相对冲击。'; }
+  else { v.className='verdict bad'; v.textContent='⚠ 该假设导致产能击穿（瓶颈 ≥100% 或交期逾期），需扩容/转移/加班。'; }
+  // 基准对照
+  $('baseBox').innerHTML=`<h2 style="margin-bottom:6px">基准态（当前）</h2>
+    <div style="font-size:12px;color:var(--sub)">瓶颈模块 <b style="color:#ffb02e">${r.baseKpi&&r.baseKpi.bottleneckModule||'—'}</b> · 负荷 ${Math.round((r.baseKpi&&r.baseKpi.bottleneckLoad)||0)}% · 在制 ${r.baseKpi&&r.baseKpi.wip!=null?r.baseKpi.wip:'—'} · 逾期 ${r.baseKpi&&r.baseKpi.lateWos||0}</div>`;
+}
+</script>
+</body>
+</html>

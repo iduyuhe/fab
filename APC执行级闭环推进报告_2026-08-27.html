@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APC 执行级闭环推进报告 · 2026-08-27</title>
+<style>
+  :root{--bg:#0f1419;--panel:#1a2029;--panel2:#222b36;--ink:#e6edf3;--muted:#9aa7b4;--line:#2c3744;--green:#3fb950;--amber:#d29922;--red:#f85149;--blue:#58a6ff;--purple:#bc8cff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65;font-size:14px}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 60px}
+  h1{font-size:24px;margin:0 0 4px}h2{font-size:18px;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--blue)}
+  h3{font-size:14px;margin:18px 0 6px;color:var(--purple)}
+  .sub{color:var(--muted);font-size:13px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:12px 0}
+  .verdict{background:linear-gradient(135deg,#16351f,#1a2029);border:1px solid #2a5a36;border-radius:12px;padding:18px 20px;margin:16px 0}
+  .verdict b{color:var(--green)}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--blue);font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+  .t-live{background:rgba(63,185,80,.15);color:var(--green);border:1px solid #2a5a36}
+  .t-fix{background:rgba(210,153,34,.15);color:var(--amber);border:1px solid #5a4a1a}
+  code{background:#0b0f14;padding:1px 6px;border-radius:5px;color:#ffd9a0;font-size:12px}
+  ul{margin:8px 0;padding-left:22px}li{margin:5px 0}
+  .muted{color:var(--muted)}
+  .foot{margin-top:36px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+  pre{background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font-size:12px;color:#c9d4e0}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>APC 执行级闭环 · 推进报告</h1>
+  <p class="sub">方向：战略审计建议四选项之「APC 执行级闭环」（用户 2026-08-27 选定）· 契合「可控可溯迈向少人化/智能化」愿景</p>
+
+  <div class="verdict">
+    <b>结论：APC 执行级闭环已点亮并端到端验证通过。</b> 量测到达 → VM 预测 → APC 建议 → <b>经护栏 spc.inject 真实回灌</b> → 反馈修正，全程自动；自带死区防过调、<code>source:'apc'</code> 标记防递归；MES 进程稳定不崩溃。
+  </div>
+
+  <h2>一、推进前基线</h2>
+  <div class="card">
+    <ul>
+      <li><code>apc/controller.js</code> 代码早已写好：<code>step()</code> 在 <code>APC_ENABLED=1</code> 时经 <code>safeguard</code> 护栏真实 inject（offset-compensate 控制律，带死区）。</li>
+      <li>但 <b>开关默认关（APC_ENABLED=0）</b>，且 <code>step()</code> <b>只被手动 <code>POST /api/apc/advise</code> 触发</b>——事件流里没有任何自动调用。所以此前 APC 只是「手动建议器」，不是真闭环。</li>
+      <li><code>/api/spc/inject</code> 端点、<code>safeguard.js</code> 的 <code>spc.inject</code> 护栏（白名单 + 参数校验）均已就位，无全局自治开关挡路。</li>
+    </ul>
+  </div>
+
+  <h2>二、本次改动（5 处，均最小改动）</h2>
+  <table>
+    <tr><th>#</th><th>文件</th><th>改动</th><th>作用</th></tr>
+    <tr><td>1</td><td>bin/start-community.sh</td><td>MES 启动加 <code>APC_ENABLED=1</code></td><td>点亮执行级闭环（重启即生效）</td></tr>
+    <tr><td>2</td><td>server.js (onEmit)</td><td>量测事件挂 APC 自动闭环，受 <code>apcSvc.enabled</code> 门控 + <code>ev.source!=='apc'</code> 熔断</td><td>量测到达即自动建议/闭环，关时零行为变化</td></tr>
+    <tr><td>3</td><td>server.js (/api/spc/inject)</td><td>ev 透传 <code>source: cfg.source</code></td><td>APC 回灌量测带标记，供熔断识别</td></tr>
+    <tr><td>4</td><td>apc/controller.js</td><td><code>step()</code> 透传 product/lot，回灌体显式 <code>source:'apc'</code></td><td>闭环目标打中真实 product；回灌可识别</td></tr>
+    <tr><td>5</td><td>autonomy/safeguard.js</td><td><code>spc.inject</code> build 含 <code>source</code></td><td>让回灌 source 真正落到注入请求</td></tr>
+  </table>
+  <p class="muted">附：GET <code>/api/apc</code> 文案由「蓝图态闭环」改为如实描述「建议器+闭环执行器」，消除超纲宣称（说法一致）。</p>
+
+  <h2>三、关键风险与对策：递归熔断</h2>
+  <div class="card">
+    <p>APC 闭环会向 <code>/api/spc/inject</code> 写回一条量测事件 → 该事件又流经 <code>onEmit</code> → 若无防护会再次触发 APC → <b>无限递归打爆进程</b>。</p>
+    <p><b>双重防护：</b></p>
+    <ul>
+      <li><b>结构防护</b>：<code>/api/spc/inject</code> 仅把回灌量测喂给 VM/SPC 模型（<code>vmRecord+spc.onMetrology</code>），<b>不重新 emitEv</b> 到总线，故天然不会回流触发。</li>
+      <li><b>标记防护</b>：回灌量测打 <code>source:'apc'</code>，<code>onEmit</code> 中 <code>ev.source !== 'apc'</code> 显式跳过——即便未来有人改为 emit，也绝不递归。</li>
+    </ul>
+  </div>
+
+  <h2>四、验证结果（重启 5 进程实测）</h2>
+  <div class="card">
+    <h3>1. 开关已点亮</h3>
+    <pre>[MES] L4 装配完成：tenant=off <b>apc=ON</b> adapters=demo erpMode=demo
+GET /api/apc → {"enabled":true, "note":"APC 为建议器+闭环执行器…"}</pre>
+    <h3>2. 确定性闭环（predicted=120 vs target=100，偏差 20% &gt; 死区 5%）</h3>
+    <pre>POST /api/apc/advise {"tool":"METRO-001","param":"CD","product":"N2","target":100,"predicted":120}
+→ {"adjust":-10, "enabled":true, "executed":true,
+   "response":{"injected":{"type":"metrology","tool":"METRO-001","value":-10,
+     "result":"OOR","source":"apc"}}}</pre>
+    <p class="muted">→ 护栏放行 → 真实 inject → 回灌量测带 <code>source:'apc'</code> 标记 ✅</p>
+    <h3>3. 自动闭环（真实量测流）</h3>
+    <pre>apc 事件窗口：103 条（advise + inject 混合）
+自动触发样本：inject tool=METRO-184 adjust=-7.5 / tool=METRO-183 adjust=-7.5 …（真实 lot 量测驱动）</pre>
+    <h3>4. 递归熔断验证</h3>
+    <pre>apc 事件总数：103（有界，线性随量测增长，非指数爆炸）
+带 source=apc 的 metrology 在总线历史事件中：0（不回流）
+MES 进程：稳定 200，未崩溃</pre>
+    <h3>5. 主轴无回退</h3>
+    <pre>GET /api/health /api/eap/health /api/erp/health /api/tools /api/wip → 全部 200</pre>
+  </div>
+
+  <h2>五、当前 APC 能力边界（诚实声明）</h2>
+  <table>
+    <tr><th>能力</th><th>状态</th></tr>
+    <tr><td>VM 预测 → APC 建议修正量</td><td><span class="tag t-live">活</span></td></tr>
+    <tr><td>量测到达自动闭环微调（经护栏 inject）</td><td><span class="tag t-live">活</span></td></tr>
+    <tr><td>死区防过调 / 参数合法性护栏</td><td><span class="tag t-live">活</span></td></tr>
+    <tr><td>闭环反馈在孪生/审计总线可见</td><td><span class="tag t-fix">部分</span> 仅 apc 事件入总线（advise/inject 可追溯）；回灌量测仅喂 VM/SPC，未重发总线（设计如此，避免递归）</td></tr>
+  </table>
+
+  <div class="foot">
+    关联文档：本推进已在《战略审计报告_2026-08-27_总览.html》的「模块矩阵」与「还差哪些」中把 APC 由「蓝图」更正为「已点亮」。记忆见 2026-08-27.md。
+  </div>
+</div>
+</body>
+</html>

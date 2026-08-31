@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晶圆厂智能制造平台 · 实验台</title>
+<style>
+  /* 对齐现有页面深色主题（参考 agent.html / console.html CSS 变量） */
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#0f1626; --line:#21304a;
+    --txt:#e6edf3; --muted:#7d8aa0; --accent:#58a6ff; --accent2:#bc8cff;
+    --run:#39d98a; --idle:#5b7fb0; --pm:#f2c14e; --down:#ff5c5c;
+    --ok:#39d98a; --warn:#f2c14e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:13px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;height:100vh;display:flex;flex-direction:column}
+  header{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  header h1{font-size:15px;color:var(--accent);letter-spacing:.5px}
+  header .tag{color:var(--muted);font-size:12px}
+  header select{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px}
+  header nav{margin-left:auto;display:flex;gap:8px}
+  header nav a{color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:12px}
+  header nav a:hover{border-color:var(--accent)}
+  #main{flex:1;display:grid;grid-template-columns:300px 1fr;gap:0;min-height:0}
+  /* 左侧步骤引导 */
+  #steps{border-right:1px solid var(--line);padding:16px;overflow-y:auto;background:var(--panel2)}
+  #steps h2{font-size:13px;color:var(--accent2);margin-bottom:10px}
+  .exp-meta{color:var(--muted);font-size:12px;margin-bottom:14px;white-space:pre-wrap}
+  .step{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px;background:var(--panel)}
+  .step .hd{display:flex;align-items:center;gap:8px;font-weight:600}
+  .step .dot{width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
+  .step.done .dot{background:var(--ok);color:#04210f}
+  .step .goal{color:var(--accent);font-size:12px;margin:6px 0 2px}
+  .step .op{color:var(--txt);font-size:12px}
+  .step .judge{color:var(--muted);font-size:11px;border-top:1px dashed var(--line);margin-top:6px;padding-top:6px}
+  .step .state{float:right;font-size:11px}
+  .step.done .state{color:var(--ok)}
+  .step.fail .state{color:var(--warn)}
+  /* 右侧操作区 */
+  #work{display:flex;flex-direction:column;min-height:0}
+  #oparea{flex:1;overflow-y:auto;padding:16px}
+  #oparea h2{font-size:13px;color:var(--accent2);margin-bottom:10px}
+  .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  .form input,.form select{background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:7px 9px;font-size:13px}
+  .form .full{grid-column:1/-1;display:flex;gap:10px;align-items:center}
+  .btn{background:var(--accent);color:#06101f;border:none;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer;font-size:13px}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+  .btn:hover{filter:brightness(1.1)}
+  .result{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .result h3{font-size:12px;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .result .live{font-size:11px;color:var(--muted)}
+  pre{white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--txt);max-height:300px;overflow:auto}
+  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px}
+  .badge.ok{background:rgba(57,217,138,.15);color:var(--ok)}
+  .badge.warn{background:rgba(242,193,78,.15);color:var(--warn)}
+  /* 底部导师提示区 */
+  #tutor{border-top:1px solid var(--line);background:var(--panel2);padding:10px 16px;max-height:200px;display:flex;flex-direction:column}
+  #tutor .th{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--accent2);margin-bottom:6px}
+  #tutor .th input{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 10px;font-size:12px}
+  #tutor .body{overflow-y:auto;font-size:12px;white-space:pre-wrap;color:var(--txt)}
+  .hint{color:var(--muted);font-size:11px}
+
+  /* 面板显隐开关 */
+  #hud-toggle{position:fixed;right:14px;bottom:14px;z-index:50;
+    font:12px/1.4 system-ui,'Segoe UI',sans-serif;color:var(--muted);white-space:nowrap;
+    background:rgba(78,161,255,0.18);border:1px solid rgba(78,161,255,0.4);
+    border-radius:8px;padding:6px 11px;cursor:pointer;transition:background .15s;}
+  #hud-toggle:hover{background:rgba(78,161,255,0.35);color:var(--txt);}
+  body.hud-hidden #tutor{display:none !important;}
+
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line,#1f2b45)}
+  .nav a{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid var(--line,#1f2b45);color:var(--muted,#6b7a94);text-decoration:none}
+  .nav a:hover{color:var(--accent,#4ea1ff);border-color:var(--accent,#4ea1ff)}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+<header>
+  <h1>数智晶圆厂 · 引导式实验台</h1>
+  <span class="tag">L2 教学级 · 复用 L1 真实引擎</span>
+  <select id="expSel"></select>
+  <nav>
+    <a href="/" target="_blank">返回门户</a>
+    <a href="/twin.html" target="_blank">装备级孪生</a>
+    <a href="/fab-twin.html" target="_blank">工厂级孪生</a>
+  </nav>
+</header>
+
+<div id="main">
+  <aside id="steps">
+    <h2>实验步骤引导</h2>
+    <div class="exp-meta" id="expMeta"></div>
+    <div id="stepList"></div>
+  </aside>
+
+  <section id="work">
+    <div id="oparea">
+      <h2 id="opTitle">操作区</h2>
+      <div id="formHost"></div>
+      <div class="result">
+        <h3>实时结果 <span class="live" id="liveState"></span></h3>
+        <pre id="resultView">— 选择实验并执行操作 —</pre>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="tutor">
+  <div class="th">
+    <span>导师提示区</span>
+    <input id="tutorBox" placeholder="向教学 Agent 提问（如：CD 漂移是什么？APS 瓶颈怎么看？）" onkeydown="if(event.key==='Enter')askTutor()">
+    <button class="btn ghost" onclick="askTutor()">提问</button>
+  </div>
+  <div class="body" id="tutorBody"><span class="hint">底部导师提示区：调用 POST /api/agent/chat（教学意图）获取引导性讲解。</span></div>
+</div>
+<button id="hud-toggle" title="隐藏/显示导师区 (H)">🙈 隐藏面板</button>
+
+<script>
+// ============================================================
+//  内置实验定义（lab-config）
+//  判据均为真实调用 REST 后判定，禁止假装通过。
+// ============================================================
+const API = { spc:'/api/spc', spcInject:'/api/spc/inject', apsSim:'/api/aps/sim',
+              wip:'/api/wip', tools:'/api/tools', agent:'/api/agent/chat' };
+
+const EXPERIMENTS = [
+  {
+    id:'spc-cd', title:'实验 A · 用 SPC 拦截 CD 漂移',
+    meta:'背景：CD（关键尺寸）是光刻后量测的核心参数。当 CD 超出规格上限 USL，SPC 判定 R1 超控制限，触发 alarm 并自动停线 hold 设备。\n目标：理解 SPC 判异→停线闭环（Western Electric R1）。',
+    form:{
+      title:'注入 CD 量测（POST /api/spc/inject）',
+      fields:[
+        {k:'product',label:'产品',type:'select',opts:['N2','A16'],def:'N2'},
+        {k:'param',label:'量测参数',type:'select',opts:['CD','OVL','THK'],def:'CD'},
+        {k:'tool',label:'量测设备',type:'text',def:'METRO-001'},
+        {k:'value',label:'量测值 (建议 > USL)',type:'number',def:60},
+        {k:'lot',label:'批次(可选)',type:'text',def:'TEST-LOT'},
+      ],
+      action:'注入量测点',
+    },
+    steps:[
+      {goal:'① 观察当前 CD 规格限 USL/LSL',op:'在结果区查 GET /api/spc 的监控组，记录 CD 的 ucl(≈USL)/lcl(≈LSL)。',
+        judge:'spc.groups 存在 product×CD×tool 组或其规格限已知',check:async()=>{const j=await get(API.spc);return j.groups.some(g=>g.param==='CD');}},
+      {goal:'② 注入一个超 USL 的 CD 量测值',op:'在操作区填写 value > USL（如 60），点击"注入量测点"。',
+        judge:'POST /api/spc/inject 返回 injected.value 已记录',check:async(s)=>!!(s.lastInject&&s.lastInject.value!=null),need:'inject'},
+      {goal:'③ 查看 SPC 是否触发 alarm（自动停线）',op:'点击"刷新实时结果"，查 /api/spc 的 alarms 是否含该 tool+CD。',
+        judge:'spc.alarms 含 tool===注入tool 且 param==="CD" 的报警（R1）',check:async(s)=>{const j=await get(API.spc);return j.alarms.some(a=>a.tool===s.injectTool&&a.param==='CD');}},
+      {goal:'④ 在装备级孪生页确认设备被 hold',op:'打开顶部"装备级孪生"页，确认注入设备状态变化或 hold 标记。',
+        judge:'（人工确认）可在 /api/tools 中核对设备统计；此处标记需学员到孪生页目视确认',check:async()=>true,manual:true},
+    ],
+  },
+  {
+    id:'aps-bottleneck', title:'实验 B · 用 APS 缓解产能瓶颈',
+    meta:'背景：APS 无状态引擎读取实时 tools/lots/wos，计算各模块负荷率并识别瓶颈（默认瓶颈常为 LITHO，仅 14 台）。\n目标：用 what-if 仿真理解"设备 DOWN / 加派工单"对瓶颈负荷与交期的影响。',
+    form:{
+      title:'运行 what-if 仿真（POST /api/aps/sim）',
+      fields:[
+        {k:'downTools',label:'DOWN 设备(逗号分隔,如 LITHO-001)',type:'text',def:''},
+        {k:'extraWos',label:'加派工单(格式 product:qty:dueHours,如 N2:5:48)',type:'text',def:''},
+        {k:'horizon',label:'仿真时域(h)',type:'number',def:24},
+      ],
+      action:'运行仿真',
+    },
+    steps:[
+      {goal:'① 查当前瓶颈模块',op:'点击"运行仿真"（空参数即为当前基线），看 sim 返回的 bottleneck[0].module。',
+        judge:'sim.bottleneck[0] 存在且有 module 名',check:async(s)=>!!(s.lastSim&&s.lastSim.bottleneck&&s.lastSim.bottleneck[0]),need:'sim'},
+      {goal:'② 模拟该模块 DOWN 若干台',op:'在 downTools 填入瓶颈模块若干台（如 LITHO-001,LITHO-002），再次运行仿真。',
+        judge:'对应模块 simLoad 较 baseLoad 上升（或状态变 OVERLOAD）',check:async(s)=>{if(!s.lastSim)return false;const m=s.lastSim.modules.find(x=>x.module===(s.lastSim.bottleneck[0]&&s.lastSim.bottleneck[0].module));return m&&m.simLoad>=m.baseLoad&&m.status!=='IDLE';}},
+      {goal:'③ 运行 what-if 看负荷变化',op:'对比 modules[].delta（simLoad - baseLoad），观察瓶颈模块 delta>0。',
+        judge:'瓶颈模块 delta>0（负荷被放大）',check:async(s)=>{if(!s.lastSim)return false;const m=s.lastSim.modules.find(x=>x.module===(s.lastSim.bottleneck[0]&&s.lastSim.bottleneck[0].module));return m&&m.delta>0;}},
+      {goal:'④ 加派工单看冲击',op:'在 extraWos 加派（如 N2:5:48），运行仿真，看 simKpi.lateWos 是否增加、simValid 是否变 false。',
+        judge:'simKpi.lateWos 随 extraWos 增加，或 simValid=false(瓶颈超100%)',check:async(s)=>{if(!s.lastSim)return false;return (s.lastSim.simKpi&&s.lastSim.simKpi.lateWos>0)||s.lastSim.simValid===false;}},
+    ],
+  },
+];
+
+// ============================================================
+//  运行时状态 + UI 绑定
+// ============================================================
+const state = { expId:null, lastInject:null, injectTool:null, lastSim:null, poll:null };
+const $ = id => document.getElementById(id);
+
+function get(u){return fetch(u,{headers:{'Content-Type':'application/json'}}).then(r=>r.json()).catch(e=>({_err:e.message}));}
+function post(u,body){return fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).catch(e=>({_err:e.message}));}
+
+function buildExpOptions(){
+  const sel=$('expSel');
+  EXPERIMENTS.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.title;sel.appendChild(o);});
+  sel.onchange=()=>loadExp(sel.value);
+}
+
+function loadExp(id){
+  if(state.poll){clearInterval(state.poll);state.poll=null;}
+  const exp=EXPERIMENTS.find(e=>e.id===id); if(!exp)return;
+  state.expId=id; state.lastInject=null; state.lastSim=null; state.injectTool=null;
+  $('expMeta').textContent=exp.meta;
+  $('opTitle').textContent=exp.form.title;
+  buildForm(exp);
+  buildSteps(exp);
+  $('resultView').textContent='— 执行操作以查看实时结果 —';
+  $('liveState').textContent='';
+  // 实验 A 自动轮询 /api/spc；实验 B 不轮询（sim 为按需）
+  if(id==='spc-cd'){state.poll=setInterval(()=>refreshLive(exp),3000);}
+}
+
+function buildForm(exp){
+  const host=$('formHost'); host.innerHTML='';
+  const f=document.createElement('div'); f.className='form';
+  exp.form.fields.forEach(fl=>{
+    const lab=document.createElement('label'); lab.textContent=fl.label;
+    let inp;
+    if(fl.type==='select'){inp=document.createElement('select');fl.opts.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;inp.appendChild(op);});inp.value=fl.def;}
+    else{inp=document.createElement('input');inp.type=fl.type;inp.value=fl.def;}
+    inp.id='f_'+fl.k; lab.appendChild(inp); f.appendChild(lab);
+  });
+  const full=document.createElement('div'); full.className='full';
+  const btn=document.createElement('button'); btn.className='btn'; btn.textContent=exp.form.action; btn.onclick=()=>runAction(exp);
+  const rf=document.createElement('button'); rf.className='btn ghost'; rf.textContent='刷新实时结果'; rf.onclick=()=>refreshLive(exp);
+  full.appendChild(btn); full.appendChild(rf); f.appendChild(full);
+  host.appendChild(f);
+}
+
+function buildSteps(exp){
+  const list=$('stepList'); list.innerHTML='';
+  exp.steps.forEach((s,i)=>{
+    const d=document.createElement('div'); d.className='step'; d.id='step'+i;
+    d.innerHTML=`<div class="hd"><span class="dot">${i+1}</span><span>步骤 ${i+1}</span><span class="state"></span></div>`+
+      `<div class="goal">目标：${s.goal}</div>`+
+      `<div class="op">操作：${s.op}</div>`+
+      `<div class="judge">判据：${s.judge}</div>`;
+    list.appendChild(d);
+  });
+}
+
+function collectForm(exp){
+  const o={};
+  exp.form.fields.forEach(fl=>{
+    let v=$('f_'+fl.k).value;
+    if(fl.type==='number')v=Number(v);
+    o[fl.k]=v;
+  });
+  return o;
+}
+
+// 解析实验 B 的 extraWos 文本 -> [{product,qty,dueHours}]
+function parseExtraWos(txt){
+  if(!txt||!txt.trim())return [];
+  return txt.split(',').map(s=>s.trim()).filter(Boolean).map(p=>{
+    const [product,qty,dueHours]=p.split(':');
+    return {product:product||'N2',qty:Number(qty)||3,dueHours:Number(dueHours)||48};
+  });
+}
+
+async function runAction(exp){
+  const fv=collectForm(exp);
+  if(exp.id==='spc-cd'){
+    const body={product:fv.product,param:fv.param,tool:fv.tool,value:fv.value,lot:fv.lot||undefined};
+    const j=await post(API.spcInject,body);
+    state.lastInject=j.injected||j; state.injectTool=fv.tool;
+    $('resultView').textContent=JSON.stringify(j,null,2);
+    $('liveState').textContent='已注入，3s 自动轮询 /api/spc';
+  }else if(exp.id==='aps-bottleneck'){
+    const downTools=(fv.downTools||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const extraWos=parseExtraWos(fv.extraWos);
+    const body={downTools,extraWos,horizon:fv.horizon};
+    const j=await post(API.apsSim,body);
+    state.lastSim=j;
+    $('resultView').textContent=JSON.stringify(j,null,2);
+  }
+  refreshLive(exp);
+}
+
+async function refreshLive(exp){
+  if(exp.id==='spc-cd'){
+    const j=await get(API.spc);
+    if(j._err){$('resultView').textContent='轮询失败：'+j._err;return;}
+    // 若已有注入结果则保留，否则展示 spc 快照
+    if(!state.lastInject)$('resultView').textContent=JSON.stringify(j,null,2);
+    $('liveState').textContent='最近报警：'+(j.alarms&&j.alarms.length?j.alarms[0].param+'@'+j.alarms[0].tool:'无');
+  }
+  await evalSteps(exp);
+}
+
+async function evalSteps(exp){
+  for(let i=0;i<exp.steps.length;i++){
+    const s=exp.steps[i]; const el=$('step'+i); if(!el)continue;
+    try{
+      const pass=await s.check(state);
+      el.classList.remove('done','fail');
+      if(s.manual){el.classList.add('done');el.querySelector('.state').textContent='人工确认';}
+      else if(pass){el.classList.add('done');el.querySelector('.state').textContent='✓ 通过';}
+      else{el.querySelector('.state').textContent='待完成';}
+    }catch(e){el.querySelector('.state').textContent='判据异常';}
+  }
+}
+
+// 导师提示区：调用 /api/agent/chat（教学意图）
+async function askTutor(){
+  const box=$('tutorBox'); const msg=box.value.trim(); if(!msg)return;
+  const body=$('tutorBody');
+  const me=document.createElement('div'); me.style.color='var(--accent)'; me.textContent='你：'+msg; body.appendChild(me);
+  box.value='';
+  try{
+    const r=await fetch(API.agent,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,mode:'tutor',intent:'tutor'})});
+    const j=await r.json();
+    const ans=document.createElement('div'); ans.style.marginBottom='8px'; ans.textContent='导师：'+(j.reply||'(无回复)'); body.appendChild(ans);
+  }catch(e){
+    const ans=document.createElement('div'); ans.style.color='var(--down)'; ans.textContent='导师连接失败：'+e.message+'（请确认 agent 进程已在 8127 启动）'; body.appendChild(ans);
+  }
+  body.scrollTop=body.scrollHeight;
+}
+
+// init
+buildExpOptions();
+loadExp(EXPERIMENTS[0].id);
+// 面板显隐开关
+(function(){ const b=document.getElementById('hud-toggle'); if(!b) return;
+  function t(){ const h=document.body.classList.toggle('hud-hidden'); b.textContent=h?'👁 显示面板':'🙈 隐藏面板'; }
+  b.addEventListener('click',t); window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) t(); }); })();
+</script>
+</body>
+</html>

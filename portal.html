@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晶圆厂智能制造平台 · 业务流总览</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --panel2:#0f1626; --line:#1f2b45;
+    --text:#cfd8e3; --muted:#6b7a94; --accent:#4ea1ff;
+    --run:#39d98a; --idle:#9aa7b4; --pm:#f2c14e; --down:#ff5c5c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;padding:24px;max-width:1180px;margin:0 auto}
+  h1{font-size:22px;letter-spacing:.5px;margin-bottom:6px}
+  .sub{color:var(--muted);margin-bottom:20px;font-size:13px}
+  .section{margin:26px 0 12px;font-size:13px;color:var(--accent);font-weight:600;letter-spacing:.5px;border-left:3px solid var(--accent);padding-left:10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;transition:.15s;text-decoration:none;color:var(--text);display:block}
+  .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 20px rgba(78,161,255,.12)}
+  .card .ico{font-size:22px;margin-bottom:8px}
+  .card h3{font-size:15px;margin-bottom:4px}
+  .card p{font-size:12px;color:var(--muted);line-height:1.5}
+  .card .tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--muted);margin-top:8px}
+  .note{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:12.5px;color:var(--muted);line-height:1.7;margin-top:22px}
+  .note b{color:var(--text)}
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .nav a{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid var(--line);color:var(--muted);text-decoration:none}
+  .nav a:hover,.nav a.cur{color:var(--accent);border-color:var(--accent)}
+
+  /* === 四流原型样式 === */
+  .flows{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;margin-top:8px}
+  .flow{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px}
+  .flow h2{font-size:16px;margin-bottom:2px;display:flex;align-items:baseline;gap:8px}
+  .flow h2 .en{font-size:12px;color:var(--muted);font-weight:400}
+  .flow.otd{border-top:3px solid #378ADD}
+  .flow.npi{border-top:3px solid #7F77DD}
+  .flow.maint{border-top:3px solid #BA7517}
+  .flow.cockpit{border-top:3px solid #639922}
+  .steps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 8px}
+  .step{font-size:12.5px;padding:6px 11px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:var(--text);text-decoration:none;white-space:nowrap}
+  .step:hover{border-color:var(--accent);color:var(--accent)}
+  .arrow{color:var(--muted);font-size:12px}
+  .ref{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .unav-group{font-size:11px;color:var(--muted);margin:0 4px 0 10px;letter-spacing:.5px;white-space:nowrap}
+  .unav-group:first-of-type{margin-left:0}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><span class="unav-group">履约流</span><a href="/erp-ops.html">接单·发运</a><a href="/console.html">在制</a><a href="/twin.html">量测</a><span class="unav-group">研发流</span><a href="/npi-ops.html">NPI 流片</a><span class="unav-group">运维流</span><a href="/eap-console.html">EAP</a><a href="/twin.html">孪生</a><a href="/agent.html">问答副驾</a><span class="unav-group">驾驶舱</span><a href="/fab-twin.html">工厂KPI</a><a href="/sim.html">仿真</a><a href="/twin3d/portal.html">角色</a><a href="/portal.html">门户</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+  <h1>智能晶圆厂平台 · 业务流总览</h1>
+  <div class="sub">按业务流组织：<b>OTD 履约 / NPI 研发 / 设备运维 / 全局驾驶舱</b>——每条流把分散的功能页串成一道工序线，一眼看到业务走到哪、卡在哪。</div>
+
+  <h2 class="section">业务流导航</h2>
+  <div class="flows">
+
+    <div class="flow otd">
+      <h2>OTD 履约流 <span class="en">订单 → 交付</span> <a href="/otd-flow.html" style="font-size:13px;font-weight:600;color:#0d1117;background:#7fd1ff;padding:2px 10px;border-radius:10px;text-decoration:none;margin-left:6px">▸ 进度墙（一屏看全）</a></h2>
+      <div class="steps">
+        <a class="step" href="/erp-ops.html">① 接单 SO</a><span class="arrow">→</span>
+        <a class="step" href="/console.html">② 投料 WO</a><span class="arrow">→</span>
+        <a class="step" href="/console.html">③ 加工在制</a><span class="arrow">→</span>
+        <a class="step" href="/twin.html">④ 量测 SPC/FDC</a><span class="arrow">→</span>
+        <a class="step" href="/erp-ops.html">⑤ 发运</a><span class="arrow">→</span>
+        <a class="step" href="/erp-ops.html">⑥ 交付+应收</a>
+      </div>
+      <div class="ref">功能页：erp-ops · console · twin</div>
+    </div>
+
+    <div class="flow npi">
+      <h2>NPI 研发流 <span class="en">设计 → 量产</span></h2>
+      <div class="steps">
+        <a class="step" href="/npi-ops.html">① 设计 DES</a><span class="arrow">→</span>
+        <a class="step" href="/npi-ops.html">② 光罩 MSK</a><span class="arrow">→</span>
+        <a class="step" href="/npi-ops.html">③ 工程批</a><span class="arrow">→</span>
+        <a class="step" href="/npi-ops.html">④ 流片批</a><span class="arrow">→</span>
+        <a class="step" href="/console.html">⑤ 量产移交</a>
+      </div>
+      <div class="ref">功能页：npi-ops · console</div>
+    </div>
+
+    <div class="flow maint">
+      <h2>设备运维流 <span class="en">通信 → 闭环</span></h2>
+      <div class="steps">
+        <a class="step" href="/eap-console.html">① HSMS 通信</a><span class="arrow">→</span>
+        <a class="step" href="/twin.html">② 状态监控</a><span class="arrow">→</span>
+        <a class="step" href="/twin.html">③ 报警 FDC/SPC</a><span class="arrow">→</span>
+        <a class="step" href="/agent.html">④ PdM 观察</a><span class="arrow">→</span>
+        <a class="step" href="/eap-console.html">⑤ APC 回灌</a>
+      </div>
+      <div class="ref">功能页：eap-console · twin · agent</div>
+    </div>
+
+    <div class="flow cockpit">
+      <h2>全局驾驶舱 <span class="en">全局视角</span></h2>
+      <div class="steps">
+        <a class="step" href="/fab-twin.html">① 全厂 KPI</a><span class="arrow">→</span>
+        <a class="step" href="/console.html">② 在制/瓶颈</a><span class="arrow">→</span>
+        <a class="step" href="/sim.html">③ 仿真 what-if</a><span class="arrow">→</span>
+        <a class="step" href="/twin3d/">④ 3D 工厂</a><span class="arrow">→</span>
+        <a class="step" href="/twin3d/portal.html">⑤ 角色视图</a><span class="arrow">→</span>
+        <a class="step" href="/agent.html">⑥ AI 问答</a>
+      </div>
+      <div class="ref">功能页：fab-twin · sim · twin3d(3D 工厂/角色) · agent</div>
+    </div>
+
+  </div>
+
+  <div class="note">
+    <b>平台状态</b>：6 进程常驻（门户 8123 / MES 8124 / EAP 8125 / ERP 8126 / Agent 8127 / WMS 8128）。EAP 负责设备通信（HSMS/SECS），生产调度与量测由 MES 引擎驱动；ERP 经事件总线与 MES 联动领料与成本归集，WMS 负责实物仓储（库位/批次/收发流水），与 ERP 财务台账分工清晰。L4 多租户 / APC / 真实协议适配当前为蓝图态（默认关），按需开启。
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# ===== 运行时数据库（大文件，不入库） =====
+*.db
+*.db-shm
+*.db-wal
+
+# ===== 依赖 =====
+node_modules/
+
+# ===== 日志 =====
+*.log
+._*.log
+log_*.txt
+vlog.txt
+
+# ===== 本地记忆 / 临时 =====
+.workbuddy/
+repair_tmp/
+logs/
+tmp/
+
+# ===== 备份 / 修复中间产物 =====
+*.bak
+*._bak_*
+*.bak_*
+*_bak_*.pptx
+*_bak_*.docx
+*.tmp
+*.repaired.pptx
+*.prefooter.bak
+*.prename.bak
+
+# ===== 运行时状态文件 =====
+*.status.json
+
+# ===== 临时校验/探针脚本（点前缀 scratch） =====
+.*.cjs

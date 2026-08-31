@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晶圆厂智能制造平台 · ERP 原生制造操作台</title>
+<style>
+  :root{--bg:#0b1020;--panel:#121a2e;--panel2:#0f1626;--line:#1f2b45;--text:#cfd8e3;--muted:#6b7a94;--accent:#4ea1ff;--ok:#39d98a;--warn:#f2c14e;--bad:#ff5c5c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;padding:24px;max-width:1240px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:6px}
+  .sub{color:var(--muted);margin-bottom:16px;font-size:13px}
+  .bar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .status{font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--line)}
+  .status.ok{color:var(--ok);border-color:rgba(57,217,138,.4)}
+  .status.bad{color:var(--bad);border-color:rgba(255,92,92,.4)}
+  .section{margin:26px 0 10px;font-size:13px;color:var(--accent);font-weight:600;letter-spacing:.5px;border-left:3px solid var(--accent);padding-left:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  .kpi .b{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .kpi .n{font-size:20px;font-weight:700}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+  button{background:var(--accent);color:#06101f;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600}
+  button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  button:disabled{opacity:.5;cursor:default}
+  .tag{font-size:10px;padding:1px 7px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
+  .tag.recv{color:var(--ok);border-color:rgba(57,217,138,.4)}
+  .tag.pend{color:var(--warn);border-color:rgba(242,193,78,.4)}
+  .tag.draft{color:var(--muted);border-color:rgba(107,122,148,.4)}
+  .tag.paid{color:var(--ok);border-color:rgba(57,217,138,.4)}
+  .note{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--muted);line-height:1.7;margin-top:8px}
+  .note b{color:var(--text)}
+  a.back{font-size:12px;color:var(--muted);text-decoration:none}
+  select,input{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px;margin-right:6px}
+  #hud-toggle{position:fixed;top:60px;right:14px;z-index:99;font:12px/1.4 system-ui,sans-serif;color:var(--muted);background:rgba(78,161,255,.18);border:1px solid rgba(78,161,255,.4);border-radius:8px;padding:6px 11px;cursor:pointer}
+  #hud-toggle:hover{background:rgba(78,161,255,.35);color:var(--text)}
+  body.hud-hidden .kpi{display:none !important;}
+  .mini{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}
+  .mini label{font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+  .bal-ok{color:var(--ok);font-weight:700}
+  .bal-bad{color:var(--bad);font-weight:700}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+  <a class="back" href="/portal.html">← 返回门户</a>
+  <h1>原生 ERP 操作台 · Phase 1 真实财务域</h1>
+  <button id="hud-toggle" title="隐藏/显示指标区 (H)">🙈 隐藏面板</button>
+  <div class="sub">ERP 独立服务 (:8126) · 总账/应付应收/发票税务/采购审批/MRP 全落地。数据经事件总线与 MES 联动，经门户代理 <code>/api/erp/*</code> 免 CORS。</div>
+  <div class="bar">
+    <span id="conn" class="status bad">连接中…</span>
+    <button id="refresh">刷新全部</button>
+  </div>
+
+  <div class="section">关键指标</div>
+  <div class="kpi" id="kpis">
+    <div class="b"><div class="n" id="k-inv">—</div><div class="l">库存价值</div></div>
+    <div class="b"><div class="n" id="k-mat">—</div><div class="l">物料种类</div></div>
+    <div class="b"><div class="n" id="k-ap">—</div><div class="l">应付账款(未付)</div></div>
+    <div class="b"><div class="n" id="k-ar">—</div><div class="l">应收账款(未收)</div></div>
+    <div class="b"><div class="n" id="k-vch">—</div><div class="l">凭证数</div></div>
+    <div class="b"><div class="n" id="k-bal">—</div><div class="l">试算平衡</div></div>
+  </div>
+
+  <div class="section">销售订单 SO（订单驱动生产：SO → WO → 投料 → 量测 → 发运 → 回款）</div>
+  <div class="card">
+    <div class="mini">
+      <label>客户<input id="so-cust" type="text" value="CUS-001" style="width:120px"></label>
+      <label>产品<select id="so-prod"></select></label>
+      <label>数量(片, 25/批)<input id="so-qty" type="number" value="25" min="25" step="25" style="width:96px"></label>
+      <label>交期(h)<input id="so-due" type="number" value="72" style="width:70px"></label>
+      <label>单价(¥)<input id="so-price" type="number" value="0" style="width:90px"></label>
+      <button id="so-new">新建销售订单</button>
+    </div>
+    <div class="note" id="so-msg"></div>
+    <table id="so"><thead><tr><th>SO</th><th>客户</th><th>产品</th><th>数量</th><th>单价</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="section">总账试算平衡（GL Trial Balance）</div>
+  <div class="card"><table id="gl"><thead><tr><th>科目</th><th>名称</th><th>类别</th><th>借</th><th>贷</th></tr></thead><tbody></tbody></table>
+    <div class="note" id="gl-note"></div>
+  </div>
+
+  <div class="section">采购订单 PO（审批流：DRAFT→OPEN→RECEIVED）</div>
+  <div class="card">
+    <div class="mini">
+      <label>物料<select id="np-mat"></select></label>
+      <label>数量<input id="np-qty" type="number" value="200" style="width:80px"></label>
+      <label>单价<input id="np-price" type="number" value="0" style="width:90px"></label>
+      <label>供应商<select id="np-sup"></select></label>
+      <button id="np-draft">新建(草稿)</button>
+    </div>
+    <table id="po"><thead><tr><th>PO</th><th>供应商</th><th>物料</th><th>数量</th><th>单价</th><th>状态</th><th>审批人</th><th>操作</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="section">应付发票(进项) 与 付款</div>
+  <div class="card"><table id="ap"><thead><tr><th>发票</th><th>供应商</th><th>PO</th><th>不含税</th><th>税额</th><th>含税</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+
+  <div class="section">应收发票(销项) 与 收款</div>
+  <div class="card"><table id="ar"><thead><tr><th>发票</th><th>客户</th><th>SO</th><th>不含税</th><th>税额</th><th>含税</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+
+  <div class="section">MRP 物料需求计划</div>
+  <div class="card">
+    <div class="mini">
+      <button id="mrp-run">运行 MRP</button>
+      <button id="mrp-apply" class="ghost">一键生成采购单(进审批流)</button>
+    </div>
+    <table id="mrp"><thead><tr><th>物料</th><th>毛需求</th><th>在库</th><th>在途</th><th>安全库存</th><th>净需求</th><th>需采购</th></tr></thead><tbody></tbody></table>
+    <div class="note">净需求 = 毛需求(WO×BOM) − 在库 − 在途(未收货 PO) + 安全库存。即把库存补到「覆盖本批需求 + 安全库存」的水平；净需求&gt;0 即触发采购建议，一键生成 DRAFT 采购单，经审批→收货闭环。</div>
+  </div>
+
+  <div class="section">库存 / 物料台账</div>
+  <div class="card"><table id="inv"><thead><tr><th>编码</th><th>名称</th><th>类别</th><th>单价</th><th>库存</th><th>安全库存</th><th>价值</th></tr></thead><tbody></tbody></table></div>
+
+  <div class="section">凭证流水</div>
+  <div class="card"><table id="vch"><thead><tr><th>凭证</th><th>摘要</th><th>分录</th></tr></thead><tbody></tbody></table></div>
+
+  <div class="section">批次成本归集（事件驱动）</div>
+  <div class="card"><table id="cost"><thead><tr><th>批次</th><th>产品</th><th>物料</th><th>人工</th><th>设备</th><th>合计</th><th>工时(h)</th></tr></thead><tbody></tbody></table></div>
+
+  <div class="note">
+    <b>Phase 1 已落地能力</b>：①总账与凭证（11 个标准科目、借贷过账、试算平衡）；②应付/应收正式化 + 13% 进项/销项发票自动生成与税分离；③采购审批流（DRAFT→OPEN→RECEIVED）；④MRP 净需求计算与一键采购建议。ERP 仍仅订阅 MES 事件派生，未回推。
+  </div>
+
+<script>
+const api = p => fetch('/api/erp'+p).then(r=>r.json()).catch(()=>({__err:true}));
+const $ = s => document.querySelector(s);
+const fmt = n => (n==null||isNaN(n))?'—':Number(n).toLocaleString('zh-CN',{maximumFractionDigits:0});
+const money = n => '¥'+(n==null||isNaN(n)?'—':Number(n).toLocaleString('zh-CN',{maximumFractionDigits:0}));
+
+const tagClass = s => ({DRAFT:'draft',PENDING:'pend',OPEN:'pend',RECEIVED:'recv',CLOSED:'recv',UNPAID:'pend',PAID:'paid',IN_TRANSIT:'pend',DELIVERED:'recv'}[s]||'');
+
+async function load(){
+  const h = await api('/health');
+  const conn = $('#conn');
+  if(h && h.ok){ conn.className='status ok'; conn.textContent='✓ ERP :8126 在线 ('+(h.mode||'standalone')+' · '+h.version+')'; }
+  else { conn.className='status bad'; conn.textContent='✗ ERP 不可达'; return; }
+
+  const [inv,mats,po,ap,ar,glTrial,mrp,costs,vchs] = await Promise.all([
+    api('/inventory'), api('/materials'), api('/po'), api('/ap?status=ALL'),
+    api('/ar?status=ALL'), api('/gl/trial'), api('/mrp'), api('/costs'), api('/gl/vouchers')
+  ]);
+
+  // KPI
+  const apUnpaid = (ap.invoices||[]).filter(x=>x.status==='UNPAID').reduce((s,x)=>s+x.total,0);
+  const arUnpaid = (ar.invoices||[]).filter(x=>x.status==='UNPAID').reduce((s,x)=>s+x.total,0);
+  $('#k-inv').textContent = fmt((inv&&inv.value)||0);
+  $('#k-mat').textContent = fmt((mats&&mats.materials&&mats.materials.length)||0);
+  $('#k-ap').textContent  = money(apUnpaid);
+  $('#k-ar').textContent  = money(arUnpaid);
+  $('#k-vch').textContent = fmt((vchs&&vchs.vouchers&&vchs.vouchers.length)||0);
+  $('#k-bal').textContent = glTrial&&glTrial.balanced ? '✓ 平衡' : '✗ 不平';
+  $('#k-bal').className = 'n '+(glTrial&&glTrial.balanced?'bal-ok':'bal-bad');
+
+  // GL trial
+  const gt=$('#gl tbody'); gt.innerHTML='';
+  (glTrial.items||[]).forEach(a=>{
+    gt.insertAdjacentHTML('beforeend',`<tr><td>${a.code}</td><td>${a.name}</td><td>${a.type}</td><td>${fmt(a.debit)}</td><td>${fmt(a.credit)}</td></tr>`);
+  });
+  $('#gl-note').textContent = glTrial ? `借合计 ${fmt(glTrial.totalDebit)} ｜ 贷合计 ${fmt(glTrial.totalCredit)} ｜ ${glTrial.balanced?'借贷平衡 ✓':'借贷不平 ✗'}` : '';
+
+  // PO
+  const pt=$('#po tbody'); pt.innerHTML='';
+  (po.pos||[]).forEach(p=>{
+    const canApp = p.status==='DRAFT'||p.status==='PENDING';
+    const canRecv = p.status==='OPEN';
+    pt.insertAdjacentHTML('beforeend',`<tr>
+      <td>${p.id||''}</td><td>${p.supplier||''}</td><td>${p.material||''}</td>
+      <td>${fmt(p.qty)}</td><td>${fmt(p.price)}</td>
+      <td><span class="tag ${tagClass(p.status)}">${p.status||'OPEN'}</span></td>
+      <td>${p.approver||'—'}</td>
+      <td>${canApp?`<button data-app="${p.id}">审批</button>`:''}${canRecv?`<button data-recv="${p.id}">收货</button>`:''}${(!canApp&&!canRecv)?'—':''}</td></tr>`);
+  });
+  pt.querySelectorAll('button[data-app]').forEach(b=>b.onclick=async()=>{ b.disabled=true; await fetch('/api/erp/po/'+encodeURIComponent(b.dataset.app)+'/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approver:'经理'})}); load(); });
+  pt.querySelectorAll('button[data-recv]').forEach(b=>b.onclick=async()=>{ b.disabled=true; await fetch('/api/erp/po/'+encodeURIComponent(b.dataset.recv)+'/receive',{method:'POST'}); load(); });
+
+  // AP
+  const at=$('#ap tbody'); at.innerHTML='';
+  (ap.invoices||[]).forEach(x=>{
+    at.insertAdjacentHTML('beforeend',`<tr><td>${x.id}</td><td>${x.supplier}</td><td>${x.po_id}</td><td>${money(x.amount)}</td><td>${money(x.tax)}</td><td>${money(x.total)}</td><td><span class="tag ${tagClass(x.status)}">${x.status}</span></td><td>${x.status==='UNPAID'?`<button data-pay="${x.id}">付款</button>`:'✓'}</td></tr>`);
+  });
+  at.querySelectorAll('button[data-pay]').forEach(b=>b.onclick=async()=>{ b.disabled=true; await fetch('/api/erp/ap/'+encodeURIComponent(b.dataset.pay)+'/pay',{method:'POST'}); load(); });
+
+  // AR
+  const rt=$('#ar tbody'); rt.innerHTML='';
+  (ar.invoices||[]).forEach(x=>{
+    rt.insertAdjacentHTML('beforeend',`<tr><td>${x.id}</td><td>${x.customer}</td><td>${x.so_id}</td><td>${money(x.amount)}</td><td>${money(x.tax)}</td><td>${money(x.total)}</td><td><span class="tag ${tagClass(x.status)}">${x.status}</span></td><td>${x.status==='UNPAID'?`<button data-recv="${x.id}">收款</button>`:'✓'}</td></tr>`);
+  });
+  rt.querySelectorAll('button[data-recv]').forEach(b=>b.onclick=async()=>{ b.disabled=true; await fetch('/api/erp/ar/'+encodeURIComponent(b.dataset.recv)+'/receive',{method:'POST'}); load(); });
+
+  // inventory
+  const tb=$('#inv tbody'); tb.innerHTML='';
+  (mats.materials||[]).forEach(m=>{
+    const val=(m.price||0)*(m.stock||0);
+    tb.insertAdjacentHTML('beforeend',`<tr><td>${m.code||''}</td><td>${m.name||''}</td><td>${m.cat||''}</td><td>${fmt(m.price)}</td><td>${fmt(m.stock)}</td><td>${fmt(m.safetyStock)}</td><td>${fmt(val)}</td></tr>`);
+  });
+
+  // vouchers
+  const vt=$('#vch tbody'); vt.innerHTML='';
+  (vchs.vouchers||[]).slice(0,40).forEach(v=>{
+    const e=(v.entries||[]).map(en=>`${en.account} ${en.dr?('借'+fmt(en.dr)):(en.cr?('贷'+fmt(en.cr)):'')}`).join('；');
+    vt.insertAdjacentHTML('beforeend',`<tr><td>${v.id}</td><td>${v.summary}</td><td style="font-size:11px;color:var(--muted)">${e}</td></tr>`);
+  });
+
+  // costs
+  const ct=$('#cost tbody'); ct.innerHTML='';
+  (costs.costs||[]).slice(0,40).forEach(c=>{
+    ct.insertAdjacentHTML('beforeend',`<tr><td>${c.lot||''}</td><td>${c.product||''}</td><td>${fmt(c.matCost)}</td><td>${fmt(c.laborCost)}</td><td>${fmt(c.equipCost)}</td><td>${fmt(c.totalCost)}</td><td>${c.cycleH??'—'}</td></tr>`);
+  });
+  await loadSO();
+}
+
+// 销售订单 SO：手动建单（订单驱动生产）+ 手动发运/交付
+const SO_PRODUCTS = ['N2','A16','CIS'];
+async function fillSoProducts(){ const s=$('#so-prod'); if(s.options.length) return; s.innerHTML=SO_PRODUCTS.map(p=>`<option value="${p}">${p}</option>`).join(''); }
+async function loadSO(){
+  const d = await api('/so'); const tb=$('#so tbody'); tb.innerHTML='';
+  (d.sos||[]).forEach(s=>{
+    const canShip = s.status==='OPEN';
+    tb.insertAdjacentHTML('beforeend',`<tr><td>${s.id}</td><td>${s.customer}</td><td>${s.product}</td><td>${fmt(s.qty)}</td><td>${money(s.price)}</td><td><span class="tag ${tagClass(s.status)}">${s.status}</span></td><td>${canShip?`<button data-ship="${s.id}">发运/交付</button>`:'—'}</td></tr>`);
+  });
+  tb.querySelectorAll('button[data-ship]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    const r=await fetch('/api/erp/so/'+encodeURIComponent(b.dataset.ship)+'/ship',{method:'POST'}).then(x=>x.json()).catch(e=>({error:e.message}));
+    $('#so-msg').textContent = r.ok ? `✓ ${b.dataset.ship} 已发运 → 应收发票 ${r.invoice} 含税 ${money(r.total)}` : `✗ ${(r.error||'发运失败')}`;
+    loadSO();
+  });
+}
+
+// MRP 渲染
+async function renderMrp(){ const m=await api('/mrp'); const tb=$('#mrp tbody'); tb.innerHTML=''; (m.items||[]).forEach(it=>{ tb.insertAdjacentHTML('beforeend',`<tr><td>${it.material} ${it.name?'('+it.name+')':''}</td><td>${fmt(it.gross)}</td><td>${fmt(it.issued)}</td><td>${fmt(it.onHand)}</td><td>${fmt(it.onOrder)}</td><td style="${it.need?'color:var(--bad);font-weight:700':''}">${fmt(it.net)}</td><td>${it.need?'是':'—'}</td></tr>`); }); }
+$('#mrp-run').onclick = ()=>renderMrp();
+$('#mrp-apply').onclick = async ()=>{ const r=await fetch('/api/erp/mrp/apply',{method:'POST'}).then(x=>x.json()); alert('已生成 '+((r.created)||0)+' 张 DRAFT 采购单'); load(); renderMrp(); };
+
+// 新建草稿采购单
+async function fillSelectors(){
+  const [mats,sups]=await Promise.all([api('/materials'),api('/suppliers')]);
+  const ms=$('#np-mat'); ms.innerHTML=(mats.materials||[]).map(m=>`<option value="${m.code}">${m.code} ${m.name}</option>`).join('');
+  const ss=$('#np-sup'); ss.innerHTML=(sups.suppliers||[]).map(s=>`<option value="${s.id}">${s.id} ${s.name}</option>`).join('');
+  const m0=(mats.materials||[])[0]; if(m0) $('#np-price').value=m0.price||0;
+}
+$('#np-mat').onchange = async ()=>{ const c=$('#np-mat').value; const m=await api('/materials'); const it=(m.materials||[]).find(x=>x.code===c); if(it) $('#np-price').value=it.price||0; };
+$('#np-draft').onclick = async ()=>{ const b={material:$('#np-mat').value,qty:+$('#np-qty').value||1,price:+$('#np-price').value||0,supplier:$('#np-sup').value,draft:true}; const r=await fetch('/api/erp/po',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(x=>x.json()); if(r.ok){ alert('已建草稿 '+r.id); load(); } else alert('失败'); };
+
+$('#so-new').onclick=async()=>{
+  const body={ customer:$('#so-cust').value||'CUS-001', product:$('#so-prod').value, qty:Math.max(25,Math.round((+$('#so-qty').value||25)/25)*25), dueHours:+$('#so-due').value||72 };
+  const price=+$('#so-price').value; if(price>0) body.price=price;
+  const r=await fetch('/api/erp/so',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(x=>x.json()).catch(e=>({error:e.message}));
+  $('#so-msg').textContent = r.ok ? `✓ ${r.id} 已创建并投料（${r.product} ×${r.qty}，约 ${r.lots} lot）→ 完工后自动发运` : `✗ ${(r.error||'创建失败')}`;
+  loadSO();
+};
+$('#refresh').onclick=load;
+(async()=>{ await fillSelectors(); await fillSoProducts(); await load(); await renderMrp(); })();
+// 面板显隐开关
+(function(){ const b=document.getElementById('hud-toggle'); if(!b) return;
+  function t(){ const h=document.body.classList.toggle('hud-hidden'); b.textContent=h?'👁 显示面板':'🙈 隐藏面板'; }
+  b.addEventListener('click',t); window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) t(); }); })();
+</script>
+</body>
+</html>

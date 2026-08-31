@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晶圆厂智能制造平台 · MES 控制台</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --panel2:#0f1626; --line:#1f2b45;
+    --text:#cfd8e3; --muted:#6b7a94; --accent:#4ea1ff;
+    --run:#39d98a; --idle:#9aa7b4; --pm:#f2c14e; --down:#ff5c5c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:13px/1.55 "Segoe UI","Microsoft YaHei",sans-serif;padding:20px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+  h1{font-size:18px;letter-spacing:.5px}
+  .badge{font-size:11px;padding:2px 10px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .badge.ok{border-color:var(--run);color:var(--run)}
+  .spacer{flex:1}
+  .rule-sel{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:12px}
+  .btn{background:linear-gradient(90deg,#1a4f8b,#2f81f7);border:none;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--accent)}
+  .grid{display:grid;gap:12px;margin-bottom:12px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .cards{grid-template-columns:1fr 1fr}
+  @media(max-width:900px){.cards{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .panel h2{font-size:13px;color:var(--accent);margin-bottom:10px;font-weight:600;letter-spacing:.5px}
+  .kpi .v{font-size:26px;font-weight:700;font-family:Consolas,monospace}
+  .kpi .l{font-size:11px;color:var(--muted);margin-top:2px}
+  .kpi .v.g{color:var(--run)} .kpi .v.b{color:var(--accent)} .kpi .v.y{color:var(--pm)} .kpi .v.r{color:var(--down)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{color:var(--muted);text-align:left;font-weight:500;padding:5px 8px;border-bottom:1px solid var(--line)}
+  td{padding:5px 8px;border-bottom:1px solid var(--panel2)}
+  tr:hover td{background:var(--panel2)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .st-run{background:var(--run)} .st-idle{background:var(--idle)} .st-pm{background:var(--pm)} .st-down{background:var(--down)} .st-DONE{background:var(--accent)}
+  .bar{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden}
+  .bar>i{display:block;height:100%}
+  .stat-line{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .quick{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin:14px 0 6px}
+  .qcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-align:center;color:var(--text);text-decoration:none;font-size:12.5px;transition:.15s}
+  .qcard:hover{border-color:var(--accent);color:var(--accent)}
+  .qcard span{display:block;font-size:20px;margin-bottom:4px}
+  .stat-line b{color:var(--text);font-family:Consolas,monospace}
+  .hist{font-size:11px;color:var(--muted);background:var(--panel2);border-radius:6px;padding:8px;margin-top:4px}
+  .tabs{display:flex;gap:8px;margin-bottom:10px}
+  .tab{padding:4px 12px;border-radius:6px;border:1px solid var(--line);cursor:pointer;font-size:12px;color:var(--muted)}
+  .tab.on{background:var(--panel2);color:var(--accent);border-color:var(--accent)}
+  .muted{color:var(--muted)} .mono{font-family:Consolas,monospace}
+
+  /* 面板显隐开关 */
+  #hud-toggle{position:fixed;top:60px;right:14px;z-index:99;
+    font:12px/1.4 system-ui,'Segoe UI',sans-serif;color:var(--muted);white-space:nowrap;
+    background:rgba(78,161,255,0.18);border:1px solid rgba(78,161,255,0.4);
+    border-radius:8px;padding:6px 11px;cursor:pointer;transition:background .15s;}
+  #hud-toggle:hover{background:rgba(78,161,255,0.35);color:var(--text);}
+  body.hud-hidden header,body.hud-hidden #quick-links,body.hud-hidden #kpis{display:none !important;}
+
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line,#1f2b45)}
+  .nav a{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid var(--line,#1f2b45);color:var(--muted,#6b7a94);text-decoration:none}
+  .nav a:hover{color:var(--accent,#4ea1ff);border-color:var(--accent,#4ea1ff)}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+<header>
+  <h1>⚙ fab-mes · MES 控制台</h1>
+  <span class="badge" id="b-svc">连接中…</span>
+  <span class="badge" id="b-up">–</span>
+  <span class="badge ok" id="b-clients">–</span>
+  <span class="spacer"></span>
+  <label class="muted" style="font-size:11px">派工规则</label>
+  <select class="rule-sel" id="rule">
+    <option>FIFO</option><option>SPT</option><option>CR</option><option>EDD</option><option>BN</option><option>HYBRID</option>
+  </select>
+  <button class="btn" id="btn-wo">+ 创建工单</button>
+  <button class="btn ghost" id="btn-refresh">刷新</button>
+</header>
+<button id="hud-toggle" title="隐藏/显示顶部面板 (H)">🙈 隐藏面板</button>
+
+<div class="grid quick" id="quick-links">
+  <a class="qcard" href="/portal.html"><span>🗺️</span>门户总览</a>
+  <a class="qcard" href="/twin.html"><span>🔧</span>装备孪生</a>
+  <a class="qcard" href="/line-twin.html"><span>📊</span>产线孪生</a>
+  <a class="qcard" href="/fab-twin.html"><span>🏗️</span>工厂孪生</a>
+  <a class="qcard" href="/twin3d/"><span>🌐</span>3D 物理工厂</a>
+  <a class="qcard" href="/sim.html"><span>⚙️</span>产能仿真</a>
+  <a class="qcard" href="/lab.html"><span>🔬</span>教学实验台</a>
+  <a class="qcard" href="/agent.html"><span>🤖</span>问答副驾</a>
+  <a class="qcard" href="/eap-console.html"><span>🔌</span>EAP 控制台</a>
+  <a class="qcard" href="/twin3d/portal.html"><span>🧭</span>角色工作台</a>
+</div>
+
+<div class="grid kpis" id="kpis"></div>
+
+<div class="grid cards">
+  <div class="panel">
+    <h2>设备状态</h2>
+    <div class="grid kpis" id="tool-status" style="margin-bottom:10px"></div>
+    <h2>模块负载（队列 / 在制）</h2>
+    <div id="mod-bars"></div>
+  </div>
+  <div class="panel">
+    <h2>SEMI E10/E58 统计</h2>
+    <div class="stat-line" id="e10-line"></div>
+    <h2 style="margin-top:12px">按模块</h2>
+    <div id="e10-mod"></div>
+  </div>
+</div>
+
+<div class="grid cards">
+  <div class="panel">
+    <h2>工单 (Work Orders)</h2>
+    <div style="max-height:320px;overflow:auto"><table id="wo-table">
+      <tr><th>工单</th><th>产品</th><th>数量</th><th>WIP</th><th>DONE</th><th>交期</th></tr>
+    </table></div>
+  </div>
+  <div class="panel">
+    <h2>批次追踪 (Lots)</h2>
+    <div class="tabs" id="lot-tabs">
+      <span class="tab on" data-f="">全部</span>
+      <span class="tab" data-f="WIP">WIP</span>
+      <span class="tab" data-f="DONE">DONE</span>
+    </div>
+    <div style="max-height:280px;overflow:auto"><table id="lot-table">
+      <tr><th>批次</th><th>产品</th><th>工序</th><th>状态</th><th>设备</th><th>交期</th></tr>
+    </table></div>
+    <div id="lot-hist"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>WIP 快照</h2>
+  <div class="stat-line" id="wip-line"></div>
+</div>
+
+<div class="panel">
+  <h2>量测数据（SPC 数据源 · METRO 步骤）</h2>
+  <div id="metro-stats"></div>
+  <div style="max-height:200px;overflow:auto;margin-top:8px"><table id="metro-table">
+    <tr><th>时间</th><th>批次</th><th>产品</th><th>参数</th><th>值</th><th>目标</th><th>结果</th></tr>
+  </table></div>
+</div>
+
+<div class="grid cards">
+  <div class="panel">
+    <h2>预测性维护 PdM（故障风险排行）</h2>
+    <div id="pdm"></div>
+  </div>
+  <div class="panel">
+    <h2>虚拟量测 VM（预测 vs 实测）</h2>
+    <div id="vm-stats"></div>
+    <div style="max-height:220px;overflow:auto;margin-top:8px"><table id="vm-table">
+      <tr><th>批次</th><th>参数</th><th>预测</th><th>实际</th><th>误差%</th><th>状态</th></tr>
+    </table></div>
+  </div>
+</div>
+
+<div class="grid cards">
+  <div class="panel">
+    <h2>SPC 统计过程控制（判异 → 自动停线）</h2>
+    <div style="max-height:150px;overflow:auto"><table id="spc-table">
+      <tr><th>产品</th><th>参数</th><th>设备</th><th>n</th><th>均值</th><th>UCL</th><th>LCL</th><th>最近</th><th>状态</th></tr>
+    </table></div>
+    <div style="max-height:140px;overflow:auto;margin-top:8px"><table id="spc-alarm">
+      <tr><th>时间</th><th>产品/参数</th><th>设备</th><th>值</th><th>规则</th></tr>
+    </table></div>
+  </div>
+  <div class="panel">
+    <h2>FDC 设备异常检测（wph 性能退化）</h2>
+    <div style="max-height:300px;overflow:auto"><table id="fdc-table">
+      <tr><th>时间</th><th>设备</th><th>模块</th><th>wph</th><th>模块均值</th></tr>
+    </table></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>APS 产能计划（先进排程 · 实时负荷/瓶颈/排程）</h2>
+  <div id="aps-kpi" class="stat-line"></div>
+  <div style="margin-top:8px">
+    <b>模块产能负荷</b>
+    <div id="aps-loads"></div>
+  </div>
+  <div style="margin-top:8px;max-height:180px;overflow:auto"><table id="aps-wos">
+    <tr><th>工单</th><th>产品</th><th>批次</th><th>ETC</th><th>余量</th><th>交期</th><th>状态</th></tr>
+  </table></div>
+  <div id="aps-suggest" style="margin-top:6px;color:var(--pm)"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = ts => { const d = new Date(ts); return d.toTimeString().slice(0, 8); };
+const state = { lots: [], filter: '' };
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+async function refresh(){
+  try{
+    const [h, w, e, wos, lots, cfg] = await Promise.all([
+      api('/api/health'), api('/api/wip'), api('/api/e10'), api('/api/wos'), api('/api/lots'), api('/api/config'),
+    ]);
+    $('b-svc').textContent = h.service + ' v' + h.version;
+    $('b-svc').className = 'badge ok';
+    $('b-up').textContent = '运行 ' + h.uptime + 's';
+    $('b-clients').textContent = 'WS 客户端 ' + h.clients;
+    $('rule').value = cfg.rule;
+
+    // KPI
+    const g = e.global;
+    $('kpis').innerHTML = `
+      <div class="panel kpi"><div class="v g">${g.utilPct}%</div><div class="l">利用率 (E58)</div></div>
+      <div class="panel kpi"><div class="v b">${g.availPct}%</div><div class="l">可用率</div></div>
+      <div class="panel kpi"><div class="v y">${w.wip}</div><div class="l">在制 WIP</div></div>
+      <div class="panel kpi"><div class="v">${w.done}</div><div class="l">完成批次</div></div>
+      <div class="panel kpi"><div class="v">${w.moves}</div><div class="l">工序流转</div></div>
+      <div class="panel kpi"><div class="v">${w.avgCycleH}h</div><div class="l">平均周期</div></div>`;
+
+    // 设备状态
+    const ts = (await api('/api/tools')).byStatus;
+    const st = [['RUN', ts.RUN || 0, 'st-run'], ['IDLE', ts.IDLE || 0, 'st-idle'], ['PM', ts.PM || 0, 'st-pm'], ['DOWN', ts.DOWN || 0, 'st-down']];
+    $('tool-status').innerHTML = st.map(([k, v, c]) =>
+      `<div class="panel kpi"><div class="v" style="color:${getComputedStyle(document.documentElement).getPropertyValue('--' + k.toLowerCase())}">${v}</div><div class="l"><span class="dot ${c}"></span>${k} ${h.tools} 台</div></div>`).join('');
+
+    // 模块负载
+    const mods = Object.entries(w.byModule).map(([k, v]) => ({ k, ...v }));
+    const maxV = Math.max(1, ...mods.map(m => m.queue + m.processing));
+    const modColor = { LITHO:'#ff5c8a', ETCH:'#4ea1ff', DEP:'#57d6a6', CMP:'#f2c14e', IMPL:'#b98cff', METRO:'#ff9f5c' };
+    $('mod-bars').innerHTML = mods.map(m => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span class="mono" style="width:52px;color:${modColor[m.k] || '#fff'}">${m.k}</span>
+        <div class="bar" style="flex:1"><i style="width:${(m.queue + m.processing) / maxV * 100}%;background:${modColor[m.k] || '#fff'}"></i></div>
+        <span class="mono">${m.queue}/${m.processing}</span>
+      </div>`).join('');
+
+    // E10
+    $('e10-line').innerHTML = `利用率 <b>${g.utilPct}%</b> · 可用率 <b>${g.availPct}%</b> · 待机 ${g.standbyPct}% · 维护 ${g.pmPct}% · 停机 ${g.downPct}% · MTBF <b>${g.mtbfH}h</b> · MTTR <b>${g.mttrH}h</b>`;
+    $('e10-mod').innerHTML = Object.entries(e.byModule).map(([k, m]) =>
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span class="mono" style="width:52px">${k}</span>
+        <div class="bar" style="flex:1"><i style="width:${m.utilPct}%;background:${modColor[k] || '#fff'}"></i></div>
+        <span class="mono">${m.utilPct}%</span></div>`).join('');
+
+    // 工单
+    $('wo-table').innerHTML = '<tr><th>工单</th><th>产品</th><th>数量</th><th>WIP</th><th>DONE</th><th>交期</th></tr>' +
+      wos.wos.slice().reverse().map(wo => `<tr>
+        <td class="mono">${wo.id}</td><td>${wo.product}</td><td>${wo.total}</td>
+        <td>${wo.lots.WIP || 0}</td><td style="color:var(--accent)">${wo.lots.DONE || 0}</td>
+        <td class="muted mono">${fmt(wo.due)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">暂无工单</td></tr>';
+
+    // 批次
+    state.lots = lots.lots;
+    renderLots();
+
+    // WIP 快照
+    $('wip-line').innerHTML = `规则 <b>${w.rule}</b> · 在制 <b>${w.wip}</b> · 完成 <b>${w.done}</b> · 流转 <b>${w.moves}</b> · 释放 <b>${w.releases}</b> · 产品 ` +
+      Object.entries(w.byProduct || {}).map(([k, v]) => `<b>${k}:${v}</b>`).join(' ') + ' · 平均周期 <b>' + w.avgCycleH + 'h</b>';
+
+    // 量测（SPC 数据源）
+    const metro = await api('/api/metrology?limit=20');
+    $('metro-stats').innerHTML = metro.stats.length
+      ? metro.stats.map(s => `<span class="tag" style="margin:0 6px 4px 0;display:inline-block">${s.product} ${s.param} · n=${s.n} · mean=${s.mean} · σ=${s.sd} · CPK=${s.cpk}</span>`).join('')
+      : '<span class="muted">尚无量测（lot 完成 METRO 步骤后产生）</span>';
+    $('metro-table').innerHTML = '<tr><th>时间</th><th>批次</th><th>产品</th><th>参数</th><th>值</th><th>目标</th><th>结果</th></tr>' +
+      metro.samples.map(x => `<tr>
+        <td class="muted">${tt(x.ts)}</td><td class="mono">${x.lot}</td><td>${x.product}</td>
+        <td>${x.param}</td><td class="mono">${x.value}${x.unit}</td><td class="muted mono">${x.target}</td>
+        <td style="color:${x.result === 'OK' ? 'var(--run)' : 'var(--down)'}">${x.result}</td></tr>`).join('') ||
+      '<tr><td colspan="7" class="muted">暂无量测</td></tr>';
+
+    // PdM 预测性维护
+    const pdm = await api('/api/pdm');
+    $('pdm').innerHTML = `<div class="stat-line" style="margin-bottom:8px">高风险设备 <b style="color:var(--down)">${pdm.highRisk}</b> / ${pdm.count} · 模块风险 TOP: ${pdm.byModule.slice(0,3).map(m => `${m.module} ${m.totalRisk}`).join(' · ')}</div>` +
+      pdm.top.slice(0, 8).map(r => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span class="mono" style="width:96px">${r.id}</span>
+          <div class="bar" style="flex:1"><i style="width:${Math.min(100, r.risk * 100)}%;background:${r.risk > 0.7 ? 'var(--down)' : r.risk > 0.45 ? 'var(--pm)' : 'var(--run)'}"></i></div>
+          <span class="mono" style="width:40px">${r.risk}</span>
+          <span style="width:64px;font-size:11px;color:${r.risk > 0.7 ? 'var(--down)' : 'var(--muted)'}">${r.suggestText}</span>
+        </div>`).join('');
+
+    // VM 虚拟量测
+    const vmv = await api('/api/vm?limit=20');
+    $('vm-stats').innerHTML = vmv.stats.n
+      ? `<div class="stat-line">样本 <b>${vmv.stats.n}</b> · MAPE <b>${vmv.stats.mape}%</b> · ±3% 命中 <b style="color:var(--run)">${vmv.stats.hit3Pct}%</b> · ±5% 命中 <b>${vmv.stats.hit5Pct}%</b></div>`
+      : '<span class="muted">尚无预测（lot 进入 METRO 时预测，量测到达后对比）</span>';
+    $('vm-table').innerHTML = '<tr><th>批次</th><th>参数</th><th>预测</th><th>实际</th><th>误差%</th><th>状态</th></tr>' +
+      vmv.results.map(x => `<tr>
+        <td class="mono">${x.lot}</td><td>${x.param}</td>
+        <td class="mono">${x.pred ?? '—'}</td><td class="mono">${x.actual}</td>
+        <td class="mono" style="color:${Math.abs(x.errPct || 0) <= 5 ? 'var(--run)' : 'var(--down)'}">${x.errPct ?? '—'}</td>
+        <td style="color:${x.status === 'OK' ? 'var(--run)' : x.status === 'DEVIATION' ? 'var(--pm)' : 'var(--muted)'}">${x.status}</td></tr>`).join('') ||
+      '<tr><td colspan="6" class="muted">暂无结果</td></tr>';
+
+    // SPC 判异监控
+    const spc = await api('/api/spc');
+    $('spc-table').innerHTML = '<tr><th>产品</th><th>参数</th><th>设备</th><th>n</th><th>均值</th><th>UCL</th><th>LCL</th><th>最近</th><th>状态</th></tr>' +
+      spc.groups.slice().reverse().slice(0, 15).map(g => `<tr>
+        <td>${g.product}</td><td>${g.param}</td><td class="mono">${g.tool}</td><td>${g.n}</td>
+        <td class="mono">${g.mean}</td><td class="mono">${g.ucl}</td><td class="mono">${g.lcl}</td><td class="mono">${g.lastValue}</td>
+        <td style="color:${g.violated ? 'var(--down)' : 'var(--run)'}">${g.violated ? '⚠ 判异' : '正常'}</td></tr>`).join('') ||
+      '<tr><td colspan="9" class="muted">暂无监控组（lot 完成 METRO 后建立）</td></tr>';
+    $('spc-alarm').innerHTML = '<tr><th>时间</th><th>产品/参数</th><th>设备</th><th>值</th><th>规则</th></tr>' +
+      spc.alarms.slice(0, 10).map(a => `<tr>
+        <td class="muted">${tt(a.ts)}</td><td>${a.product} ${a.param}</td><td class="mono">${a.tool}</td>
+        <td class="mono" style="color:var(--down)">${a.value}</td><td style="color:var(--down)">${a.rules.join(', ')}</td></tr>`).join('') ||
+      '<tr><td colspan="5" class="muted">暂无报警</td></tr>';
+
+    // FDC 设备异常
+    const fdc = await api('/api/fdc');
+    $('fdc-table').innerHTML = '<tr><th>时间</th><th>设备</th><th>模块</th><th>wph</th><th>模块均值</th></tr>' +
+      fdc.alarms.slice(0, 15).map(a => `<tr>
+        <td class="muted">${tt(a.ts)}</td><td class="mono">${a.tool}</td><td>${a.module}</td>
+        <td class="mono" style="color:var(--pm)">${a.wph}</td><td class="muted mono">${a.avgWph}</td></tr>`).join('') ||
+      '<tr><td colspan="5" class="muted">暂无异常</td></tr>';
+
+    // APS 产能计划
+    const aps = await api('/api/aps');
+    const k = aps.kpi;
+    $('aps-kpi').innerHTML = `瓶颈 <b style="color:var(--down)">${k.bottleneckModule}</b> ${k.bottleneckLoad}% · 平均负荷 <b>${k.avgLoadPct}%</b> · 准时率 <b style="color:${k.onTimePct >= 90 ? 'var(--run)' : 'var(--down)'}">${k.onTimePct}%</b> · 在制 <b>${k.wip}</b> · 未结 <b>${k.wosOpen}</b> · 产能 <b>${k.totalCapWph}</b> wph · 规则 <b>${k.rule}</b>`;
+    const loadBar = m => {
+      const c = m.loadPct >= 100 ? 'var(--down)' : m.loadPct >= 75 ? 'var(--pm)' : 'var(--run)';
+      return `<div style="margin:3px 0"><span class="mono" style="display:inline-block;width:70px">${m.key}</span>
+        <span style="display:inline-block;width:180px;background:var(--bg);border-radius:4px;overflow:hidden;vertical-align:middle">
+          <span style="display:inline-block;width:${Math.min(100, m.loadPct)}%;background:${c};height:12px"></span></span>
+        <span class="muted mono">${m.loadPct}% · ${m.tools}台(run ${m.run}) · ${m.status}</span></div>`;
+    };
+    $('aps-loads').innerHTML = aps.modules.map(loadBar).join('');
+    $('aps-wos').innerHTML = '<tr><th>工单</th><th>产品</th><th>批次</th><th>ETC</th><th>余量</th><th>交期</th><th>状态</th></tr>' +
+      aps.wos.slice(0, 10).map(w => `<tr>
+        <td class="mono">${w.id}</td><td>${w.product}</td><td>${w.lots}</td>
+        <td class="mono">${w.etcH}h</td>
+        <td class="mono" style="color:${w.slackH < 0 ? 'var(--down)' : 'var(--run)'}">${w.slackH}h</td>
+        <td class="muted mono">${tt(w.due)}</td>
+        <td style="color:${w.status === 'LATE' ? 'var(--down)' : w.status === 'ONTIME' ? 'var(--pm)' : 'var(--run)'}">${w.status}${w.critical ? ' ⚠' : ''}</td></tr>`).join('') ||
+      '<tr><td colspan="7" class="muted">暂无工单</td></tr>';
+    $('aps-suggest').innerHTML = '💡 ' + aps.suggest.join('；');
+  }catch(e){
+    $('b-svc').textContent = '后端未连接: ' + e.message;
+    $('b-svc').className = 'badge';
+  }
+}
+
+function renderLots(){
+  const list = state.lots.filter(l => !state.filter || l.status === state.filter);
+  $('lot-table').innerHTML = '<tr><th>批次</th><th>产品</th><th>工序</th><th>状态</th><th>设备</th><th>交期</th></tr>' +
+    list.slice().reverse().slice(0, 60).map(l => `<tr data-id="${l.id}" style="cursor:pointer">
+      <td class="mono">${l.id}</td><td>${l.product}</td>
+      <td class="mono">${l.step}/${l.step + l.rem}</td>
+      <td><span class="dot ${l.status === 'WIP' ? 'st-idle' : 'st-DONE'}"></span>${l.status}</td>
+      <td class="mono">${l.curTool || '—'}</td>
+      <td class="muted mono">${fmt(l.due)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">无批次</td></tr>';
+}
+
+document.addEventListener('click', async e => {
+  const tr = e.target.closest('tr[data-id]');
+  if(tr){
+    const lot = await api('/api/lots/' + tr.dataset.id);
+    $('lot-hist').innerHTML = `<h2 style="font-size:12px;color:var(--accent);margin:8px 0">${lot.id} 追踪历史 (${lot.hist.length} 步)</h2>` +
+      `<div class="hist mono">${lot.hist.map(h => `${h.step}. ${h.mod} @ ${h.tool} · ${h.durH}h`).join('<br>') || '尚未开始加工'}</div>`;
+  }
+  const tab = e.target.closest('.tab');
+  if(tab){
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+    tab.classList.add('on');
+    state.filter = tab.dataset.f;
+    renderLots();
+  }
+});
+
+$('rule').onchange = async e => {
+  const r = await api('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rule: e.target.value }) });
+  if(r.rule) { refresh(); }
+};
+$('btn-wo').onclick = async () => {
+  const product = prompt('产品（N2 / A16）：', 'N2');
+  const qty = prompt('批次数（1-20）：', '3');
+  if(product && qty){ await api('/api/wos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product, qty: +qty }) }); refresh(); }
+};
+$('btn-refresh').onclick = refresh;
+setInterval(refresh, 3000);
+refresh();
+// 面板显隐开关
+(function(){ const b=document.getElementById('hud-toggle'); if(!b) return;
+  function t(){ const h=document.body.classList.toggle('hud-hidden'); b.textContent=h?'👁 显示面板':'🙈 隐藏面板'; }
+  b.addEventListener('click',t); window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) t(); }); })();
+</script>
+</body>
+</html>

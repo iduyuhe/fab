@@ -1,0 +1,40 @@
+{
+  "rules": [
+    {
+      "match": "EUV",
+      "module": "LITHO",
+      "wph": 30,
+      "type": "EUV Scanner"
+    },
+    {
+      "match": "ETCH",
+      "module": "ETCH",
+      "wph": 80,
+      "type": "Etcher"
+    },
+    {
+      "match": "CVD",
+      "module": "DEP",
+      "wph": 60,
+      "type": "Deposition"
+    },
+    {
+      "match": "CMP",
+      "module": "CMP",
+      "wph": 70,
+      "type": "CMP"
+    },
+    {
+      "match": "IMP",
+      "module": "IMPL",
+      "wph": 55,
+      "type": "Implant"
+    },
+    {
+      "match": "MET",
+      "module": "METRO",
+      "wph": 120,
+      "type": "Metrology"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+/* fab-mes 统一主题基底 (U5 · 2026-08-29)
+ * 单一事实来源:所有报告类文档通过注入 <link rel="stylesheet" href="/theme.css">
+ * 引用本文件,以统一深色视觉盘。
+ * 设计原则:仅统一"基底"色彩(背景 / 正文 / 链接 / 表头 / 代码),
+ * 不改动布局,也不覆盖卡片(.card)、标签(.tag)、注释(.note)等语义组件的自有色,
+ * 避免破坏各文档的强调语义。本文件由 portal(8123) 经 /theme.css 提供。 */
+:root{
+  --bg:#0d1117;      /* 统一页面背景(原报告 #0d1117 / 控制台 #0b1020 微差归一) */
+  --panel:#161b22;
+  --panel2:#1c2330;
+  --line:#30363d;
+  --text:#e6edf3;    /* 统一正文主色 */
+  --muted:#8b949e;
+  --accent:#4ea1ff;  /* 统一主蓝 */
+  --run:#39d98a; --pm:#ffba49; --down:#ff5c5c; --purple:#b083ff;
+}
+
+/* 基底兜底:本文件在文档 <style> 之后注入,故可覆盖其内部硬编码 hex */
+body{ background:var(--bg) !important; color:var(--text) !important; }
+p, li, td, dt, dd{ color:#c9d1d9 !important; }
+h1, h2, h3, h4{ color:var(--text) !important; }
+a{ color:var(--accent) !important; }
+th{ color:var(--accent) !important; }
+code, pre{ color:var(--purple) !important; }
+hr{ border-color:var(--line) !important; }

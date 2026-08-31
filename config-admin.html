@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主数据配置管理台 · fab-mes</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; background:#0f1419; color:#e6edf3; }
+  header { padding:14px 22px; background:#161b22; border-bottom:1px solid #30363d; display:flex; align-items:center; gap:14px; }
+  header h1 { font-size:17px; margin:0; font-weight:600; }
+  header a { color:#58a6ff; text-decoration:none; font-size:13px; }
+  .tabs { display:flex; gap:2px; padding:0 18px; background:#161b22; border-bottom:1px solid #30363d; flex-wrap:wrap; }
+  .tab { padding:10px 16px; cursor:pointer; font-size:14px; color:#8b949e; border-bottom:2px solid transparent; }
+  .tab.active { color:#e6edf3; border-bottom-color:#58a6ff; }
+  .wrap { padding:20px 22px; max-width:1100px; }
+  .bar { display:flex; gap:10px; align-items:flex-end; margin-bottom:14px; flex-wrap:wrap; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #21262d; }
+  th { color:#8b949e; font-weight:500; }
+  input,select { background:#0d1117; border:1px solid #30363d; color:#e6edf3; padding:6px 8px; border-radius:6px; font-size:13px; }
+  input:focus,select:focus { outline:none; border-color:#58a6ff; }
+  button { background:#238636; color:#fff; border:none; padding:7px 14px; border-radius:6px; cursor:pointer; font-size:13px; }
+  button.sec { background:#21262d; }
+  button.del { background:#6e2a2a; padding:4px 9px; }
+  .hint { color:#8b949e; font-size:12px; margin:0 0 8px; }
+  .card { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:16px; margin-bottom:16px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .msg { font-size:12px; margin-left:10px; }
+  .ok { color:#3fb950; } .err { color:#f85149; }
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+<header>
+  <h1>主数据配置管理台</h1>
+  <a href="/console.html">← 返回控制台</a>
+  <span class="hint" style="margin:0 0 0 auto">数据存于 fab-config.db（ERP/WMS 共用真相源）</span>
+</header>
+<div class="tabs" id="tabs"></div>
+<div class="wrap" id="view"></div>
+
+<script>
+const API = '/api/erp/config';
+const TABS = [
+  { key:'products',   label:'产品' },
+  { key:'materials',  label:'物料' },
+  { key:'bom',        label:'BOM' },
+  { key:'cost-rates', label:'费率' },
+  { key:'suppliers',  label:'供应商' },
+  { key:'customers',  label:'客户' },
+];
+let cur = 'products';
+
+function el(html){ const d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+function msg(text, ok){ const m=el(`<span class="msg ${ok?'ok':'err'}">${text}</span>`); const bar=document.querySelector('.bar'); const old=bar.querySelector('.msg'); if(old) old.remove(); bar.appendChild(m); setTimeout(()=>m.remove(),2500); }
+async function get(path){ const r=await fetch(API+path); return r.json(); }
+async function post(path, body){ const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); return r.json(); }
+async function del(path){ const r=await fetch(API+path,{method:'DELETE'}); return r.json(); }
+function esc(s){ return String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+function renderTabs(){
+  const t=document.getElementById('tabs'); t.innerHTML='';
+  TABS.forEach(tb=>{ const e=el(`<div class="tab ${tb.key===cur?'active':''}">${tb.label}</div>`); e.onclick=()=>{cur=tb.key; renderTabs(); render();}; t.appendChild(e); });
+}
+
+async function render(){
+  const v=document.getElementById('view'); v.innerHTML='';
+  if(cur==='products') return renderProducts(v);
+  if(cur==='materials') return renderMaterials(v);
+  if(cur==='bom') return renderBom(v);
+  if(cur==='cost-rates') return renderCost(v);
+  if(cur==='suppliers') return renderSuppliers(v);
+  if(cur==='customers') return renderCustomers(v);
+}
+
+// ---------- 产品 ----------
+async function renderProducts(v){
+  const {products}=await get('/products');
+  v.appendChild(el(`<div class="card"><div class="bar"><b>产品主数据</b><span class="hint">kind: FIN=成品 / RAW=原料；std_cycle_h 标准周期(小时)</span></div>
+    <table><thead><tr><th>代码</th><th>名称</th><th>类型</th><th>单位</th><th>标准周期h</th><th></th></tr></thead>
+    <tbody>${products.map(p=>`<tr><td>${esc(p.code)}</td><td>${esc(p.name)}</td><td>${esc(p.kind)}</td><td>${esc(p.uom)}</td><td>${esc(p.std_cycle_h)}</td>
+      <td><button class="del" onclick="delRow('products','${esc(p.code)}')">删</button></td></tr>`).join('')}</tbody></table></div>`));
+  v.appendChild(el(`<div class="card"><div class="bar"><b>新增/更新产品</b></div>
+    <div class="row">
+      <input id="p_code" placeholder="代码 如 N2">
+      <input id="p_name" placeholder="名称">
+      <select id="p_kind"><option value="FIN">FIN</option><option value="RAW">RAW</option></select>
+      <input id="p_uom" placeholder="单位 如 片">
+      <input id="p_cyc" placeholder="标准周期h" type="number" style="width:120px">
+      <button onclick="saveProduct()">保存</button>
+    </div></div>`));
+}
+window.saveProduct=async()=>{ const b={code:val('p_code'),name:val('p_name'),kind:val('p_kind'),uom:val('p_uom'),std_cycle_h:val('p_cyc')};
+  if(!b.code){msg('代码必填',false);return;} const r=await post('/products',b); msg(r.ok?'已保存':'失败',r.ok); render(); };
+window.delRow=async(k,code)=>{ if(!confirm('删除 '+code+'？'))return; const r=await del('/'+k+'/'+encodeURIComponent(code)); msg(r.ok?'已删除':'失败',r.ok); render(); };
+
+// ---------- 物料 ----------
+async function renderMaterials(v){
+  const {materials}=await get('/materials');
+  v.appendChild(el(`<div class="card"><div class="bar"><b>物料主数据</b><span class="hint">price=单价, safety_stock=安全库存, lead_days=采购提前期</span></div>
+    <table><thead><tr><th>代码</th><th>名称</th><th>类别</th><th>单位</th><th>单价</th><th>安全库存</th><th>提前期</th><th></th></tr></thead>
+    <tbody>${materials.map(m=>`<tr><td>${esc(m.code)}</td><td>${esc(m.name)}</td><td>${esc(m.cat)}</td><td>${esc(m.unit)}</td><td>${esc(m.price)}</td><td>${esc(m.safety_stock)}</td><td>${esc(m.lead_days)}</td>
+      <td><button class="del" onclick="delRow('materials','${esc(m.code)}')">删</button></td></tr>`).join('')}</tbody></table></div>`));
+  v.appendChild(el(`<div class="card"><div class="bar"><b>新增/更新物料</b></div>
+    <div class="row">
+      <input id="m_code" placeholder="代码 如 WAFER-300">
+      <input id="m_name" placeholder="名称">
+      <select id="m_cat"><option value="RAW">RAW</option><option value="FIN">FIN</option></select>
+      <input id="m_unit" placeholder="单位">
+      <input id="m_price" placeholder="单价" type="number" style="width:110px">
+      <input id="m_safe" placeholder="安全库存" type="number" style="width:110px">
+      <input id="m_lead" placeholder="提前期" type="number" style="width:100px">
+      <button onclick="saveMaterial()">保存</button>
+    </div></div>`));
+}
+window.saveMaterial=async()=>{ const b={code:val('m_code'),name:val('m_name'),cat:val('m_cat'),unit:val('m_unit'),price:val('m_price'),safety_stock:val('m_safe'),lead_days:val('m_lead')};
+  if(!b.code){msg('代码必填',false);return;} const r=await post('/materials',b); msg(r.ok?'已保存':'失败',r.ok); render(); };
+
+// ---------- BOM ----------
+async function renderBom(v){
+  const {products}=await get('/products');
+  const sel=el(`<select id="bom_prod">${products.map(p=>`<option value="${esc(p.code)}">${esc(p.code)} ${esc(p.name)}</option>`).join('')}</select>`);
+  const card=el(`<div class="card"><div class="bar"><b>BOM 物料清单</b></div><div class="row" style="margin-bottom:10px">产品 ${sel.outerHTML} <button onclick="loadBom()">加载</button></div>
+    <div id="bom_list"></div></div>`);
+  v.appendChild(card);
+  const add=el(`<div class="card"><div class="bar"><b>维护该产品 BOM（整单覆盖保存）</b><span class="hint">逐行 物料代码 + 数量；保存会覆盖该产品全部 BOM 行</span></div>
+    <div id="bom_edit"></div>
+    <div class="row" style="margin-top:10px"><button onclick="addBomRow()">+ 加一行</button><button onclick="saveBom()">保存 BOM</button></div></div>`);
+  v.appendChild(add);
+  sel.onchange=loadBom;
+  window._bomProd=sel.value; loadBom();
+}
+window.loadBom=async()=>{ const p=document.getElementById('bom_prod').value; window._bomProd=p;
+  const {bom}=await get('/bom?product='+encodeURIComponent(p));
+  const list=document.getElementById('bom_list');
+  list.innerHTML=`<table><thead><tr><th>序</th><th>物料</th><th>数量</th></tr></thead><tbody>
+    ${bom.map(b=>`<tr><td>${esc(b.seq)}</td><td>${esc(b.material)}</td><td>${esc(b.qty)}</td></tr>`).join('')}</tbody></table>`;
+  const edit=document.getElementById('bom_edit');
+  edit.innerHTML=bom.length? bom.map((b,i)=>bomRowHtml(b.material,b.qty,i)).join('') : bomRowHtml('',1,0);
+};
+function bomRowHtml(mat,q,i){ return `<div class="row" style="margin-bottom:6px" data-i="${i}"><input class="bm_mat" placeholder="物料代码" value="${esc(mat)}"><input class="bm_qty" type="number" placeholder="数量" value="${esc(q)}" style="width:110px"><button class="sec del" onclick="this.parentNode.remove()">×</button></div>`; }
+window.addBomRow=()=>{ const e=document.getElementById('bom_edit'); e.insertAdjacentHTML('beforeend', bomRowHtml('',1,e.children.length)); };
+window.saveBom=async()=>{ const p=window._bomProd; const rows=[...document.querySelectorAll('#bom_edit .row')].map((r,i)=>({seq:i+1,material:r.querySelector('.bm_mat').value,qty:r.querySelector('.bm_qty').value}));
+  const r=await post('/bom',{product:p,items:rows}); msg(r.ok?'BOM 已保存':'失败',r.ok); loadBom(); };
+
+// ---------- 费率 ----------
+async function renderCost(v){
+  const {costRates}=await get('/cost-rates');
+  v.appendChild(el(`<div class="card"><div class="bar"><b>工序成本费率</b><span class="hint">按工序(module)设人工费率/设备费率/单步工时h</span></div>
+    <table><thead><tr><th>工序</th><th>人工费率/h</th><th>设备费率/h</th><th>单步工时h</th><th></th></tr></thead>
+    <tbody>${costRates.map(c=>`<tr><td>${esc(c.module)}</td><td>${esc(c.labor_rate)}</td><td>${esc(c.equip_rate)}</td><td>${esc(c.step_h)}</td>
+      <td><button class="del" onclick="delRate('${esc(c.module)}')">删</button></td></tr>`).join('')}</tbody></table></div>`));
+  v.appendChild(el(`<div class="card"><div class="bar"><b>新增/更新费率</b></div>
+    <div class="row">
+      <input id="c_mod" placeholder="工序 如 LITHO">
+      <input id="c_lab" placeholder="人工费率" type="number" style="width:110px">
+      <input id="c_equ" placeholder="设备费率" type="number" style="width:110px">
+      <input id="c_stp" placeholder="单步工时h" type="number" step="0.01" style="width:120px">
+      <button onclick="saveRate()">保存</button>
+    </div></div>`));
+}
+window.saveRate=async()=>{ const b={module:val('c_mod'),labor_rate:val('c_lab'),equip_rate:val('c_equ'),step_h:val('c_stp')};
+  if(!b.module){msg('工序必填',false);return;} const r=await post('/cost-rates',b); msg(r.ok?'已保存':'失败',r.ok); render(); };
+window.delRate=async(m)=>{ if(!confirm('删除 '+m+'？'))return; const r=await del('/cost-rates/'+encodeURIComponent(m)); msg(r.ok?'已删除':'失败',r.ok); render(); };
+
+// ---------- 供应商 ----------
+async function renderSuppliers(v){
+  const {suppliers}=await get('/suppliers');
+  v.appendChild(el(`<div class="card"><div class="bar"><b>供应商主数据</b></div>
+    <table><thead><tr><th>代码</th><th>名称</th><th>联系人</th><th>提前期</th><th></th></tr></thead>
+    <tbody>${suppliers.map(s=>`<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.contact)}</td><td>${esc(s.lead_days)}</td>
+      <td><button class="del" onclick="delRow('suppliers','${esc(s.id)}')">删</button></td></tr>`).join('')}</tbody></table></div>`));
+  v.appendChild(el(`<div class="card"><div class="bar"><b>新增/更新供应商</b></div>
+    <div class="row">
+      <input id="s_id" placeholder="代码 如 SUP-005">
+      <input id="s_name" placeholder="名称">
+      <input id="s_con" placeholder="联系人">
+      <input id="s_lead" placeholder="提前期" type="number" style="width:100px">
+      <button onclick="saveSup()">保存</button>
+    </div></div>`));
+}
+window.saveSup=async()=>{ const b={id:val('s_id'),name:val('s_name'),contact:val('s_con'),lead_days:val('s_lead')};
+  if(!b.id){msg('代码必填',false);return;} const r=await post('/suppliers',b); msg(r.ok?'已保存':'失败',r.ok); render(); };
+
+// ---------- 客户 ----------
+async function renderCustomers(v){
+  const {customers}=await get('/customers');
+  v.appendChild(el(`<div class="card"><div class="bar"><b>客户主数据</b></div>
+    <table><thead><tr><th>代码</th><th>名称</th><th>地区</th><th></th></tr></thead>
+    <tbody>${customers.map(c=>`<tr><td>${esc(c.id)}</td><td>${esc(c.name)}</td><td>${esc(c.region)}</td>
+      <td><button class="del" onclick="delRow('customers','${esc(c.id)}')">删</button></td></tr>`).join('')}</tbody></table></div>`));
+  v.appendChild(el(`<div class="card"><div class="bar"><b>新增/更新客户</b></div>
+    <div class="row">
+      <input id="cu_id" placeholder="代码 如 CUS-004">
+      <input id="cu_name" placeholder="名称">
+      <input id="cu_reg" placeholder="地区">
+      <button onclick="saveCus()">保存</button>
+    </div></div>`));
+}
+window.saveCus=async()=>{ const b={id:val('cu_id'),name:val('cu_name'),region:val('cu_reg')};
+  if(!b.id){msg('代码必填',false);return;} const r=await post('/customers',b); msg(r.ok?'已保存':'失败',r.ok); render(); };
+
+function val(id){ const e=document.getElementById(id); return e?e.value.trim():''; }
+renderTabs(); render();
+</script>
+</body>
+</html>

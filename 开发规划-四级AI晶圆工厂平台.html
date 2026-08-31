@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 晶圆工厂智能企业平台 · 完整开发规划</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--fg:#e6edf3;--muted:#8b949e;
+        --c1:#58a6ff;--c2:#3fb950;--c3:#d29922;--c4:#f85149;--accent:#bc8cff;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+  .wrap{max-width:1120px;margin:0 auto;padding:48px 28px 80px}
+  h1{font-size:30px;margin:0 0 6px;background:linear-gradient(90deg,var(--c1),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+  h2{font-size:22px;margin:46px 0 14px;padding-left:12px;border-left:4px solid var(--c1)}
+  h3{font-size:17px;margin:26px 0 10px;color:var(--c1)}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:8px}
+  .tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--line);color:var(--muted);margin-right:6px}
+  p{margin:10px 0;color:#c9d1d9}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:16px 0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top}
+  th{background:#1c2330;color:var(--c1);font-weight:600}
+  tr:nth-child(even) td{background:#11161d}
+  .ph{font-weight:700}
+  .p0{color:var(--c4)} .p1{color:var(--c3)} .p2{color:var(--c1)} .p3{color:var(--c2)}
+  .note{background:#1a2030;border-left:3px solid var(--accent);padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0;color:#c9d1d9;font-size:14px}
+  .key{border-left:3px solid var(--c2)}
+  .warn{border-left:3px solid var(--c4)}
+  code{background:#1c2330;padding:2px 6px;border-radius:5px;font-size:13px;color:#ffa657}
+  ul{margin:10px 0;padding-left:22px} li{margin:6px 0}
+  .foot{margin-top:56px;color:var(--muted);font-size:13px;text-align:center;border-top:1px solid var(--line);padding-top:20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .agent{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+  .agent b{color:var(--accent)}
+  .step{display:flex;gap:12px;margin:10px 0;align-items:flex-start}
+  .step .n{flex:0 0 28px;height:28px;border-radius:50%;background:var(--c1);color:#0d1117;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>AI 晶圆工厂智能企业平台 · 完整开发规划</h1>
+  <div class="sub">基于战略白皮书 · 用 Agent 团队分四级完整开发 · 规划书 v1</div>
+  <div>
+    <span class="tag">社区级</span><span class="tag">教学级</span><span class="tag">专业级</span>
+    <span class="tag">工厂级</span><span class="tag">Agent 团队并行开发</span><span class="tag">规划阶段（未写业务代码）</span>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">规划目标</h3>
+    <p>把现有演示级平台（事件驱动主线 + 三级孪生 + 五大引擎 + 原生 ERP），按"社区 → 教学 → 专业 → 工厂"四级，
+    借助 <strong>Agent 团队</strong> 并行开发，演进为<strong>以 AI Agent 为核心的 AI 芯片晶圆厂智能企业操作系统</strong>。
+    本规划只定义蓝图、分工与里程碑，<strong>不在此阶段编写业务代码</strong>。</p>
+  </div>
+
+  <h2>一、产品架构总图（目标态）</h2>
+  <div class="card">
+    <pre style="font-size:13px;color:#c9d1d9;white-space:pre-wrap;line-height:1.6">
+┌─────────────────────────────────────────────────────────────┐
+│                    四级交付外壳（逐级升档）                    │
+│   L1 社区(开源沙盘) → L2 教学(课程实验) → L3 专业(工程工具) → L4 工厂(真实部署) │
+├─────────────────────────────────────────────────────────────┤
+│                    AI Agent 团队（三层）                       │
+│   战略层(厂长大脑) · 领域层(质量/设备/量测/排程/成本专家) · 执行层(设备协作者)  │
+├─────────────────────────────────────────────────────────────┤
+│                    核心能力层（五级引擎 + 孪生）                 │
+│   SPC/FDC · PdM · VM · APS · ERP · 三级数字孪生 · what-if 仿真    │
+├─────────────────────────────────────────────────────────────┤
+│                    数据主线层（事件驱动）                       │
+│   WIP Engine → 事件总线(WS) → 各订阅方 · 拓扑/主数据 · 时序/关系存储  │
+├─────────────────────────────────────────────────────────────┤
+│                    接入层（标准 / 协议）                        │
+│   SECS/GEM(E37) · HSMS · OPC-UA · EDA · ISA-95 · B2MML          │
+└─────────────────────────────────────────────────────────────┘
+    </pre>
+  </div>
+  <div class="note key"><b>设计原则</b>：下层不依赖上层；四级外壳共享同一核心层；Agent 团队只编排"领域层 + 战略层"能力，执行层对接设备。
+  用 L4 的架构思想（微服务、ISA-95、合规）反向约束 L1–L3 的数据模型，避免返工。</div>
+
+  <h2>二、Agent 团队分工（并行开发的核心）</h2>
+  <p>把平台拆成 6 个相对独立的"域"，每个域配一个专职 Agent（或 Agent 小组），由"总架构 Agent"协调。
+  各 Agent 通过<strong>共享的事件总线协议 + 明确定义的接口契约</strong>解耦协作，而非互相改代码。</p>
+
+  <div class="agent"><b>① 数据主线 Agent（底座组）</b>：事件总线、WIP Engine、拓扑/主数据、时序+关系存储抽象、WS 协议。→ 所有其他 Agent 的依赖根。</div>
+  <div class="agent"><b>② 智能引擎 Agent（质量/设备组）</b>：SPC(补 Cpk/Ppk) · FDC(多变量) · PdM(补 RUL) · VM(补置信区间)。→ 领域层 Agent 的知识底座。</div>
+  <div class="agent"><b>③ 排程仿真 Agent（APS 组）</b>：有限产能排程、优化求解器接口、what-if 沙箱、负荷模型修正（瞬时占用率口径）。</div>
+  <div class="agent"><b>④ 企业资源 Agent（ERP 组）</b>：物料/BOM/成本/ARAP → 扩展 PLM/SCM 接口、ISA-95 第四/五层建模、标准会计凭证。</div>
+  <div class="agent"><b>⑤ 孪生可视化 Agent（前端组）</b>：三级孪生渲染升级、工厂级机理孪生、教学实验台 UI、社区沙盘打包。</div>
+  <div class="agent"><b>⑥ Agent 平台 Agent（AI 内核组）</b>：Agent 编排框架、对话/规则双模、领域知识库、人审锚点、记忆与工具调用。</div>
+
+  <div class="note"><b>协调机制</b>：总架构 Agent 定义<strong>接口契约清单</strong>（事件类型、API schema、数据模型），各域 Agent 先对齐契约再并行实现；
+  每周做一次"契约集成日"验证跨域联通。这是避免 Agent 团队写出互相不兼容代码的关键。</div>
+
+  <h2>三、四级开发路线图（分阶段）</h2>
+
+  <h3 class="p1">阶段 0 · 地基加固（所有级共用，必须先做）</h3>
+  <div class="card">
+    <ul>
+      <li>定义跨域<strong>接口契约</strong>（事件 schema、API、数据模型）—— Agent 团队并行的前提。</li>
+      <li>数据主线微服务化（MES/EAP/APS/ERP 拆独立进程 + 轻量 MQ），根治单进程单点。</li>
+      <li>存储抽象层（关系 + 时序），让四级可切换不同后端。</li>
+      <li><span class="p1">产出</span>：可在本地一键拉起的多进程骨架 + 契约文档。</li>
+    </ul>
+  </div>
+
+  <h3 class="p2">阶段 1 · L1 社区级（MVP 第一枪）</h3>
+  <div class="card">
+    <ul>
+      <li>把现有孪生 + 引擎打包成<strong>一键部署开源沙盘</strong>（Docker / 单命令）。</li>
+      <li>接入<strong>对话式 Agent</strong>（轻量规则+检索优先，零 API 成本），能自然语言问答与引导。</li>
+      <li>内置"AI 芯片典型工艺路线"默认场景。</li>
+      <li><span class="p2">产出</span>：github 开源项目 + 在线 demo + 对话助手。</li>
+    </ul>
+  </div>
+
+  <h3 class="p2">阶段 2 · L2 教学级</h3>
+  <div class="card">
+    <ul>
+      <li>在 L1 上加<strong>课程模块 + 实验台 + 评测</strong>（如"用 SPC 拦截 CD 漂移"实验）。</li>
+      <li>Agent 升级为<strong>带教导师</strong>：提示不代做、个性化错题。</li>
+      <li>引入 SEMI 标准工艺库（脱敏真实配方）。</li>
+      <li><span class="p2">产出</span>：院校可采购的教学平台 + 实验库。</li>
+    </ul>
+  </div>
+
+  <h3 class="p3">阶段 3 · L3 专业级</h3>
+  <div class="card">
+    <ul>
+      <li>架构彻底微服务化 + OPC-UA/EDA 适配器（接真实设备/数据）。</li>
+      <li>引擎模型深度升级（Cpk/RUL/置信区间）+ APS 优化求解器。</li>
+      <li>Agent 进入<strong>协作副驾</strong>态（半自治、人审锚点）。</li>
+      <li><span class="p3">产出</span>：工程师可用的专业工具，商业化起点。</li>
+    </ul>
+  </div>
+
+  <h3 class="p0">阶段 4 · L4 工厂级</h3>
+  <div class="card">
+    <ul>
+      <li>多工厂/多租户、ISA-95 建模、等保/21 CFR Part 11、高可用。</li>
+      <li>Agent 自治体群 7×24 + 人在回路监督；真实 APC 闭环。</li>
+      <li><span class="p0">产出</span>：真实 FAB 上线运行的智能企业系统。</li>
+    </ul>
+  </div>
+
+  <h2>四、优先级与执行原则</h2>
+  <table>
+    <tr><th>优先级</th><th>事项</th><th>理由</th></tr>
+    <tr><td class="ph p0">P0</td><td>阶段0 地基 + 接口契约</td><td>Agent 团队并行的硬前提，不做则各域互相不兼容</td></tr>
+    <tr><td class="ph p1">P1</td><td>L1 社区级 MVP</td><td>零合规负担、快速出活、验证 Agent 接入范式、建生态</td></tr>
+    <tr><td class="ph p1">P1</td><td>Agent 平台内核（双模）</td><td>贯穿四级，越早定型越省返工</td></tr>
+    <tr><td class="ph p2">P2</td><td>L2 教学级</td><td>变现快、市场空白，依赖 L1</td></tr>
+    <tr><td class="ph p3">P3</td><td>L3 专业级</td><td>商业核心，但依赖架构拆分与模型深度</td></tr>
+    <tr><td class="ph p0">P3</td><td>L4 工厂级</td><td>价值最高、门槛最高，最后攻坚</td></tr>
+  </table>
+
+  <div class="note warn"><b>执行铁律</b>：① 先契约后实现；② 下层不依赖上层；③ 每阶段可独立验收、可回退；
+  ④ Agent 团队只改自己域，跨域改动走"契约集成日"；⑤ 工厂级的合规/高可用要求从阶段0就反向约束数据模型。</div>
+
+  <h2>五、本规划落地的下一步</h2>
+  <div class="card">
+    <ol>
+      <li><b>你确认规划</b>：四级顺序、Agent 分工、优先级是否认可。</li>
+      <li><b>启动阶段0</b>：由"总架构 Agent"产出<strong>接口契约文档</strong>，再派发 6 个域 Agent 并行实现地基。</li>
+      <li><b>启动阶段1（L1）</b>：孪生/引擎 Agent 打包沙盘 + Agent 平台 Agent 接对话内核。</li>
+    </ol>
+  </div>
+
+  <div class="note">本规划为<strong>蓝图与编排设计</strong>，已写入项目记忆。待你确认后，即可由 Agent 团队按阶段0→阶段1顺序开工，
+  每阶段交付可运行、可验收的增量。</div>
+
+  <div class="foot">
+    开发规划 · 生成于 2026-08-23 · 基于 fab-mes 现有资产（2155 行 JS + 7 个 HTML）<br>
+    战略来源：战略白皮书-AI晶圆工厂智能企业平台.html · Agent 团队并行开发 · 分四级演进
+  </div>
+
+</div>
+</body>
+</html>

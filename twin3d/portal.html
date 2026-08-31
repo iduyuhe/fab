@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晶圆厂智能制造平台 · 3D 角色工作台（S1–S5）</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --panel2:#0f1626; --line:#1f2b45;
+    --text:#cfd8e3; --muted:#6b7a94; --accent:#4ea1ff; --green:#39d98a; --red:#ff5c5c; --yellow:#f2c14e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font:13px/1.55 "Segoe UI","Microsoft YaHei",sans-serif;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+  h1{font-size:15px;letter-spacing:.5px;white-space:nowrap}
+  h1 small{font-size:10px;color:var(--muted);font-weight:400;margin-left:6px}
+  .sys{display:flex;gap:6px}
+  .sys-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);padding:2px 8px;border:1px solid var(--line);border-radius:20px}
+  .sys-item .dot{width:7px;height:7px;border-radius:50%;background:#5a5f6a}
+  .sys-item.on .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .spacer{flex:1}
+  .quick{font-size:11px;color:var(--accent);text-decoration:none;border:1px solid var(--line);padding:3px 10px;border-radius:6px}
+  .quick:hover{border-color:var(--accent)}
+  #clock{font-family:Consolas,monospace;font-size:11px;color:var(--muted)}
+  nav{display:flex;gap:3px;padding:6px 16px 0;border-bottom:1px solid var(--line);background:var(--panel2)}
+  .tab{padding:7px 16px;font-size:12px;color:var(--muted);cursor:pointer;border:1px solid transparent;border-bottom:none;border-radius:7px 7px 0 0}
+  .tab.on{color:var(--accent);background:var(--panel);border-color:var(--line);font-weight:600}
+  main{flex:1;overflow:auto;padding:14px 16px}
+  .view{display:none}
+  .view.on{display:block}
+  .grid{display:grid;gap:12px;margin-bottom:12px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+  .two{grid-template-columns:1fr 1fr}
+  @media(max-width:1000px){.two{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .panel h2{font-size:12px;color:var(--accent);margin-bottom:8px;font-weight:600;letter-spacing:.5px}
+  .kpi .v{font-size:22px;font-weight:700;font-family:Consolas,monospace}
+  .kpi .l{font-size:10px;color:var(--muted);margin-top:1px}
+  .v.g{color:var(--green)} .v.b{color:var(--accent)} .v.y{color:var(--yellow)} .v.r{color:var(--red)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+  .st-run{background:var(--green)} .st-idle{background:#9aa7b4} .st-pm{background:var(--yellow)} .st-down{background:var(--red)} .st-HOLD{background:var(--red)}
+  .bar{height:7px;border-radius:4px;background:var(--panel2);overflow:hidden}
+  .bar>i{display:block;height:100%}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{color:var(--muted);text-align:left;font-weight:500;padding:3px 6px;border-bottom:1px solid var(--line)}
+  td{padding:3px 6px;border-bottom:1px solid var(--panel2)}
+  tr:hover td{background:var(--panel2)}
+  .mono{font-family:Consolas,monospace}
+  .muted{color:var(--muted)}
+  .scroll{max-height:260px;overflow:auto}
+  .tag{font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);display:inline-block;margin:0 4px 3px 0}
+  .btn{background:linear-gradient(90deg,#1a4f8b,#2f81f7);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px}
+  .rule-sel{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px}
+  .evt{display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--panel2);font-size:11px}
+  .evt .t{color:var(--muted);font-family:Consolas,monospace}
+  .evt .c{color:var(--accent);font-family:Consolas,monospace}
+  .empty{color:var(--muted);padding:12px;text-align:center;font-size:11px}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+<header>
+  <h1>🏭 晶圆厂智能制造平台 <small>角色工作台 · S1-S5</small></h1>
+  <div class="sys">
+    <span class="sys-item" id="s-twin"><span class="dot"></span>孪生</span>
+    <span class="sys-item" id="s-mes"><span class="dot"></span>MES</span>
+    <span class="sys-item" id="s-eap"><span class="dot"></span>EAP</span>
+  </div>
+  <span class="spacer"></span>
+  <a class="quick" href="/twin3d/" target="_blank">数字孪生 3D（SPC 联动）</a>
+  <a class="quick" href="/" target="_blank">MES 控制台</a>
+  <a class="quick" href="/eap-console.html" target="_blank">EAP 控制台</a>
+  <span id="clock">–</span>
+</header>
+<nav id="nav">
+  <span class="tab on" data-v="overview">总览</span>
+  <span class="tab" data-v="exec">厂长</span>
+  <span class="tab" data-v="process">工艺工程师</span>
+  <span class="tab" data-v="equip">设备工程师</span>
+  <span class="tab" data-v="operator">操作员</span>
+  <span class="tab" data-v="erp">供应链/财务</span>
+</nav>
+<main>
+  <div class="view on" id="v-overview">
+    <div class="grid kpis" id="o-kpi"></div>
+    <div class="grid two">
+      <div class="panel"><h2>模块负载（队列/在制）</h2><div id="o-mods"></div><h2 style="margin-top:10px">最近事件</h2><div id="o-events"></div></div>
+      <div class="panel"><h2>系统健康与入口</h2><div id="o-sys"></div><h2 style="margin-top:10px">平台能力</h2><div id="o-cap"></div></div>
+    </div>
+  </div>
+
+  <div class="view" id="v-exec">
+    <div class="grid kpis" id="e-kpi"></div>
+    <div class="grid two">
+      <div class="panel"><h2>产品分布与模块负载</h2><div id="e-mod"></div></div>
+      <div class="panel"><h2>完成批次（最近 20）</h2><div id="e-done"></div></div>
+    </div>
+  </div>
+
+  <div class="view" id="v-process">
+    <div class="grid kpis" id="p-kpi"></div>
+    <div class="grid two">
+      <div class="panel"><h2>SPC 监控组（判异 ⚠）</h2><div class="scroll"><table id="p-spc"><tr><th>产品/参数</th><th>设备</th><th>n</th><th>均值</th><th>UCL</th><th>最近</th><th>状态</th></tr></table></div></div>
+      <div class="panel"><h2>SPC 报警</h2><div class="scroll"><table id="p-alarm"><tr><th>产品/参数</th><th>设备</th><th>值</th><th>规则</th></tr></table></div><h2 style="margin-top:8px">虚拟量测精度</h2><div id="p-vm"></div></div>
+    </div>
+    <div class="panel"><h2>量测统计（CPK）</h2><div id="p-cpk"></div></div>
+  </div>
+
+  <div class="view" id="v-equip">
+    <div class="grid kpis" id="q-kpi"></div>
+    <div class="grid two">
+      <div class="panel"><h2>PdM 故障风险排行</h2><div id="q-pdm"></div></div>
+      <div class="panel"><h2>FDC 设备异常</h2><div class="scroll"><table id="q-fdc"><tr><th>设备</th><th>模块</th><th>wph</th><th>模块均值</th></tr></table></div></div>
+    </div>
+    <div class="panel"><h2>SEMI E10/E58 统计</h2><div id="q-e10"></div></div>
+  </div>
+
+  <div class="view" id="v-operator">
+    <div class="grid kpis" id="r-kpi"></div>
+    <div class="grid two">
+      <div class="panel"><h2>工单 <button class="btn" id="btn-wo" style="float:right">+ 创建</button></h2>
+        <div class="scroll"><table id="r-wo"><tr><th>工单</th><th>产品</th><th>数量</th><th>WIP</th><th>DONE</th><th>交期</th></tr></table></div></div>
+      <div class="panel"><h2>批次追踪 <span style="float:right">规则 <select class="rule-sel" id="r-rule"></select></span></h2>
+        <div class="scroll"><table id="r-lots"><tr><th>批次</th><th>产品</th><th>工序</th><th>状态</th><th>设备</th></tr></table></div></div>
+    </div>
+  </div>
+
+  <div class="view" id="v-erp">
+    <div class="grid kpis" id="x-kpi"></div>
+    <div class="grid two">
+      <div class="panel"><h2>物料库存（原生 ERP）</h2>
+        <div class="scroll"><table id="x-mat"><tr><th>料号</th><th>名称</th><th>库存</th><th>安全库存</th><th>单价</th><th>状态</th></tr></table></div></div>
+      <div class="panel"><h2>批次成本（料+工时+设备）</h2><div id="x-cost"></div>
+        <h2 style="margin-top:8px">应收 / 应付</h2><div id="x-arap"></div></div>
+    </div>
+    <div class="grid two">
+      <div class="panel"><h2>采购订单 PO</h2>
+        <div class="scroll"><table id="x-po"><tr><th>PO</th><th>供应商</th><th>物料</th><th>数量</th><th>金额</th><th>状态</th></tr></table></div></div>
+      <div class="panel"><h2>销售订单 SO</h2>
+        <div class="scroll"><table id="x-so"><tr><th>SO</th><th>客户</th><th>产品</th><th>数量</th><th>金额</th><th>状态</th></tr></table></div></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const API = { mes: '', eap: '', erp: '', wms: '', agent: '' };  // 全部走门户 8123 同源代理（/api→8124, /api/eap→8125, /api/erp→8126, /api/wms→8128, /api/agent→8127）
+const modColor = { LITHO:'#ff5c8a', ETCH:'#4ea1ff', DEP:'#57d6a6', CMP:'#f2c14e', IMPL:'#b98cff', METRO:'#ff9f5c' };
+const tt = ts => new Date(ts).toTimeString().slice(0, 8);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function jget(base, path, ms=4000){
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try{ const r = await fetch(base + path, { signal: c.signal }); return r.ok ? await r.json() : null; }
+  catch(e){ return null; } finally { clearTimeout(t); }
+}
+const post = async (path, body) => { try{ await fetch(API.mes + path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); }catch(e){} };
+
+let D = {};   // 聚合数据缓存
+async function loadAll(){
+  const [h, w, e10, tools, spc, fdc, vmv, pdm, metro, wos, lots, ev, eh, meta, aps, erp, wmsH, agentH] = await Promise.all([
+    jget(API.mes, '/api/health'), jget(API.mes, '/api/wip'), jget(API.mes, '/api/e10'),
+    jget(API.mes, '/api/tools'), jget(API.mes, '/api/spc'), jget(API.mes, '/api/fdc'),
+    jget(API.mes, '/api/vm?limit=15'), jget(API.mes, '/api/pdm'), jget(API.mes, '/api/metrology?limit=8'),
+    jget(API.mes, '/api/wos'), jget(API.mes, '/api/lots'), jget(API.mes, '/api/events?limit=8'),
+    jget(API.eap, '/api/eap/health'), jget(API.mes, '/api/meta'),
+    jget(API.mes, '/api/aps'),
+    jget(API.erp, '/api/erp/inventory'), jget(API.erp, '/api/erp/costs'), jget(API.erp, '/api/erp/arap'), jget(API.erp, '/api/erp/po'), jget(API.erp, '/api/erp/so'), jget(API.erp, '/api/erp/health'),
+    jget(API.wms, '/api/wms/health'), jget(API.agent, '/api/agent/health'),
+  ]);
+  D = { h, w, e10, tools, spc, fdc, vmv, pdm, metro, wos, lots, ev, eh, meta, aps, erp, wmsH, agentH };
+  renderAll();
+}
+
+function healthLights(){
+  $('s-twin').className = 'sys-item on';                    // 自身页面在线即 on
+  $('s-mes').className = 'sys-item ' + (D.h ? 'on' : 'off');
+  $('s-eap').className = 'sys-item ' + (D.eh ? 'on' : 'off');
+}
+
+function renderAll(){
+  healthLights();
+  renderOverview(); renderExec(); renderProcess(); renderEquip(); renderOperator(); renderErp();
+}
+
+// ---------- 总览 ----------
+function renderOverview(){
+  const g = D.e10 ? D.e10.global : {}, by = D.tools ? D.tools.byStatus : {};
+  $('o-kpi').innerHTML = kpi([['RUN 设备', by.RUN ?? '—', 'g'], ['利用率', g.utilPct + '%', 'b'], ['可用率', g.availPct + '%', ''], ['WIP', D.w ? D.w.wip : '—', 'y'], ['完成', D.w ? D.w.done : '—', ''], ['EAP 在线', D.eh ? D.eh.online + '/' + D.eh.total : '—', ''], ['SPC 判异', (D.spc && D.spc.groups.filter(g2 => g2.violated).length) || 0, 'r'], ['VM 命中', D.vmv && D.vmv.stats.n ? D.vmv.stats.hit3Pct + '%' : '—', '']]);
+  $('o-mods').innerHTML = modBars(D.w);
+  $('o-events').innerHTML = (D.ev && D.ev.events || []).map(x => `<div class="evt"><span class="t">${tt(x.ts)}</span><span class="c">${esc(x.id || x.lot || '—')}</span><span>${esc(x.status || x.type)}</span></div>`).join('') || '<div class="empty">暂无事件</div>';
+  const sysList = [['数字孪生', 8123, true], ['MES', 8124, !!D.h], ['EAP', 8125, !!D.eh], ['ERP', 8126, !!D.erpH], ['WMS', 8128, !!D.wmsH], ['Agent', 8127, !!D.agentH]];
+  $('o-sys').innerHTML = sysList.map(([n, port, ok]) => `<div class="evt"><span class="dot ${ok ? 'st-run' : 'st-idle'}"></span>${n} ${port} 端口</div>`).join('');
+  $('o-cap').innerHTML = '<div class="evt"><span class="dot st-run"></span>S1 数据底座</div><div class="evt"><span class="dot st-run"></span>S2 量测/E87/E90</div><div class="evt"><span class="dot st-run"></span>S3 PdM/VM</div><div class="evt"><span class="dot st-run"></span>S4 SPC/FDC 停线</div><div class="evt"><span class="dot st-run"></span>S5 角色工作台</div>';
+}
+
+// ---------- 厂长 ----------
+function renderExec(){
+  const g = D.e10 ? D.e10.global : {}, w = D.w || {}, aps = D.aps || { kpi: {}, modules: [], wos: [] }, k = aps.kpi || {};
+  $('e-kpi').innerHTML = kpi([['在制 WIP', w.wip ?? '—', 'y'], ['完成批次', w.done ?? '—', ''], ['工序流转', w.moves ?? '—', ''], ['平均周期', (w.avgCycleH ?? '—') + 'h', ''], ['利用率', (g.utilPct ?? '—') + '%', 'b'], ['可用率', (g.availPct ?? '—') + '%', '']]);
+  $('e-mod').innerHTML = '<div class="evt">产品分布：' + Object.entries(w.byProduct || {}).map(([k2, v]) => `<b style="color:var(--accent)">${k2}:${v}</b>`).join(' · ') + '</div>' + modBars(w) +
+    '<div style="margin-top:10px"><b>APS 产能负荷</b> · 瓶颈 <b style="color:var(--red)">' + (k.bottleneckModule || '—') + '</b> ' + (k.bottleneckLoad ?? '') + '% · 平均 ' + (k.avgLoadPct ?? '—') + '% · 准时率 <b style="color:' + ((k.onTimePct ?? 100) >= 90 ? 'var(--green)' : 'var(--red)') + '">' + (k.onTimePct ?? '—') + '%</b> · 逾期 ' + (k.lateWos ?? 0) + ' 单</div>' +
+    (aps.modules || []).map(m => `<div style="display:flex;align-items:center;gap:6px;margin-top:3px"><span class="mono" style="width:56px;font-size:10px">${m.key}</span><div class="bar" style="flex:1"><i style="width:${Math.min(100, m.loadPct)}%;background:${m.loadPct >= 100 ? 'var(--red)' : m.loadPct >= 75 ? 'var(--yellow)' : 'var(--green)'}"></i></div><span class="mono muted" style="width:34px;font-size:10px">${m.loadPct}%</span></div>`).join('') +
+    ((aps.suggest || []).map(s => `<div class="evt" style="color:var(--yellow)">💡 ${s}</div>`).join('') || '');
+  $('e-done').innerHTML = '<div class="scroll"><table><tr><th>批次</th><th>产品</th><th>周期</th></tr>' + (D.lots ? D.lots.lots.filter(l => l.status === 'DONE').slice(-20).map(l => `<tr><td class="mono">${l.id}</td><td>${l.product}</td><td class="mono">${((l.due - l.created) / 3600e3).toFixed(1)}h(上限)</td></tr>`).join('') : '') + '</table></div>';
+}
+
+// ---------- 工艺工程师 ----------
+function renderProcess(){
+  const spc = D.spc || { groups: [], alarms: [] }, vm = D.vmv || {};
+  $('p-kpi').innerHTML = kpi([['监控组', spc.groups.length, ''], ['判异组', spc.groups.filter(g => g.violated).length, 'r'], ['SPC 报警', spc.alarms.length, 'r'], ['VM 样本', vm.stats ? vm.stats.n : 0, ''], ['VM MAPE', vm.stats && vm.stats.n ? vm.stats.mape + '%' : '—', 'b'], ['±3% 命中', vm.stats && vm.stats.n ? vm.stats.hit3Pct + '%' : '—', 'g']]);
+  $('p-spc').innerHTML = '<tr><th>产品/参数</th><th>设备</th><th>n</th><th>均值</th><th>UCL</th><th>最近</th><th>状态</th></tr>' + spc.groups.slice().reverse().slice(0, 20).map(g => `<tr><td>${g.product} ${g.param}</td><td class="mono">${g.tool}</td><td>${g.n}</td><td class="mono">${g.mean}</td><td class="mono">${g.ucl}</td><td class="mono">${g.lastValue}</td><td style="color:${g.violated ? 'var(--red)' : 'var(--green)'}">${g.violated ? '⚠' : '✓'}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">暂无</td></tr>';
+  $('p-alarm').innerHTML = '<tr><th>产品/参数</th><th>设备</th><th>值</th><th>规则</th></tr>' + spc.alarms.slice(0, 10).map(a => `<tr><td>${a.product} ${a.param}</td><td class="mono">${a.tool}</td><td class="mono" style="color:var(--red)">${a.value}</td><td style="color:var(--red)">${a.rules.join(',')}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">暂无报警</td></tr>';
+  $('p-vm').innerHTML = vm.stats && vm.stats.n ? `<div class="evt">MAPE <b>${vm.stats.mape}%</b> · ±3% <b style="color:var(--green)">${vm.stats.hit3Pct}%</b> · ±5% <b>${vm.stats.hit5Pct}%</b> · 样本 ${vm.stats.n}</div>` + (vm.results || []).slice(0, 5).map(x => `<div class="evt"><span class="c">${x.lot}</span><span>${x.param} 预测 <b class="mono">${x.pred}</b> 实际 <b class="mono">${x.actual}</b> 误差 ${x.errPct}%</span></div>`).join('') : '<div class="empty">暂无预测数据</div>';
+  $('p-cpk').innerHTML = (D.metro && D.metro.stats || []).map(s => `<span class="tag" style="color:${s.cpk >= 1.33 ? 'var(--green)' : s.cpk >= 1 ? 'var(--yellow)' : 'var(--red)'}">${s.product} ${s.param} CPK=${s.cpk} (n=${s.n})</span>`).join('') || '<div class="empty">尚无量测</div>';
+}
+
+// ---------- 设备工程师 ----------
+function renderEquip(){
+  const by = D.tools ? D.tools.byStatus : {}, g = D.e10 ? D.e10.global : {};
+  $('q-kpi').innerHTML = kpi([['RUN', by.RUN ?? '—', 'g'], ['IDLE', by.IDLE ?? '—', ''], ['PM', by.PM ?? '—', 'y'], ['DOWN', by.DOWN ?? '—', 'r'], ['高风险', D.pdm ? D.pdm.highRisk : '—', 'r'], ['FDC 异常', D.fdc ? D.fdc.count : 0, 'y']]);
+  $('q-pdm').innerHTML = (D.pdm ? D.pdm.top.slice(0, 10) : []).map(r => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span class="mono" style="width:92px">${r.id}</span><div class="bar" style="flex:1"><i style="width:${Math.min(100, r.risk * 100)}%;background:${r.risk > 0.7 ? 'var(--red)' : r.risk > 0.45 ? 'var(--yellow)' : 'var(--green)'}"></i></div><span class="mono" style="width:34px">${r.risk}</span><span style="width:60px;font-size:10px;color:var(--muted)">${r.suggestText}</span></div>`).join('') || '<div class="empty">暂无</div>';
+  $('q-fdc').innerHTML = '<tr><th>设备</th><th>模块</th><th>wph</th><th>模块均值</th></tr>' + (D.fdc ? D.fdc.alarms.slice(0, 15) : []).map(a => `<tr><td class="mono">${a.tool}</td><td>${a.module}</td><td class="mono" style="color:var(--yellow)">${a.wph}</td><td class="mono muted">${a.avgWph}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">无异常</td></tr>';
+  $('q-e10').innerHTML = g.utilPct != null ? `<div class="evt">利用率 <b style="color:var(--green)">${g.utilPct}%</b> · 可用率 <b>${g.availPct}%</b> · 待机 ${g.standbyPct}% · 维护 ${g.pmPct}% · 停机 ${g.downPct}%</div><div class="evt">MTBF <b class="mono">${g.mtbfH}h</b> · MTTR <b class="mono">${g.mttrH}h</b> · 累计运行 ${D.e10.uptimeH}h</div>` : '<div class="empty">暂无</div>';
+}
+
+// ---------- 操作员 ----------
+function renderOperator(){
+  const w = D.w || {};
+  $('r-kpi').innerHTML = kpi([['在制 WIP', w.wip ?? '—', 'y'], ['完成', w.done ?? '—', ''], ['流转', w.moves ?? '—', ''], ['规则', esc(w.rule || '—'), 'b']]);
+  $('r-wo').innerHTML = '<tr><th>工单</th><th>产品</th><th>数量</th><th>WIP</th><th>DONE</th><th>交期</th></tr>' + (D.wos ? D.wos.wos.slice().reverse().slice(0, 20).map(x => `<tr><td class="mono">${x.id}</td><td>${x.product}</td><td>${x.total}</td><td>${x.lots.WIP || 0}</td><td style="color:var(--accent)">${x.lots.DONE || 0}</td><td class="muted mono">${tt(x.due)}</td></tr>`).join('') : '') + '</table>';
+  $('r-lots').innerHTML = '<tr><th>批次</th><th>产品</th><th>工序</th><th>状态</th><th>设备</th></tr>' + (D.lots ? D.lots.lots.slice().reverse().slice(0, 40).map(l => `<tr><td class="mono">${l.id}</td><td>${l.product}</td><td class="mono">${l.step}/${l.step + l.rem}</td><td><span class="dot ${l.status === 'HOLD' ? 'st-HOLD' : l.status === 'DONE' ? 'st-run' : 'st-idle'}"></span>${l.status}${l.holdReason ? ' <span class="muted" style="font-size:10px">' + esc(l.holdReason) + '</span>' : ''}</td><td class="mono">${l.curTool || '—'}</td></tr>`).join('') : '') + '</table>';
+  const sel = $('r-rule');
+  if (!sel.dataset.init && D.meta) { sel.innerHTML = D.meta.dispatchRules.map(r => `<option>${r}</option>`).join(''); sel.value = w.rule; sel.dataset.init = 1;
+    sel.onchange = async e => { await post('/api/config', { rule: e.target.value }); };
+  }
+  $('btn-wo').onclick = async () => { const p = prompt('产品 N2/A16:', 'N2'); const q = prompt('批次数:', '3'); if (p && q) { await post('/api/wos', { product: p, qty: +q }); } };
+}
+
+// ---------- 供应链/财务（原生 ERP） ----------
+function renderErp(){
+  const inv = D.erp && D.erp[0], cost = D.erp && D.erp[1], arap = D.erp && D.erp[2], po = D.erp && D.erp[3], so = D.erp && D.erp[4], eh = D.erp && D.erp[5];
+  $('x-kpi').innerHTML = kpi([['库存总值', inv ? (inv.value / 10000).toFixed(0) + '万' : '—', 'b'], ['低库存', inv ? inv.lowStock : '—', 'r'], ['批次成本', cost ? cost.count : '—', ''], ['成本总额', cost ? (cost.totalCost / 10000).toFixed(0) + '万' : '—', ''], ['应收 AR', arap ? (arap.arTotal / 10000).toFixed(0) + '万' : '—', 'g'], ['应付 AP', arap ? (arap.apTotal / 10000).toFixed(0) + '万' : '—', 'y'], ['PO', po ? po.pos.filter(x => x.status === 'OPEN').length : '—', ''], ['SO', so ? so.sos.filter(x => x.status === 'OPEN').length : '—', '']]);
+  $('x-mat').innerHTML = '<tr><th>料号</th><th>名称</th><th>库存</th><th>安全库存</th><th>单价</th><th>状态</th></tr>' + (inv ? inv.materials.map(m => `<tr><td class="mono">${m.code}</td><td>${esc(m.name)}</td><td class="mono" style="color:${m.stock < m.safety_stock ? 'var(--red)' : 'var(--green)'}">${m.stock}</td><td class="muted mono">${m.safety_stock}</td><td class="mono">${m.price.toLocaleString()}</td><td>${m.cat === 'RAW' ? (m.stock < m.safety_stock ? '<span style="color:var(--red)">低库存</span>' : '<span style="color:var(--green)">充足</span>') : '<span class="muted">成品</span>'}</td></tr>`).join('') : '<tr><td colspan="6" class="empty">ERP 未连接</td></tr>') + '</table>';
+  $('x-cost').innerHTML = (cost ? cost.batches.slice(0, 8).map(b => `<div class="evt"><span class="c">${b.lot}</span><span>${b.product} 料 <b class="mono">${b.mat_cost.toLocaleString()}</b> + 工 <b class="mono">${b.labor_cost.toLocaleString()}</b> + 设备 <b class="mono">${b.equip_cost.toLocaleString()}</b> = <b class="mono" style="color:var(--accent)">${b.total_cost.toLocaleString()}</b></span></div>`).join('') : '<div class="empty">暂无成本数据</div>') || '<div class="empty">暂无成本数据</div>';
+  $('x-arap').innerHTML = arap ? `<div class="evt">应收 AR <b class="mono" style="color:var(--green)">${arap.arTotal.toLocaleString()}</b> 元 · 应付 AP <b class="mono" style="color:var(--yellow)">${arap.apTotal.toLocaleString()}</b> 元</div>` + arap.rows.slice(0, 5).map(r => `<div class="evt"><span class="c">${r.kind}</span><span>${esc(r.ref)}</span><span class="mono" style="float:right">${r.amount.toLocaleString()}</span></div>`).join('') : '<div class="empty">暂无台账</div>';
+  $('x-po').innerHTML = '<tr><th>PO</th><th>供应商</th><th>物料</th><th>数量</th><th>金额</th><th>状态</th></tr>' + (po ? po.pos.slice(0, 10).map(p => `<tr><td class="mono">${p.id}</td><td>${esc(p.supplier)}</td><td>${esc(p.material)}</td><td class="mono">${p.qty}</td><td class="mono">${(p.qty * p.price).toLocaleString()}</td><td><span class="dot ${p.status === 'RECEIVED' ? 'st-run' : 'st-idle'}"></span>${p.status}</td></tr>`).join('') : '<tr><td colspan="6" class="empty">ERP 未连接</td></tr>') + '</table>';
+  $('x-so').innerHTML = '<tr><th>SO</th><th>客户</th><th>产品</th><th>数量</th><th>金额</th><th>状态</th></tr>' + (so ? so.sos.slice(0, 10).map(s => `<tr><td class="mono">${s.id}</td><td>${esc(s.customer)}</td><td>${s.product}</td><td class="mono">${s.qty}</td><td class="mono">${(s.qty * s.price).toLocaleString()}</td><td><span class="dot ${s.status === 'SHIPPED' ? 'st-run' : 'st-idle'}"></span>${s.status}</td></tr>`).join('') : '<tr><td colspan="6" class="empty">ERP 未连接</td></tr>') + '</table>';
+}
+function kpi(arr){ return arr.map(([l, v, c]) => `<div class="panel kpi"><div class="v ${c || ''}">${esc(v)}</div><div class="l">${l}</div></div>`).join(''); }
+function modBars(w){
+  const maxV = Math.max(1, ...Object.entries(w && w.byModule || {}).map(([, v]) => v.queue + v.processing));
+  return Object.entries(w && w.byModule || {}).map(([k, v]) => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span class="mono" style="width:48px;color:${modColor[k] || '#fff'}">${k}</span><div class="bar" style="flex:1"><i style="width:${(v.queue + v.processing) / maxV * 100}%;background:${modColor[k] || '#fff'}"></i></div><span class="mono" style="width:44px">${v.queue}/${v.processing}</span></div>`).join('') || '<div class="empty">MES 未连接</div>';
+}
+
+document.querySelectorAll('#nav .tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('#nav .tab').forEach(x => x.classList.toggle('on', x === t));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + t.dataset.v));
+});
+setInterval(loadAll, 4000);
+setInterval(() => $('clock').textContent = new Date().toTimeString().slice(0, 8), 1000);
+loadAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WMS 新建与接入数字主线报告</title>
+<style>
+  :root{ --bg:#0f1320; --card:#171c2e; --ink:#e8ecf6; --mut:#9aa6c0; --acc:#4ea1ff; --ok:#37d39b; --warn:#ffb454; --miss:#ff6b81; --line:#2a3350; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 22px 64px}
+  h1{font-size:26px;margin:0 0 4px}
+  h2{font-size:20px;margin:34px 0 12px;border-left:4px solid var(--acc);padding-left:10px}
+  h3{font-size:16px;margin:20px 0 8px;color:var(--acc)}
+  .sub{color:var(--mut);margin:0 0 8px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .kpi b{display:block;font-size:24px;color:var(--ok)}
+  .kpi span{color:var(--mut);font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;background:#121727}
+  tr:last-child td{border-bottom:none}
+  code{background:#0c1020;padding:1px 6px;border-radius:5px;color:#aee;font-size:13px}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .t-live{background:rgba(55,211,155,.16);color:var(--ok)}
+  .t-fix{background:rgba(78,161,255,.16);color:var(--acc)}
+  .t-blue{background:rgba(154,166,192,.16);color:var(--mut)}
+  .t-miss{background:rgba(255,107,129,.16);color:var(--miss)}
+  .ok{color:var(--ok);font-weight:600}
+  .warn{color:var(--warn);font-weight:600}
+  .muted{color:var(--mut)}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+  .node{background:#121a30;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px}
+  .arrow{color:var(--acc);font-weight:700}
+  ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
+  .foot{color:var(--mut);font-size:12px;margin-top:40px;border-top:1px solid var(--line);padding-top:14px}
+  .badge{font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin-left:8px}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>WMS 仓储执行域 · 新建与接入数字主线报告</h1>
+  <p class="sub">fab-mes 晶圆厂智能体系 · 关闭「唯一真空白」业务域 · 生成 2026-08-23</p>
+
+  <!-- 概览 -->
+  <h2>一、结论概览</h2>
+  <div class="grid">
+    <div class="kpi"><b>已建</b><span>WMS 独立进程 :8128（standalone）</span></div>
+    <div class="kpi"><b>100%</b><span>ERP/WMS 数字主线对齐率（同源 lotRelease）</span></div>
+    <div class="kpi"><b>0</b><span>负库存 / 账实偏离（含超发防护）</span></div>
+    <div class="kpi"><b>6/6</b><span>业务进程健康（health 200）</span></div>
+  </div>
+  <div class="card">
+    <p>WMS 已从零建立为<b>独立进程</b>（<code>fab-wms.js :8128</code>），与 ERP 同样以 <b>MES 事件总线为唯一真相源</b>派生：WMS 管<b>实物</b>（库位 / 批次库存 / 收货上架 / 拣货齐套 / 收发流水），ERP 管<b>账</b>（stock 数字 / 成本 / 应收应付）。语义对应、数据自然对齐、互不复推。原战略审计点名的「唯一真空白业务域」已闭合。</p>
+  </div>
+
+  <!-- 设计决策 -->
+  <h2>二、设计决策（用户确认）</h2>
+  <table>
+    <tr><th>维度</th><th>选择</th><th>理由</th></tr>
+    <tr><td>部署形态</td><td><span class="tag t-live">独立进程 :8128</span></td><td>仿 ERP 域隔离；WMS 崩溃不影响 MES/ERP 主线</td></tr>
+    <tr><td>功能范围</td><td>核心执行层</td><td>库位管理 + 批次级库存 + 收货 GR / 上架 Putaway / 拣货 Pick(对接 lotRelease) / 发运 GI(对接 autoShip) / 齐套检查 / 收发流水</td></tr>
+    <tr><td>接入方式</td><td>WS 订阅 MES + reconcile 重连补偿</td><td>与 ERP 一致；断连期间事件丢失可补偿，不引入循环依赖</td></tr>
+    <tr><td>留痕</td><td>独立 <code>wms_tx</code> 收发流水</td><td>不可变仓储执行日志；事件类型已登记 audit 白名单，未来可并入统一审计链（不碰红线）</td></tr>
+  </table>
+
+  <!-- 架构 -->
+  <h2>三、架构与文件清单</h2>
+  <table>
+    <tr><th>文件</th><th>职责</th></tr>
+    <tr><td><code>fab-wms.js</code></td><td>进程入口，<code>createWmsService({inProc:false}).listen(8128)</code></td></tr>
+    <tr><td><code>services/wms-service.js</code></td><td>核心逻辑：库位/库存/任务/收发流水 + 事件联动 + HTTP handler（仿 erp-service.js 范式）</td></tr>
+    <tr><td><code>fab-wms.db</code></td><td>WMS 独立库（node:sqlite + WAL），与 MES/ERP 库互不耦合</td></tr>
+    <tr><td><code>wms-ops.html</code></td><td>仓储操作台（UNIFIED NAV 含「WMS 仓储」入口），调用 <code>/api/wms/*</code></td></tr>
+    <tr><td><code>portal.js</code></td><td>门户代理 <code>/api/wms/*</code> → 8128（保持路径，同 Agent 模式）；白名单 + 静态托管</td></tr>
+    <tr><td><code>audit/index.js</code></td><td>AUDIT_EVENTS 白名单追加 wmsPick / wmsPutaway / wmsGoodsReceipt / wmsShip</td></tr>
+    <tr><td><code>bin/start-community.sh</code></td><td>编排新增 WMS 进程（6 业务 + HSMS 共拉起，trap 全杀）</td></tr>
+    <tr><td><code>docs/CONTRACT.md</code></td><td>新增 WMS 进程行、4 个事件、§3.6 WMS API 章节、§6.3 职责表</td></tr>
+    <tr><td><code>verify_wms.py</code> / <code>verify_wms_extra.py</code></td><td>端到端验证脚本（已实测通过）</td></tr>
+  </table>
+
+  <!-- 数字主线接入 -->
+  <h2>四、数字主线接入点</h2>
+  <p class="muted">严格遵循项目纪律「串主轴、不推翻」——WMS 仅挂接 spine 既有事件，不新增主干依赖。</p>
+  <div class="flow">
+    <span class="node">MES lotRelease</span><span class="arrow">→</span>
+    <span class="node">WMS 实物拣货 + 齐套检查（WH-RAW→STAGE-A）</span><span class="arrow">→</span>
+    <span class="node">产线加工（EAP/HSMS 驱动）</span><span class="arrow">→</span>
+    <span class="node">MES lotDone</span><span class="arrow">→</span>
+    <span class="node">WMS 成品上架 WH-FIN + 消耗 STAGE-A</span>
+  </div>
+  <p>同一 <code>lotRelease</code> / <code>lotDone</code> 同时驱动 <b>WMS 实物</b> 与 <b>ERP 财务领料/成本</b>，二者从同一真相源派生 → 天然对齐。</p>
+
+  <!-- 验证结果 -->
+  <h2>五、端到端验证结果</h2>
+  <table>
+    <tr><th>验证项</th><th>结果</th><th>说明</th></tr>
+    <tr><td>WMS /health · mesConnected</td><td><span class="ok">PASS</span></td><td><code>ok=true, mesConnected=true</code></td></tr>
+    <tr><td>采购收货 GR → 上架，RCV-01 账实</td><td><span class="ok">PASS</span></td><td>RCV-01 收货 100 → 上架后归零（账实修复生效）</td></tr>
+    <tr><td>lotRelease 自动拣货（PICK）</td><td><span class="ok">PASS</span></td><td>MES 自动投料即触发 WMS 拣货 + 齐套✓</td></tr>
+    <tr><td>lotDone 自动上架（PUTAWAY）</td><td><span class="ok">PASS</span></td><td>轮询 0s 出现，成品入 WH-FIN</td></tr>
+    <tr><td>销售发运 GI（正向路径）</td><td><span class="ok">PASS</span></td><td>WH-FIN 0 → GR+上架→25 → 发运→0</td></tr>
+    <tr><td>超发防护（账实一致）</td><td><span class="ok">PASS</span></td><td>WH-FIN=0 时发运被拒（<code>on-hand-insufficient</code>），不产生负库存</td></tr>
+    <tr><td>齐套检查 kit</td><td><span class="ok">PASS</span></td><td>返回批次级 {lot,product,ok,missing}（已修正取数端点）</td></tr>
+    <tr><td>ERP/WMS 数字主线对齐</td><td><span class="ok">100%</span></td><td>WMS PICK 批次数 = ERP ISSUE 批次数，交集 100%</td></tr>
+    <tr><td>库存流转自洽</td><td><span class="ok">PASS</span></td><td>WH-RAW 随 PICK 递减（正数，无透支）、STAGE-A 随 PICK 增/随 lotDone 消耗、WH-FIN 随 PUTAWAY 增</td></tr>
+    <tr><td>无进程崩溃</td><td><span class="ok">PASS</span></td><td>6 业务进程 health 均 200（EAP HSMS 会话已建立；其 /api/eap/health 路由未提供，属既有设计）</td></tr>
+  </table>
+
+  <!-- 修复记录 -->
+  <h2>六、过程中发现并修复的问题</h2>
+  <div class="card">
+    <h3>1. MES 全新库启动崩溃 <span class="badge">关键</span></h3>
+    <p><code>storage/sqlite.js</code> 构造函数在 <code>_initStatements()</code> 之后才 <code>initSchema()</code>，导致全新 <code>fab-mes.db</code> 上 <code>prepare('...tools...')</code> 报 <code>no such table</code>。已调整为<b>先建表再 prepare</b>。该 bug 在「有历史库」时被掩盖，干净基线首次暴露——会阻塞所有全新部署。</p>
+    <h3>2. WMS 库存流转账实不一致 <span class="badge">4 处 adjust 补全</span></h3>
+    <ul>
+      <li>拣货 PICK 须从 WH-RAW 扣减并<b>转入 STAGE-A</b>（原只扣减不转入）</li>
+      <li>lotDone 上架须<b>消耗 STAGE-A 暂存原料</b>（原未消耗）</li>
+      <li>putaway 上架须<b>从 RCV-01 扣减</b>（原账实不归零）</li>
+      <li>reconcile 补拣货须加 STAGE-A 转入</li>
+    </ul>
+    <h3>3. WH-RAW 初始备料 5000 → 50000</h3>
+    <p>防止 MES 历史在制 lot 触发 reconcile 时透支（干净基线同启后更无此风险）。</p>
+    <h3>4. 超发防护 + 齐套取数修正</h3>
+    <p>shipOrder 增加 WH-FIN 在库校验，禁止超发产生负库存；kitStatus 取数端点由 <code>/api/wip</code>（仅计数）修正为 <code>/api/lots</code>（含 product），齐套检查现能正确返回在制批次。</p>
+  </div>
+
+  <!-- 操作入口 -->
+  <h2>七、操作入口</h2>
+  <ul>
+    <li>仓储操作台：<code>http://127.0.0.1:8123/wms-ops.html</code></li>
+    <li>门户代理 API：<code>/api/wms/*</code> → 8128</li>
+    <li>启动编排：<code>bash bin/start-community.sh</code>（已含 WMS 进程）</li>
+    <li>验证脚本：<code>python verify_wms.py</code> / <code>python verify_wms_extra.py</code></li>
+  </ul>
+
+  <div class="foot">
+    本报告为 WMS 新建交付物；同步更新《战略审计报告_2026-08-27_总览.html》将 WMS 由「唯一真空白/未建」改为「已建（活）」。<br>
+    关联文件：fab-wms.js · services/wms-service.js · wms-ops.html · portal.js · audit/index.js · bin/start-community.sh · docs/CONTRACT.md · verify_wms*.py
+  </div>
+</div>
+</body>
+</html>

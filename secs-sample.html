@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SECS/GEM 设备联调 · 平台按 SEMI 标准打通一条线</title>
+<style>
+body{font-family:system-ui,'Microsoft YaHei',sans-serif;background:#0d1117;color:#c9d1d9;margin:0;padding:32px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:24px;color:#e6edf3;border-left:4px solid #3fb950;padding-left:12px;margin-bottom:6px}
+.sub{color:#8b949e;font-size:14px;line-height:1.8;margin:8px 0 24px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px}
+.card h2{font-size:15px;color:#58a6ff;margin:0 0 10px}
+.card p{font-size:13px;color:#8b949e;line-height:1.7;margin:0 0 14px}
+.btn{display:inline-block;background:#238636;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer}
+.btn:hover{background:#2ea043}
+.btn:disabled{background:#30363d;color:#8b949e;cursor:not-allowed}
+.btn.ghost{background:#21262d;border:1px solid #30363d}
+.kv{display:flex;gap:18px;margin-top:10px;font-size:13px}
+.kv div{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 14px;flex:1}
+.kv b{display:block;color:#7ee787;font-size:16px;margin-top:4px}
+#running{display:none;color:#d29922;font-size:13px;margin-top:12px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #d29922;border-top-color:transparent;border-radius:50%;animation:s 1s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes s{to{transform:rotate(360deg)}}
+#result{margin-top:12px;font-size:14px}
+.ok{color:#3fb950}.bad{color:#f85149}
+.note{margin-top:28px;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:18px 20px}
+.note h3{font-size:14px;color:#58a6ff;margin:0 0 8px}
+.note p{font-size:13px;color:#8b949e;line-height:1.9;margin:0}
+.note b{color:#e6edf3}
+.dev{margin-top:28px;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:18px 20px}
+.dev h3{font-size:14px;color:#58a6ff;margin:0 0 14px}
+.devgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.devbox{background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px}
+.devbox .nm{font-size:14px;color:#e6edf3;font-weight:600}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:8px;vertical-align:1px}
+.on{background:#3fb950}.off{background:#6e7681}
+.devbox .meta{font-size:12px;color:#8b949e;margin-top:8px;line-height:1.6}
+.devbox .sp{font-size:12px;color:#7ee787;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SECS/GEM 设备联调 · 平台按 SEMI 标准打通一条线</h1>
+  <p class="sub">这是 <b>晶圆厂 AI 原生的智能制造平台</b> 按 <b>SEMI 国际标准（HSMS / SECS-II / GEM）</b> 与设备（仿真机台）打通一条产线的标杆样品：设备 HSMS 会话建立 → S6F11 事件驱动在制推进 → APC 经 S2F41 回灌工艺参数。平台原生实现完整协议栈，<b>不依赖、不绑定任何第三方商业 EAP/机台套装</b>。</p>
+
+  <div class="cards">
+    <div class="card">
+      <h2>▶ 一键联调复现</h2>
+      <p>点击后平台会在后台跑通一单联调工单，经 SECS/GEM 设备链路流转，并自动生成新的联调凭证。约需 1–2 分钟，可实时看到进度。</p>
+      <button class="btn" id="runBtn" onclick="run()">▶ 开始联调</button>
+      <div id="running"><span class="spin"></span>联调任务运行中，平台正在经 HSMS/SECS-II/GEM 与仿真机台跑通一条线…</div>
+      <div id="result"></div>
+    </div>
+    <div class="card">
+      <h2>📄 联调凭证</h2>
+      <p>查看最近一次「SECS/GEM 联调」的完整凭证：设备通信建立、协议栈、S6F11 事件驱动、S2F41 控制回灌与完整性声明。</p>
+      <button class="btn ghost" onclick="location.href='/secs-delivery.html'">打开联调凭证</button>
+      <div class="kv">
+        <div>联调批次<b id="lastLot">—</b></div>
+        <div>推进工序<b id="lastSteps">—</b></div>
+        <div>S6F11 事件<b id="lastEv">—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dev">
+    <h3>● 实时设备状态（EAP Host 视角 · HSMS :5000）</h3>
+    <div class="devgrid" id="devGrid">
+      <div class="devbox"><div class="nm">加载中…</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>这一联调证明了什么</h3>
+    <p>平台的 MES 进程内置了完整的 <b>SECS/GEM 协议网关</b>：3 台设备完成 HSMS 会话与 GEM 通信建立，设备加工事件（S6F11）经 EAP Host 桥接进 fab-mes 事件总线、真实驱动在制推进，APC 收敛的工艺参数再经 <b>S2F41 SET_PARAM</b> 回灌设备（ACK=0 接受）。真实机台接入只需把 HSMS 网关指向机台地址，代码零改动。该样品由 <b>secs-demo.mjs</b> 可复现生成。</p>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+async function loadStatus(){ try{ const r=await fetch('/api/sample/secs/status'); const j=await r.json(); render(j); return j; }catch(e){ return null; } }
+function render(j){
+  const last = (j&&j.last)||{};
+  $('#lastLot').textContent = last.lotId || '—';
+  $('#lastSteps').textContent = (last.steps!=null)?('第 '+last.steps+' 道'):'—';
+  $('#lastEv').textContent = ((last.lotStart||0)+(last.lotDone||0))>0 ? ('S='+last.lotStart+' / D='+last.lotDone) : '—';
+  if(j&&j.running){ setRunning(true); }
+  else {
+    setRunning(false);
+    if(last.done){ $('#result').innerHTML='✅ 联调达成 · 凭证已更新'; $('#result').className='ok'; }
+    else if(last.crashed){ $('#result').innerHTML='⚠️ 本次联调中断'; $('#result').className='bad'; }
+    else { $('#result').innerHTML='尚未运行 · 可随时一键联调'; $('#result').className=''; }
+  }
+}
+function setRunning(b){ $('#runBtn').disabled=b; $('#runBtn').textContent=b?'联调中…':'▶ 开始联调'; $('#running').style.display=b?'block':'none'; }
+async function run(){
+  const r=await fetch('/api/sample/secs/run',{method:'POST'}); const j=await r.json();
+  if(!j.ok){ alert(j.msg||j.error||'启动失败'); return; }
+  setRunning(true); poll();
+}
+function poll(){ const t=setInterval(async()=>{ const j=await loadStatus(); if(!(j&&j.running)){ clearInterval(t); setRunning(false);} },2500); }
+async function loadDevices(){
+  try{
+    const r=await fetch('/api/eap/devices'); const j=await r.json();
+    const g=$('#devGrid'); g.innerHTML='';
+    (j.devices||[]).forEach(d=>{
+      const sp=d.lastSetpoint?('S2F41 → '+d.lastSetpoint.param+'='+d.lastSetpoint.setpoint+' (ACK='+d.lastSetpoint.ack+')'):'—';
+      const le=d.lastEvent?(d.lastEvent.type+'/'+(d.lastEvent.status||'')):'—';
+      const box=document.createElement('div'); box.className='devbox';
+      box.innerHTML='<div class="nm">'+d.name+'<span class="dot '+(d.online?'on':'off')+'"></span></div>'+
+        '<div class="meta">HSMS：'+(d.online?'在线 ✓':'离线')+'<br>最近事件：'+le+'</div>'+
+        '<div class="sp">'+sp+'</div>';
+      g.appendChild(box);
+    });
+  }catch(e){}
+}
+window.addEventListener('load', ()=>{ loadStatus(); loadDevices(); setInterval(loadDevices, 5000); });
+</script>
+</body>
+</html>

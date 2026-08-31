@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fab-mes · OTD 全生命周期诊断报告</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1f2a37; --muted:#5b6b7b;
+    --line:#e3e9f0; --brand:#2563eb; --brand2:#0e7490;
+    --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --miss:#7c3aed;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.6;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 64px}
+  header{border-bottom:3px solid var(--brand);padding-bottom:18px;margin-bottom:8px}
+  h1{font-size:26px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:14px}
+  h2{font-size:20px;margin:40px 0 12px;padding-left:10px;border-left:4px solid var(--brand)}
+  h3{font-size:16px;margin:22px 0 8px;color:var(--brand2)}
+  .verdict{background:linear-gradient(135deg,#eff6ff,#ecfeff);border:1px solid var(--line);
+    border-radius:12px;padding:18px 20px;margin:18px 0}
+  .verdict b{color:var(--brand)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);margin:12px 0 8px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13.5px}
+  th{background:#f0f4f9;color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .b-real{background:#dcfce7;color:var(--ok)}
+  .b-partial{background:#fef3c7;color:var(--warn)}
+  .b-broken{background:#fee2e2;color:var(--bad)}
+  .b-miss{background:#ede9fe;color:var(--miss)}
+  code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:12.5px;color:#334155}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .pill{font-weight:700}
+  .p0{color:var(--bad)} .p1{color:var(--warn)} .p2{color:var(--brand2)}
+  ul{margin:8px 0 8px 0;padding-left:20px}
+  li{margin:4px 0}
+  .note{font-size:12.5px;color:var(--muted);font-style:italic}
+  .foot{margin-top:48px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:12.5px}
+  .kv{font-size:13px;color:var(--muted)}
+</style>
+  <link rel="stylesheet" href="../theme.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>fab-mes · OTD 全生命周期诊断报告</h1>
+  <div class="sub">订单到交付（Order-To-Delivery）覆盖度 / AI 原生深度 / 下游财务连通性 · 只读三路审计</div>
+  <div class="kv">审计对象：六进程常驻平台（portal 8123 / MES+HSMS 8124 / EAP 8125 / ERP 8126 / Agent 8127 / WMS 8128）· 审计方式：代码数据流 + AI 深度 + 下游财务，全只读，未改动任何文件</div>
+</header>
+
+<div class="verdict">
+  <b>总体结论：中段跑通、首尾断裂、AI 不闭环。</b><br>
+  生产不是<b>订单驱动</b>的——工单由 <code>autoWo</code> 每 8s 随机产生（N2/A16），销售订单（SO）是孤儿数据；末端发运与财务各自为政、口径背离；AI 引擎多为"真实算法 + 纯展示"，仅 SPC 构成一条统计自控闭环。距"AI 原生自主控制体系"仍有结构性短板。
+</div>
+
+<h2>一、OTD 十阶段覆盖矩阵</h2>
+<table>
+  <thead><tr><th>#</th><th>阶段</th><th>状态</th><th>关键事实（审计依据）</th></tr></thead>
+  <tbody>
+    <tr><td>①</td><td>接单 SO</td><td><span class="badge b-partial">PARTIAL</span></td><td>SO 在 ERP 孤立存在（<code>erp-service.js:570</code> POST <code>/api/erp/so</code>；<code>sales_orders</code> 表 <code>:53</code>），<b>从不触发生产</b>，无 SO→WO 链路，无报价/审批流。</td></tr>
+    <tr><td>②</td><td>排产 APS</td><td><span class="badge b-partial">PARTIAL</span></td><td><code>aps.js:20 plan()</code> + <code>/api/aps</code>、<code>/api/aps/sim</code> 只算负荷/瓶颈/交期建议，<b>不回写 WIP 引擎</b>，不按 SO 排程，无闭环执行。</td></tr>
+    <tr><td>③</td><td>投料</td><td><span class="badge b-partial">PARTIAL</span></td><td><code>core.js:49 createWO → :73 _enqueue</code> 发 <code>lotRelease</code>；但来源仅 <code>autoWo</code>（<code>server.js:793</code>）与手动 <code>/api/wos</code>，与订单无关。</td></tr>
+    <tr><td>④</td><td>加工</td><td><span class="badge b-real">REAL</span></td><td><code>core.js:80 dispatch / :99 completeTool</code> 看门狗自驱；EAP <code>eap-host.js:86</code> S6F11→<code>/api/ingest</code>（<code>server.js:708</code>）真实桥通（演示 3 台设备）。</td></tr>
+    <tr><td>⑤</td><td>量测/SPC</td><td><span class="badge b-real">REAL</span></td><td><code>server.js:241 generateMetrology</code>→SPC（<code>spc.js:23</code>）；SPC 报警自动停线 + 12s 自动放行（<code>server.js:179-196</code>，上期已修死锁）。</td></tr>
+    <tr><td>⑥</td><td>完工</td><td><span class="badge b-real">REAL</span></td><td><code>core.js:99-117</code> 末步发 <code>lotDone</code>（带 product+cycleH），正常。</td></tr>
+    <tr><td>⑦</td><td>入库</td><td><span class="badge b-real">REAL</span></td><td><code>wms-service.js:222</code> PUTAWAY + <code>recommendLoc</code> 规则；<code>reconcileWithMES</code>（<code>:577</code>）重连补偿。</td></tr>
+    <tr><td>⑧</td><td>发运</td><td><span class="badge b-partial">PARTIAL</span></td><td>ERP 侧 <code>autoShip</code>（<code>erp-service.js:256-280</code>）随 lotDone 自动但<b>需有 OPEN SO 才触发</b>；WMS <code>shipOrder</code>（<code>:264</code>/<code>:567</code>）仅手动，两域背离。</td></tr>
+    <tr><td>⑨</td><td>结算 AR/GL</td><td><span class="badge b-broken">BROKEN</span></td><td>AR 依赖预先 OPEN SO 否则静默跳过；<b>完工从不过 GL 凭证</b>（<code>receiveFinish</code> <code>:173-178</code> 不调 <code>postVoucher</code>）；成本按固定费率估算。</td></tr>
+    <tr><td>⑩</td><td>交付确认</td><td><span class="badge b-miss">MISSING</span></td><td>无客户签收 / 在途 / 签收状态机；SO 仅置 <code>SHIPPED</code>，无回执。</td></tr>
+  </tbody>
+</table>
+<p class="note">注：阶段 ④⑤⑥⑦ 已实际跑通且事件互联；①②③⑧⑩ 功能骨架在，但与"订单驱动"主轴断裂；⑨ 逻辑存在但有错配。</p>
+
+<h2>二、AI 原生深度判定</h2>
+<table>
+  <thead><tr><th>组件</th><th>接线（事件驱动/自主）</th><th>是否反馈控制产线</th><th>真实/演示</th></tr></thead>
+  <tbody>
+    <tr><td>SPC</td><td>✅ 事件驱动（<code>metrology</code>→<code>spc.onMetrology</code>）</td><td>✅ 自动 hold/release 机台+批次</td><td><span class="badge b-real">REAL</span> 唯一自主闭环（统计规则）</td></tr>
+    <tr><td>FDC</td><td>✅ 事件驱动（腔室漂移→<code>fdc.assess</code>）</td><td>❌ <code>fdcAlarm</code> 仅广播/落库，无消费者</td><td><span class="badge b-real">REAL</span> 引擎，纯顾问</td></tr>
+    <tr><td>PdM</td><td>❌ 仅 <code>GET /api/pdm</code> 按需</td><td>❌ 只返回风险+建议文本</td><td><span class="badge b-real">REAL</span> 计算，纯展示</td></tr>
+    <tr><td>VM</td><td>✅ 事件驱动（<code>lotStart</code>/<code>metrology</code>）</td><td>❌ 预测只落库，仅 APC 读取（APC 默认关）</td><td><span class="badge b-real">REAL</span> 纯顾问</td></tr>
+    <tr><td>APS</td><td>❌ 仅 <code>GET /api/aps</code></td><td>❌ what-if 不重排产线</td><td><span class="badge b-real">REAL</span> 计算，纯顾问</td></tr>
+    <tr><td>APC</td><td>⚠️ 仅 <code>APC_ENABLED=1</code> 才订阅（默认 0）</td><td>⚠️ "调 setpoint"实为回灌假测量</td><td><span class="badge b-partial">演示态</span></td></tr>
+    <tr><td>数字孪生</td><td>❌ 仅 WS 只读渲染</td><td>❌ display-only，无控制权威</td><td><span class="badge b-real">REAL</span> 可视化</td></tr>
+    <tr><td>Agent</td><td>❌ 在事件环之外，独立进程</td><td>❌ human-in-the-loop，非编排器</td><td><span class="badge b-real">REAL</span> 问答副驾，L4 多重门控、白名单仅 4 项</td></tr>
+  </tbody>
+</table>
+<div class="verdict" style="margin-top:14px">
+  <b>判定：AI 展示 + 一条统计闭环，非真正 AI-native。</b><br>
+  平台拥有多个真实智能引擎与一个真实统计自控（SPC），但缺"模型输出 → 自动改写设备/排程/订单"的端到端自主链路。准确说法：<b>具备智能分析层与单点统计自控的半自动 MES</b>。
+</div>
+
+<h2>三、下游财务与发运连通性</h2>
+<h3>事件总线现状</h3>
+<ul>
+  <li>真实 EMIT：<code>lotRelease</code>（core.js:76）、<code>lotDone</code>（core.js:117，带 product+cycleH）、<code>lotStart</code> / <code>metrology</code> / <code>spcAlarm</code> / <code>fdcAlarm</code> / <code>vmResult</code> 等。</li>
+  <li><b>从未 EMIT</b>：<code>soCreated</code>、<code>orderCreated</code>、<code>shipment</code>、<code>invoiceCreated</code>、<code>delivery</code>（全仓零出现）。</li>
+  <li>WMS 从未 in-proc 接入 server.js，仅经 standalone WS 广播接收（订阅半残风险已排除：有 3s 重连 + reconcile）。</li>
+</ul>
+<h3>关键断裂点（文件依据）</h3>
+<table>
+  <thead><tr><th>断裂</th><th>说明</th><th>位置</th></tr></thead>
+  <tbody>
+    <tr><td>① SO 与源头不连通</td><td>SO 仅手动 POST 创建，无任何代码把 SO 转为工单/批次；<code>soCreated</code> 无订阅者。</td><td><code>erp-service.js:570</code></td></tr>
+    <tr><td>② AR 依赖预先 OPEN SO</td><td><code>autoShip(product)</code> 无 OPEN SO 时 <code>so=undefined → return</code>，AR 永不被触发（即观察到的 AR 空）。</td><td><code>erp-service.js:273-281</code></td></tr>
+    <tr><td>③ 完工 GL 凭证缺失</td><td><code>receiveFinish</code> 只更新库存账，不调 <code>postVoucher</code>；系统 <code>postVoucher</code> 仅在 AP/AR/付款/收款出现。</td><td><code>erp-service.js:173-178</code></td></tr>
+    <tr><td>④ 发运事件与双域背离</td><td>WMS <code>shipOrder</code> 仅手动、不发事件、不调 ERP；ERP 在 lotDone 自行"虚拟发运"。两条发运线独立、互不可见。</td><td><code>wms-service.js:264</code> / <code>erp-service.js:256</code></td></tr>
+  </tbody>
+</table>
+
+<h2>四、短板清单与补齐计划（全部自研）</h2>
+<div class="cols">
+  <div class="card">
+    <h3><span class="pill p0">P0</span> 焊通 OTD 主轴（先做，AI 编排才有主轴可编）</h3>
+    <ul>
+      <li><b>P0-1 订单驱动生产</b>：SO 创建 → EMIT <code>soCreated</code> → APS 排程 → <code>engine.createWO</code> 投料（替代 autoWo 凭空造单）。</li>
+      <li><b>P0-2 发运事件化 + 双域一致</b>：EMIT <code>shipment</code>，WMS 发运订阅触发 ERP <code>shipOrder</code>，消除 ERP 虚拟发运 / WMS 物理发运背离。</li>
+      <li><b>P0-3 交付确认状态机</b>：shipment → in-transit → delivered + 客户签收回执。</li>
+      <li><b>P0-4 结算纠偏</b>：<code>lotDone</code> 完工补 GL 凭证；AR 按真实 SO/发运自动开票，不再静默跳过。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><span class="pill p1">P1</span> 让 AI 真正闭环（AI 原生核心）</h3>
+    <ul>
+      <li><b>P1-1 FDC→自动响应</b>：<code>fdcAlarm</code> 接回控制环（hold/隔离/通知）。</li>
+      <li><b>P1-2 APC 真实 setpoint</b>：接 VM 预测+设备反馈写入真实 setpoint，可审计默认开。</li>
+      <li><b>P1-3 VM→APC feed；APS→dispatch</b>：APS 按 SO 交期/优先级真实重排产线。</li>
+      <li><b>P1-4 Agent 升级为 OTD 编排器</b>：白名单+人审下创建 SO、触发投料/发运、回答"我的订单到哪了"、异常自动建议并编排处置。</li>
+    </ul>
+  </div>
+</div>
+<div class="card" style="margin-top:16px">
+  <h3><span class="pill p2">P2</span> 收尾可信</h3>
+  <ul>
+    <li>成本按实际工艺路线计费（替代固定费率）；多租户/HA 视需求；文档与口径对齐（收回"AI-native 自主控制"等夸大表述）。</li>
+  </ul>
+</div>
+
+<h3>建议执行顺序</h3>
+<p>遵循项目"串主轴、不填层"范式：<b>P0 是主轴本身断裂，必须先焊通</b>；P1 把已具备的引擎接入这条主轴形成闭环；P2 做收尾与可信化。每一批改完均按 <code>bin/start-community.sh</code> 全量重启 + 验收脚本验证回归。</p>
+
+<div class="foot">
+  方法论：本审计为只读三路（代码数据流 / AI 深度 / 下游财务），未修改任何源文件。短板定位依据为实际代码行号与运行时事件流观测。下一步由用户拍板补齐范围后进入"整改→重启验证"阶段。
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晶圆厂智能制造平台 · 装备级数字孪生</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --panel2:#0f1626; --line:#1f2b45;
+    --txt:#cfd8e3; --muted:#6b7a94; --accent:#4ea1ff;
+    --run:#39d98a; --idle:#5b7fb0; --pm:#f2c14e; --down:#ff5c5c; --alarm:#ff3b5c;
+    --unav-h:40px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--txt);
+    font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;overflow:hidden}
+  /* 顶部报警横幅 */
+  #banner{position:fixed;top:var(--unav-h);left:0;right:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:10px 18px;background:linear-gradient(90deg,rgba(255,59,92,.95),rgba(255,59,92,.75));
+    color:#fff;font-weight:600;box-shadow:0 2px 14px rgba(255,59,92,.4);transform:translateY(-100%);
+    transition:transform .35s ease}
+  #banner.show{transform:translateY(0)}
+  #banner .pulse{width:12px;height:12px;border-radius:50%;background:#fff;animation:bk 1s infinite}
+  @keyframes bk{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(1.5)}}
+  #banner .items{font-weight:400;font-size:12.5px;opacity:.95;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  #banner .close{cursor:pointer;margin-left:auto;font-size:18px;opacity:.85}
+
+  .layout{display:flex;height:calc(100vh - var(--unav-h));margin-top:var(--unav-h)}
+  /* 左侧设备选择器 */
+  .nav-panel{width:300px;flex:0 0 300px;background:var(--panel2);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;min-height:0;transition:margin-left .25s ease}
+  .nav-panel.collapsed{margin-left:-300px}
+  .nav-head{padding:12px 12px 8px}
+  .nav-head h2{font-size:13px;color:var(--accent);margin-bottom:8px;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+  .nav-head h2 .collapse{cursor:pointer;color:var(--muted);font-size:16px;line-height:1}
+  #search{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:7px;
+    color:var(--txt);padding:7px 10px;font-size:12px;outline:none}
+  #search:focus{border-color:var(--accent)}
+  .nav-summary{display:flex;gap:5px;padding:8px 12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .pill{font-size:10.5px;padding:2px 7px;border-radius:12px;background:#16213b;color:var(--muted)}
+  .pill.run{color:var(--run)} .pill.idle{color:var(--idle)} .pill.pm{color:var(--pm)} .pill.down{color:var(--down)}
+  .nav-list{flex:1 1 auto;overflow-y:auto;padding:6px 8px 16px}
+  .grp-line{font-size:11px;color:var(--accent);font-weight:600;margin:10px 4px 4px;letter-spacing:.5px;
+    position:sticky;top:0;background:var(--panel2);padding:3px 0}
+  .grp-mod{font-size:10.5px;color:var(--muted);margin:6px 4px 2px;padding-left:6px;border-left:2px solid var(--line)}
+  .tool-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px}
+  .tool-item:hover{background:#16213b}
+  .tool-item.active{background:rgba(78,161,255,.18);outline:1px solid var(--accent)}
+  .tool-item .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .tool-item .tid{font-family:Consolas,monospace;flex:1}
+  .tool-item .tutil{color:var(--muted);font-size:11px}
+  .dot.RUN{background:var(--run)} .dot.IDLE{background:var(--idle)} .dot.PM{background:var(--pm)}
+  .dot.DOWN{background:var(--down);box-shadow:0 0 6px var(--down)}
+
+  /* 右侧孪生面板 */
+  .twin-panel{flex:1 1 auto;overflow-y:auto;padding:18px 22px 60px;min-width:0}
+  .twin-panel::-webkit-scrollbar,.nav-list::-webkit-scrollbar{width:8px}
+  .twin-panel::-webkit-scrollbar-thumb,.nav-list::-webkit-scrollbar-thumb{background:#1f2b45;border-radius:4px}
+  .empty{color:var(--muted);font-size:13px;padding:20px;text-align:center}
+  .empty.big{font-size:16px;margin-top:80px}
+  .twin-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
+  .th-id{font-size:24px;font-weight:700;font-family:Consolas,monospace;letter-spacing:1px}
+  .th-sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .th-badge{font-size:13px;font-weight:700;padding:6px 16px;border-radius:8px;letter-spacing:1px}
+  .th-badge.RUN{background:rgba(57,217,138,.18);color:var(--run)}
+  .th-badge.IDLE{background:rgba(91,127,176,.18);color:var(--idle)}
+  .th-badge.PM{background:rgba(242,193,78,.18);color:var(--pm)}
+  .th-badge.DOWN{background:rgba(255,92,92,.2);color:var(--down)}
+  .card-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .card h3{font-size:13px;color:var(--accent);margin-bottom:10px;letter-spacing:.5px;
+    display:flex;align-items:center;gap:8px}
+  .kv{display:flex;justify-content:space-between;font-size:12.5px;margin:5px 0;color:var(--muted)}
+  .kv b{color:var(--txt);font-family:Consolas,monospace;font-weight:600}
+  .bar{height:8px;border-radius:6px;background:#1a2547;overflow:hidden;margin:8px 0 4px}
+  .bar>i{display:block;height:100%}
+  /* 结构示意 */
+  .struct{display:flex;gap:18px;align-items:stretch}
+  .struct-col{display:flex;flex-direction:column;gap:8px;justify-content:center}
+  .lp,.ll{padding:10px 12px;border-radius:8px;font-size:11px;text-align:center;background:#16213b;color:var(--muted);border:1px solid var(--line)}
+  .chambers{display:flex;flex-wrap:wrap;gap:10px;flex:1}
+  .chamber{width:120px;border-radius:9px;padding:8px 9px;border:1px solid rgba(255,255,255,.08);
+    background:#16213b;display:flex;flex-direction:column;gap:3px;transition:background .3s,border-color .3s}
+  .chamber .ch-h{font-weight:700;font-size:12px;margin-bottom:1px;font-family:Consolas,monospace;letter-spacing:.5px}
+  .chamber .ch-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+  .chamber .ch-row b{color:var(--txt);font-family:Consolas,monospace;font-weight:600}
+  .chamber .ch-state{font-size:10.5px;text-align:center;margin-top:3px;padding:2px 0;border-radius:5px;
+    background:rgba(91,127,176,.15);color:var(--idle)}
+  .chamber.RUN{background:rgba(57,217,138,.14);border-color:rgba(57,217,138,.4)}
+  .chamber.RUN .ch-state{background:rgba(57,217,138,.22);color:var(--run)}
+  .chamber.IDLE{background:rgba(91,127,176,.12)}
+  .chamber.PM{background:rgba(242,193,78,.14);border-color:rgba(242,193,78,.4)}
+  .chamber.PM .ch-state{background:rgba(242,193,78,.2);color:var(--pm)}
+  .chamber.DOWN{background:rgba(255,92,92,.16);border-color:rgba(255,92,92,.5);animation:blink 1s infinite}
+  .chamber.DOWN .ch-state{background:rgba(255,92,92,.25);color:var(--down)}
+  .chamber.WARN{background:rgba(255,153,0,.16);border-color:rgba(255,153,0,.55)}
+  .chamber.WARN .ch-state{background:rgba(255,153,0,.26);color:#ffb347}
+  .ch-fault{font-size:10px;text-align:center;margin-top:3px;color:#ffb347;font-family:Consolas,monospace}
+  @keyframes blink{50%{opacity:.45}}
+  .lp.RUN,.ll.RUN{color:var(--run);border-color:rgba(57,217,138,.4)}
+  .lp.DOWN,.ll.DOWN{color:var(--down);border-color:var(--down)}
+  .struct-note{font-size:11px;color:var(--muted);margin-top:10px}
+  /* SPC 图 */
+  .spc-chart{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:12px}
+  .spc-title{font-size:12px;margin-bottom:6px}
+  .spc-title .unit{color:var(--muted);font-size:11px}
+  .spc-title .vbadge{margin-left:8px;font-size:10px;background:rgba(255,59,92,.2);color:var(--alarm);padding:1px 7px;border-radius:10px}
+  .spc-chart canvas{width:100%;display:block}
+  /* WIP */
+  .wip-card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-bottom:10px}
+  .wip-id{font-family:Consolas,monospace;font-size:13px;font-weight:600;margin-bottom:6px}
+  /* 报警 */
+  .alarm-row{font-size:12px;padding:6px 0;border-bottom:1px dashed var(--line);font-family:Consolas,monospace;color:#ffb3bd}
+  .alarm-row .at{color:var(--muted);margin-right:8px}
+  .reopen{position:fixed;left:8px;bottom:8px;z-index:30;display:none;background:var(--panel);border:1px solid var(--line);
+    color:var(--accent);border-radius:7px;padding:6px 10px;cursor:pointer;font-size:12px}
+  .nav-panel.collapsed ~ .reopen{display:block}
+
+  /* 全局面板显隐开关 */
+  #hud-toggle{position:fixed;top:calc(12px + var(--unav-h));right:12px;z-index:999;
+    font:12px/1.4 system-ui,'Segoe UI',sans-serif;color:var(--muted);white-space:nowrap;
+    background:rgba(78,161,255,0.18);border:1px solid rgba(78,161,255,0.4);
+    border-radius:8px;padding:6px 11px;cursor:pointer;transition:background .15s;
+    box-shadow:0 2px 10px rgba(0,0,0,0.3);}
+  #hud-toggle:hover{background:rgba(78,161,255,0.35);color:var(--txt);}
+  body.hud-hidden .nav-panel{display:none !important;}
+  body.hud-hidden .nav-panel ~ .reopen{display:none !important;}
+  body.hud-hidden .twin-panel{margin-left:0 !important;}
+
+  /* 工艺路线流程图 */
+  .route-flow{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:6px 0 10px}
+  .rchip{display:flex;flex-direction:column;align-items:center;padding:5px 8px;border-radius:8px;background:#16213b;border:1px solid var(--line);min-width:52px}
+  .rchip .rm{font-size:12px;font-weight:600;line-height:1.1}
+  .rchip .rp{font-size:9.5px;color:var(--muted);margin-top:2px}
+  .rchip.own{border-color:rgba(78,161,255,.6);background:rgba(78,161,255,.12)}
+  .rchip.cur{outline:2px solid var(--run);background:rgba(57,217,138,.2);box-shadow:0 0 10px rgba(57,217,138,.4);animation:rpulse 1.2s infinite}
+  .rchip.cur .rm{color:var(--run)}
+  @keyframes rpulse{50%{box-shadow:0 0 4px rgba(57,217,138,.2)}}
+  .rarr{color:var(--muted);font-size:12px;margin:0 1px}
+  .route-note{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.7}
+  .route-note .qv{color:var(--txt);font-family:Consolas,monospace}
+  /* 质量总览 */
+  .qstat{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .qpill{font-size:11px;padding:4px 10px;border-radius:14px;background:#16213b;border:1px solid var(--line);color:var(--muted)}
+  .qpill.ok{border-color:rgba(57,217,138,.5);color:var(--run)}
+  .qpill.bad{border-color:rgba(255,92,92,.5);color:var(--down)}
+  .qpill.warn{border-color:rgba(242,193,78,.5);color:var(--pm)}
+  .qlist{font-size:11.5px;line-height:1.75;font-family:Consolas,monospace;color:var(--muted);max-height:170px;overflow:auto}
+  .qlist .qv{color:var(--txt)} .qlist .qbad{color:var(--down)}
+  /* 晶圆图 */
+  .wafer-wrap{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+  .wafer-grid{display:grid;grid-template-columns:repeat(5,30px);gap:4px}
+  .wcell{width:30px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+    font-size:9px;font-weight:700;color:#0b1020;background:#1a2547}
+  .wcell.WIP{background:#2b3a63;color:#9fb3d8}
+  .wcell.DONE{background:#39d98a;color:#06231a}
+  .wcell.SCRAP{background:#ff5c5c;color:#2a0000}
+  .wcell.HOLD{background:#f2c14e;color:#2a1d00}
+  .wlegend{display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--muted)}
+  .wlegend .lg{display:flex;align-items:center;gap:6px}
+  .wlegend .sw{width:13px;height:13px;border-radius:3px}
+  .yield-pill{font-family:Consolas,monospace;color:var(--run);font-weight:700}
+  /* 配方 */
+  .recipe-name{font-family:Consolas,monospace;color:var(--accent);font-size:13px;font-weight:700}
+  .recipe-ver{font-size:10px;color:var(--muted);margin-left:8px}
+  .recipe-params{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:12px;margin-top:8px}
+  .recipe-params .pk{color:var(--muted)}
+  .recipe-params .pv{font-family:Consolas,monospace;color:var(--txt)}
+  /* 腔室趋势 sparkline */
+  .ch-spark{width:100%;height:22px;display:block;margin-top:4px}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+<div id="banner">
+  <span class="pulse"></span>
+  <span id="banner-txt">在制报警</span>
+  <span class="items" id="banner-items"></span>
+  <span class="close" onclick="document.getElementById('banner').classList.remove('show')">×</span>
+</div>
+<button id="hud-toggle" title="隐藏/显示面板 (H)">🙈 隐藏面板</button>
+
+<div class="layout">
+  <aside class="nav-panel" id="navPanel">
+    <div class="nav-head">
+      <h2><span class="collapse" id="collapseBtn" title="收起/展开导航">⊟</span>设备选择器</h2>
+      <input id="search" placeholder="搜索设备 ID / 配方…" />
+    </div>
+    <div class="nav-summary" id="navSummary"></div>
+    <div class="nav-list" id="navList"></div>
+  </aside>
+  <div class="reopen" id="reopenBtn">› 设备列表</div>
+
+  <main class="twin-panel" id="twin">
+    <div class="empty big">从左侧选择一台设备，查看它的数字孪生镜像</div>
+  </main>
+</div>
+
+<script>
+// ===================== 常量 =====================
+const STATUS_COLOR = { RUN:'#39d98a', IDLE:'#5b7fb0', PM:'#f2c14e', DOWN:'#ff5c5c' };
+const LINE_NAME    = { 'FAB-L1':'前道产线 L1', 'FAB-L2':'前道产线 L2', 'FAB-L3':'量测产线 L3' };
+const MOD_NAME     = { LITHO:'光刻',ETCH:'刻蚀',DEP:'沉积',CMP:'CMP',IMPL:'注入',METRO:'量测' };
+const LINES = ['FAB-L1','FAB-L2','FAB-L3'];
+
+// ===================== 状态 =====================
+const TOOLS = new Map();          // id -> {id,module,modName,status,util,wph,wafers,chambers,recipe,line,bay}
+const alarms = new Map();         // toolId -> {param,value,rules,ts}
+let selectedId = null;
+let spcSnapshot = { groups: [], alarms: [] };
+let e10ByTool = {};               // id -> byTool metrics
+let wipLots = [];                 // 在制批次
+let byStatus = {};
+let chamberData = null;           // 选中设备逐腔室真实遥测
+let META = null;                  // /api/meta 主数据（含 routes / products）
+const META_ROUTES = {};           // product -> [module, module, ...] 工艺路线（按步序）
+let metroAll = [];                // 全量量测样本（按 tool 过滤）
+let fdcAll = [];                  // 全量 FDC 报警（按 tool 过滤）
+let waferData = null;            // 选中设备当前在制 lot 的逐片晶圆数据
+let recipeData = null;           // 选中设备当前加载的工艺配方
+let chamberHist = null;          // 选中设备各腔室时序历史（趋势 sparkline）
+
+// ===================== DOM =====================
+const navList   = document.getElementById('navList');
+const navSummary= document.getElementById('navSummary');
+const twin      = document.getElementById('twin');
+const searchBox = document.getElementById('search');
+const banner    = document.getElementById('banner');
+const navPanel  = document.getElementById('navPanel');
+
+// ===================== 数据拉取（全部为真实接口） =====================
+async function loadTools(){
+  try{
+    const j = await (await fetch('/api/tools')).json();
+    byStatus = j.byStatus || {};
+    (j.tools||[]).forEach(t=>{ if(!TOOLS.has(t.id)) TOOLS.set(t.id,t); else Object.assign(TOOLS.get(t.id), t); });
+    renderNav();
+  }catch(e){ console.warn('loadTools',e); }
+}
+async function loadE10(){
+  try{
+    const j = await (await fetch('/api/e10')).json();
+    e10ByTool = j.byTool || {};
+    if(selectedId) renderHealthOnly();
+  }catch(e){ console.warn('loadE10',e); }
+}
+async function loadSpc(){
+  try{
+    const j = await (await fetch('/api/spc')).json();
+    spcSnapshot = { groups: j.groups||[], alarms: j.alarms||[] };
+    if(selectedId){ drawSpcCharts(TOOLS.get(selectedId)); renderQualityOnly(); }
+  }catch(e){ console.warn('loadSpc',e); }
+}
+async function loadWip(){
+  try{
+    const j = await (await fetch('/api/lots?status=WIP')).json();
+    wipLots = j.lots || [];
+    if(selectedId) renderWipOnly();
+  }catch(e){ console.warn('loadWip',e); }
+}
+// 逐腔室真实遥测（仿真引擎腔室级状态模型）：仅拉取当前选中设备
+async function loadChambers(){
+  if(!selectedId) return;
+  try{
+    const j = await (await fetch('/api/chambers?tool='+encodeURIComponent(selectedId))).json();
+    chamberData = j.chambers || [];
+    updateChamberTelemetry();
+  }catch(e){ console.warn('loadChambers',e); }
+}
+// 工艺路线主数据（产品 → 重入路线）：仅拉一次，缓存
+async function loadMeta(){
+  if(META) return;
+  try{
+    const j = await (await fetch('/api/meta')).json();
+    META = j;
+    (j.routes||[]).forEach(r=>{ (META_ROUTES[r.product]=META_ROUTES[r.product]||[]).push(r.module); });
+  }catch(e){ console.warn('loadMeta',e); }
+}
+// 量测样本（按 tool 过滤出本机质量）
+async function loadMetrology(){
+  try{
+    const j = await (await fetch('/api/metrology?limit=300')).json();
+    metroAll = j.samples||[];
+    if(selectedId) renderQualityOnly();
+  }catch(e){ console.warn('loadMetrology',e); }
+}
+// FDC 设备异常（按 tool 过滤出本机）
+async function loadFdc(){
+  try{
+    const j = await (await fetch('/api/fdc?limit=300')).json();
+    fdcAll = j.alarms||[];
+    if(selectedId) renderQualityOnly();
+  }catch(e){ console.warn('loadFdc',e); }
+}
+// 晶圆级追踪：拉取选中设备当前在制 lot 的逐片状态
+async function loadWafers(){
+  if(!selectedId) return;
+  try{
+    const j = await (await fetch('/api/wafers?tool='+encodeURIComponent(selectedId))).json();
+    waferData = (j && j.wafers) ? j : null;
+    if(!waferData) waferData = (j && j.error) ? { empty:true, error:j.error } : null;
+    renderWaferOnly();
+  }catch(e){ console.warn('loadWafers',e); }
+}
+// 当前配方：选中设备当前加载的工艺配方（产品×工序）
+async function loadRecipe(){
+  if(!selectedId) return;
+  try{
+    const j = await (await fetch('/api/recipe?tool='+encodeURIComponent(selectedId))).json();
+    recipeData = (j && j.recipe) ? j : null;
+    renderRecipeOnly();
+  }catch(e){ console.warn('loadRecipe',e); }
+}
+// 腔室时序历史（trace historian）：供趋势 sparkline
+async function loadChamberHist(){
+  if(!selectedId) return;
+  try{
+    const j = await (await fetch('/api/chambers/history?tool='+encodeURIComponent(selectedId)+'&limit=40')).json();
+    chamberHist = (j && j.chambers) ? j.chambers : null;
+    drawChamberSparklines();
+  }catch(e){ console.warn('loadChamberHist',e); }
+}
+
+// ===================== 左侧设备选择器 =====================
+function renderNav(){
+  const bs = byStatus;
+  navSummary.innerHTML =
+    `<span class="pill run">RUN ${bs.RUN||0}</span>`+
+    `<span class="pill idle">IDLE ${bs.IDLE||0}</span>`+
+    `<span class="pill pm">PM ${bs.PM||0}</span>`+
+    `<span class="pill down">DOWN ${bs.DOWN||0}</span>`;
+  const q = (searchBox.value||'').toUpperCase();
+  let html='';
+  LINES.forEach(line=>{
+    const inLine = [...TOOLS.values()].filter(t=>t.line===line);
+    if(!inLine.length) return;
+    html += `<div class="grp-line">${LINE_NAME[line]||line} · ${inLine.length}台</div>`;
+    const mods = {};
+    inLine.forEach(t=>{ (mods[t.module]=mods[t.module]||[]).push(t); });
+    Object.keys(mods).forEach(mod=>{
+      const list = mods[mod].filter(t=> !q || t.id.toUpperCase().includes(q) || (t.recipe||'').toUpperCase().includes(q));
+      if(!list.length) return;
+      html += `<div class="grp-mod">${MOD_NAME[mod]||mod}</div>`;
+      list.sort((a,b)=>a.id.localeCompare(b.id)).forEach(t=>{
+        const act = t.id===selectedId ? 'active':'';
+        html += `<div class="tool-item ${act}" data-id="${t.id}">
+          <span class="dot ${t.status}"></span>
+          <span class="tid">${t.id}</span>
+          <span class="tutil">${t.util!=null?t.util+'%':''}</span>
+        </div>`;
+      });
+    });
+  });
+  if(!html.trim()) html = '<div class="empty">无匹配设备</div>';
+  navList.innerHTML = html;
+}
+navList.addEventListener('click', e=>{
+  const el = e.target.closest('.tool-item'); if(!el) return;
+  selectTool(el.dataset.id);
+});
+searchBox.addEventListener('input', renderNav);
+
+// ===================== 选择设备 =====================
+function selectTool(id){
+  selectedId = id;
+  chamberData = null; waferData = null; recipeData = null; chamberHist = null;
+  renderNav();
+  renderTwin();
+  loadChambers();
+  loadMeta().then(()=>renderRouteOnly());
+  loadMetrology();
+  loadFdc();
+  loadWafers();
+  loadRecipe();
+  loadChamberHist();
+}
+
+// ===================== 右侧孪生镜像 =====================
+function renderTwin(){
+  const t = TOOLS.get(selectedId);
+  if(!t){ twin.innerHTML = '<div class="empty big">从左侧选择一台设备，查看它的数字孪生镜像</div>'; return; }
+  twin.innerHTML = `
+    <div class="twin-head">
+      <div>
+        <div class="th-id">${t.id}</div>
+        <div class="th-sub">${t.modName||(MOD_NAME[t.module]||t.module)} · ${LINE_NAME[t.line]||t.line} · ${t.bay||''}</div>
+      </div>
+      <div class="th-badge ${t.status}">${t.status}</div>
+    </div>
+    <div class="card-grid">
+      <div class="card">
+        <h3>设备档案（MES 实时）</h3>
+        <div class="kv"><span>Recipe 配方</span><b>${t.recipe||'—'}</b></div>
+        <div class="kv"><span>利用率</span><b>${t.util!=null?t.util+'%':'—'}</b></div>
+        <div class="kv"><span>产能</span><b>${t.wph!=null?t.wph+' wph':'—'}</b></div>
+        <div class="kv"><span>累计晶圆</span><b>${(t.wafers||0).toLocaleString()}</b></div>
+        <div class="kv"><span>腔室数</span><b>${t.chambers||'—'}</b></div>
+      </div>
+      <div class="card" id="cardHealth">
+        <h3>设备健康（E10 逐台）</h3>
+        ${renderHealth(t)}
+      </div>
+    </div>
+    <div class="card">
+      <h3>设备结构示意</h3>
+      ${renderStructure(t)}
+    </div>
+    <div class="card" id="cardRoute">
+      <h3>工艺路线（Process Route）</h3>
+      ${renderRoute(t)}
+    </div>
+    <div class="card">
+      <h3>SPC 控制图（真实量测序列）</h3>
+      ${renderSpc(t)}
+    </div>
+    <div class="card" id="cardQuality">
+      <h3>质量总览（Quality）</h3>
+      ${renderQuality(t)}
+    </div>
+    <div class="card" id="cardWip">
+      <h3>在制批次（WIP）</h3>
+      ${renderWip(t)}
+    </div>
+    <div class="card" id="cardWafer">
+      <h3>晶圆图（Wafer Map）</h3>
+      ${renderWafer(t)}
+    </div>
+    <div class="card" id="cardRecipe">
+      <h3>当前配方（Recipe）</h3>
+      ${renderRecipe(t)}
+    </div>
+    <div class="card">
+      <h3>SPC 报警记录</h3>
+      ${renderAlarms(t)}
+    </div>`;
+  drawSpcCharts(t);
+}
+
+function renderHealth(t){
+  const e = e10ByTool[t.id];
+  if(!e) return '<div class="empty">暂无可靠性统计</div>';
+  const f = v => v!=null ? v+'%' : '—';
+  const h = v => v ? v+' h' : '—';
+  return `
+    <div class="kv"><span>利用率 Util</span><b>${f(e.utilPct)}</b></div>
+    <div class="kv"><span>可用度 Avail</span><b>${f(e.availPct)}</b></div>
+    <div class="kv"><span>停机率 Down</span><b>${f(e.downPct)}</b></div>
+    <div class="kv"><span>本机 MTBF</span><b>${h(e.mtbfH)}</b></div>
+    <div class="kv"><span>本机 MTTR</span><b>${h(e.mttrH)}</b></div>`;
+}
+function renderHealthOnly(){
+  const card = document.getElementById('cardHealth'); if(!card) return;
+  const t = TOOLS.get(selectedId); if(!t) return;
+  card.innerHTML = '<h3>设备健康（E10 逐台）</h3>'+renderHealth(t);
+}
+function renderStructure(t){
+  const n = t.chambers || 1;
+  let ch='';
+  for(let i=0;i<n;i++){
+    const label = String.fromCharCode(65+i);   // A,B,C...
+    ch += `<div class="chamber" id="chamber-${i}">
+      <div class="ch-h">CH-${label}</div>
+      <div class="ch-row"><span>腔温</span><b id="ct-${i}">—</b></div>
+      <div class="ch-row"><span>RF</span><b id="cr-${i}">—</b></div>
+      <div class="ch-row"><span>气流量</span><b id="cg-${i}">—</b></div>
+      <div class="ch-row"><span>真空度</span><b id="cp-${i}">—</b></div>
+      <div class="ch-state" id="cs-${i}">待机</div>
+      <div class="ch-fault" id="cf-${i}"></div>
+      <canvas class="ch-spark" id="spark-${i}"></canvas>
+    </div>`;
+  }
+  return `<div class="struct">
+      <div class="struct-col">
+        <div class="lp ${t.status}">Load Port</div>
+        <div class="ll ${t.status}">Load Lock</div>
+      </div>
+      <div class="chambers">${ch}</div>
+    </div>
+    <div class="struct-note">逐腔室真实遥测（仿真引擎腔室级状态模型）：腔室随整机 RUN/IDLE 实时升降温、RF 功率与工艺气体流量演进；非等离子模块（光刻/量测/CMP/注入）RF=0 为真实工况，待机时破真空回大气。</div>`;
+}
+// 就地更新逐腔室遥测（不重绘整页，避免闪烁）
+function updateChamberTelemetry(){
+  if(!chamberData || !chamberData.length) return;
+  chamberData.forEach((c,i)=>{
+    const box=document.getElementById('chamber-'+i), tmp=document.getElementById('ct-'+i),
+          rf=document.getElementById('cr-'+i), gas=document.getElementById('cg-'+i),
+          pr=document.getElementById('cp-'+i), st=document.getElementById('cs-'+i);
+    if(!box) return;
+    tmp.textContent = c.temp.toFixed(1)+' °C';
+    rf.textContent  = c.rf>0 ? Math.round(c.rf)+' W' : '—';
+    gas.textContent = c.gas>0 ? c.gas.toFixed(1)+' sccm' : '—';
+    pr.textContent  = c.press>=1 ? c.press.toFixed(0)+' Torr' : c.press.toFixed(4)+' Torr';
+    const faultLv = c.fault || 0;
+    st.textContent  = c.state==='RUN' ? '运行中' : c.state==='WARN' ? ('退化 Lv'+faultLv) : c.state==='DOWN' ? '故障' : '待机';
+    const fb = document.getElementById('cf-'+i);
+    if(fb) fb.textContent = faultLv>0 ? ('偏离 '+c.dev.toFixed(0)+'%') : '';
+    box.className   = 'chamber ' + (c.state==='RUN'?'RUN':c.state==='WARN'?'WARN':c.state==='DOWN'?'DOWN':(TOOLS.get(selectedId)||{}).status==='PM'?'PM':'IDLE');
+  });
+  drawChamberSparklines();
+}
+function renderSpc(t){
+  const groups = spcSnapshot.groups.filter(g=>g.tool===t.id);
+  if(!groups.length) return '<div class="empty">该设备暂无 SPC 监控组</div>';
+  return groups.slice(0,6).map((g,idx)=>`
+    <div class="spc-chart">
+      <div class="spc-title">${g.param} <span class="unit">${g.unit||''}</span> · ${g.product||''} · n=${g.n}
+        ${g.violated?'<span class="vbadge">判异</span>':''}</div>
+      <canvas id="spc-${idx}" height="150"></canvas>
+    </div>`).join('');
+}
+function drawSpcCharts(t){
+  const groups = spcSnapshot.groups.filter(g=>g.tool===t.id).slice(0,6);
+  groups.forEach((g,idx)=>{
+    const cv = document.getElementById('spc-'+idx); if(!cv) return;
+    drawSpcChart(cv, g);
+  });
+}
+function drawSpcChart(cv, g){
+  const dpr = Math.min(2, window.devicePixelRatio||1);
+  const w = cv.clientWidth || 560, h = 150;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const vals = g.values||[];
+  if(!vals.length){ ctx.fillStyle='#6b7a94'; ctx.font='12px Segoe UI'; ctx.fillText('暂无样本',12,22); return; }
+  const all = vals.concat([g.ucl,g.lcl,g.mean]).filter(v=>v!=null);
+  let min = Math.min(...all), max = Math.max(...all);
+  const pad = (max-min)*0.15 || 1; min-=pad; max+=pad;
+  const px = i => 12 + i*((w-24)/(Math.max(1,vals.length-1)));
+  const py = v => h-20 - ((v-min)/(max-min))*(h-36);
+  // UCL / LCL / CL
+  ctx.setLineDash([4,3]);
+  ctx.strokeStyle='rgba(255,77,94,.7)'; ctx.beginPath(); ctx.moveTo(12,py(g.ucl)); ctx.lineTo(w-12,py(g.ucl)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(12,py(g.lcl)); ctx.lineTo(w-12,py(g.lcl)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(242,193,78,.8)'; ctx.beginPath(); ctx.moveTo(12,py(g.mean)); ctx.lineTo(w-12,py(g.mean)); ctx.stroke();
+  ctx.font='10px Consolas';
+  ctx.fillStyle='#ff5c5c'; ctx.fillText('UCL '+g.ucl, w-78, py(g.ucl)-3);
+  ctx.fillText('LCL '+g.lcl, w-78, py(g.lcl)+11);
+  ctx.fillStyle='#f2c14e'; ctx.fillText('CL '+g.mean, 12, py(g.mean)-3);
+  // 数据点
+  vals.forEach((v,i)=>{
+    const x=px(i), y=py(v), viol = v>g.ucl || v<g.lcl;
+    ctx.fillStyle = viol?'#ff3b5c':'#4ea1ff';
+    ctx.beginPath(); ctx.arc(x,y, viol?3.5:2.2, 0, 7); ctx.fill();
+  });
+}
+function renderWip(t){
+  const lots = wipLots.filter(l=>l.curTool===t.id);
+  if(!lots.length) return '<div class="empty">当前无在制批次</div>';
+  return lots.map(l=>{
+    const total = (l.step||0)+(l.rem||0);
+    const pct = total? Math.round((l.step||0)/total*100):0;
+    return `<div class="wip-card">
+      <div class="wip-id">${l.id} · ${l.product||''}</div>
+      <div class="kv"><span>进度</span><b>第 ${l.step||0} 步 / 共 ${total} 步</b></div>
+      <div class="bar"><i style="width:${pct}%;background:#4ea1ff"></i></div>
+      <div class="kv"><span>完成度</span><b>${pct}%</b></div>
+    </div>`;
+  }).join('');
+}
+function renderWipOnly(){
+  const card = document.getElementById('cardWip'); if(!card) return;
+  const t = TOOLS.get(selectedId); if(!t) return;
+  card.innerHTML = '<h3>在制批次（WIP）</h3>'+renderWip(t);
+  renderRouteOnly();
+}
+function renderAlarms(t){
+  const al = spcSnapshot.alarms.filter(a=>a.tool===t.id);
+  if(!al.length) return '<div class="empty">无 SPC 报警记录</div>';
+  return al.slice(0,8).map(a=>`
+    <div class="alarm-row"><span class="at">${new Date(a.ts).toLocaleTimeString()}</span>
+      ${a.param}=${a.value} [${Array.isArray(a.rules)?a.rules.join(','):a.rules}]</div>`).join('');
+}
+
+// ===================== 工艺路线（Process Route） =====================
+function renderRoute(t){
+  if(!META) return '<div class="empty">工艺路线主数据加载中…</div>';
+  const lot = wipLots.find(l=>l.curTool===t.id);
+  const product = lot ? lot.product : (t._lastProduct || 'N2');
+  const route = META_ROUTES[product] || META_ROUTES['N2'] || [];
+  if(!route.length) return '<div class="empty">暂无工艺路线主数据</div>';
+  const passes = Math.round(route.length/6);
+  const curStep = lot ? (lot.step||0) : -1;
+  let chips='';
+  route.forEach((m,i)=>{
+    const own = (m===t.module);
+    const cur = (i===curStep);
+    const cls = 'rchip'+(own?' own':'')+(cur?' cur':'');
+    const pass = Math.floor(i/6)+1;
+    chips += `<span class="${cls}"><span class="rm">${MOD_NAME[m]||m}</span><span class="rp">P${pass}</span></span>`;
+    if(i<route.length-1) chips += '<span class="rarr">→</span>';
+  });
+  const roleCount = route.filter(m=>m===t.module).length;
+  const note = lot
+    ? `当前在制 <b class="qv">${lot.id}</b>（${lot.product}）位于第 <b class="qv">${curStep+1}</b> 步 / 共 ${route.length} 步`
+    : `当前本机无在制批次 · 显示默认产品 <b class="qv">${product}</b> 工艺路线`;
+  return `
+    <div class="route-flow">${chips}</div>
+    <div class="route-note">
+      ${note}<br>
+      本设备属 <b class="qv">${MOD_NAME[t.module]||t.module}</b> 工序，在工艺路线中出现 <b class="qv">${roleCount}</b> 次（共 ${passes} 轮重入：LITHO→ETCH→DEP→CMP→IMPL→METRO）。
+    </div>`;
+}
+function renderRouteOnly(){
+  const c=document.getElementById('cardRoute'); const t=TOOLS.get(selectedId); if(!c||!t) return;
+  c.innerHTML='<h3>工艺路线（Process Route）</h3>'+renderRoute(t);
+}
+
+// ===================== 质量总览（Quality） =====================
+function cpkOf(g){ if(!g.sd) return null; const a=g.ucl-g.mean, b=g.mean-g.lcl; const d=Math.min(a,b); return d>0 ? d/(3*g.sd) : null; }
+function renderQuality(t){
+  const groups = spcSnapshot.groups.filter(g=>g.tool===t.id);
+  const alarms = spcSnapshot.alarms.filter(a=>a.tool===t.id);
+  const metro  = metroAll.filter(m=>m.tool===t.id);
+  const fdc    = fdcAll.filter(a=>a.tool===t.id);
+  const violated = groups.filter(g=>g.violated).length;
+  let pills = `<span class="qpill ${groups.length?'':'warn'}">SPC 组 ${groups.length}</span>`;
+  pills   += `<span class="qpill ${violated?'bad':'ok'}">判异 ${violated}</span>`;
+  pills   += `<span class="qpill ${metro.length?'':'warn'}">量测 ${metro.length}</span>`;
+  pills   += `<span class="qpill ${fdc.length?'bad':'ok'}">FDC 异常 ${fdc.length}</span>`;
+  let html = `<div class="qstat">${pills}</div>`;
+  if(violated){
+    html += `<div class="qlist">` + groups.filter(g=>g.violated).slice(0,4).map(g=>{
+      const cpk = cpkOf(g);
+      return `<div>⚠ <span class="qbad">${g.param}</span> μ=${g.mean} UCL=${g.ucl}/LCL=${g.lcl}${cpk!=null?(' · Cpk='+cpk.toFixed(2)):''}</div>`;
+    }).join('') + `</div>`;
+  }
+  if(metro.length){
+    html += `<div class="qlist" style="margin-top:6px">` + metro.slice(0,5).map(m=>{
+      const ok = m.result==='OK';
+      return `<div>${ok?'':'⚠ '}<span class="${ok?'qv':'qbad'}">${m.param}</span>=${m.value}${m.unit||''} (${m.result}) · ${m.lot}</div>`;
+    }).join('') + `</div>`;
+  }
+  if(!groups.length && !metro.length && !fdc.length){
+    html += '<div class="empty">本机暂无质量数据</div>';
+  }
+  return html;
+}
+function renderQualityOnly(){
+  const c=document.getElementById('cardQuality'); const t=TOOLS.get(selectedId); if(!c||!t) return;
+  c.innerHTML='<h3>质量总览（Quality）</h3>'+renderQuality(t);
+}
+
+// ===================== 晶圆图（Wafer Map） =====================
+function renderWafer(t){
+  if(!waferData || waferData.empty) return '<div class="empty">本机当前无在制批次晶圆</div>';
+  const w = waferData;
+  const c = w.counts || {};
+  const total = (w.wafers||[]).length;
+  let cells='';
+  for(let i=0;i<25;i++){
+    const wf = (w.wafers||[])[i] || { status:'WIP' };
+    cells += `<div class="wcell ${wf.status}" title="Slot ${i+1} · ${wf.status}">${i+1}</div>`;
+  }
+  const yieldPct = total ? Math.round(((c.DONE||0)/total)*100) : 0;
+  const legend = `<div class="wlegend">
+    <div class="lg"><span class="sw" style="background:#39d98a"></span>DONE ${c.DONE||0}</div>
+    <div class="lg"><span class="sw" style="background:#2b3a63"></span>WIP ${c.WIP||0}</div>
+    <div class="lg"><span class="sw" style="background:#f2c14e"></span>HOLD ${c.HOLD||0}</div>
+    <div class="lg"><span class="sw" style="background:#ff5c5c"></span>SCRAP ${c.SCRAP||0}</div>
+    <div class="lg">良率 <span class="yield-pill">${yieldPct}%</span></div>
+  </div>`;
+  return `<div class="wafer-wrap"><div class="wafer-grid">${cells}</div>${legend}</div>
+    <div class="struct-note">批次 <b class="qv">${w.lot}</b>（${w.product}）共 ${total} 片；逐片状态随加工推进，工艺损耗以 SCRAP 标记（绿=DONE 已完工 / 蓝=在制 / 黄=停线 / 红=报废）。</div>`;
+}
+function renderWaferOnly(){
+  const c=document.getElementById('cardWafer'); const t=TOOLS.get(selectedId); if(!c||!t) return;
+  c.innerHTML='<h3>晶圆图（Wafer Map）</h3>'+renderWafer(t);
+}
+// ===================== 当前配方（Recipe） =====================
+function renderRecipe(t){
+  if(!recipeData) return '<div class="empty">本机当前无加载配方</div>';
+  const r = recipeData;
+  const rows = Object.entries(r.params||{}).map(([k,v])=>`<div class="pk">${k}</div><div class="pv">${v.v} ${v.u||''}</div>`).join('');
+  return `<div class="recipe-name">${r.recipe}<span class="recipe-ver">v${r.version||1}</span></div>
+    <div class="recipe-params">${rows}</div>
+    <div class="struct-note">配方按 产品×工序 绑定；lot 投料时经 EAP 下发（recipeLoad 事件）。产品 <b class="qv">${r.product}</b> · 工序 <b class="qv">${r.module}</b>。</div>`;
+}
+function renderRecipeOnly(){
+  const c=document.getElementById('cardRecipe'); const t=TOOLS.get(selectedId); if(!c||!t) return;
+  c.innerHTML='<h3>当前配方（Recipe）</h3>'+renderRecipe(t);
+}
+// ===================== 腔室趋势 sparkline =====================
+function drawChamberSparklines(){
+  if(!chamberHist) return;
+  Object.keys(chamberHist).forEach((ch,i)=>{
+    const cv=document.getElementById('spark-'+i); if(!cv) return;
+    const data=(chamberHist[ch]||[]).map(r=>r.temp);
+    drawSpark(cv, data);
+  });
+}
+function drawSpark(cv, data){
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=cv.clientWidth||110, h=22; cv.width=w*dpr; cv.height=h*dpr;
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  if(!data||data.length<2) return;
+  const min=Math.min(...data), max=Math.max(...data); const pad=(max-min)*0.2||1;
+  const py=v=>h-2-((v-min-pad)/(max-min+2*pad))*(h-4);
+  const px=i=>2+i*((w-4)/(data.length-1));
+  ctx.strokeStyle='#4ea1ff'; ctx.lineWidth=1.2; ctx.beginPath();
+  data.forEach((v,i)=>{ const x=px(i),y=py(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.stroke();
+}
+
+// ===================== 折叠导航 =====================
+document.getElementById('collapseBtn').onclick = ()=> navPanel.classList.toggle('collapsed');
+document.getElementById('reopenBtn').onclick = ()=> navPanel.classList.remove('collapsed');
+
+// ===================== WebSocket 实时 =====================
+let ws=null, wsRetry=0;
+function connect(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}`);
+  ws.onopen=()=>{wsRetry=0;};
+  ws.onclose=()=>{setTimeout(connect, Math.min(5000,1000*(++wsRetry)));};
+  ws.onerror=()=>{};
+  ws.onmessage=ev=>{
+    let m; try{m=JSON.parse(ev.data);}catch(_){return;}
+    handleEvent(m);
+  };
+}
+function handleEvent(m){
+  if(m.type==='toolStatus' && m.id && TOOLS.has(m.id)){
+    TOOLS.get(m.id).status=m.status;
+    if(selectedId===m.id){ renderTwin(); loadChambers(); } else { renderNav(); }
+    if(m.status==='DOWN') maybeBanner();
+  }
+  else if(m.type==='toolMetric' && m.id && TOOLS.has(m.id)){
+    const t=TOOLS.get(m.id);
+    if(m.util!=null)t.util=m.util; if(m.wph!=null)t.wph=m.wph; if(m.wafers!=null)t.wafers=m.wafers;
+    if(selectedId===m.id) renderTwin(); else renderNav();
+  }
+  else if(m.type==='spcAlarm' && m.tool){
+    alarms.set(m.tool,{param:m.param,value:m.value,rules:Array.isArray(m.rules)?m.rules.join(','):m.rules,ts:Date.now()});
+    updateBanner(); loadSpc();
+  }
+  else if(m.type==='toolRelease' && m.id && alarms.has(m.id)){
+    alarms.delete(m.id); updateBanner();
+  }
+}
+function maybeBanner(){
+  // 仅当报警横幅数据存在时刷新
+  if(alarms.size>0) updateBanner();
+}
+function updateBanner(){
+  const items=[...alarms.entries()].slice(0,6).map(([id,a])=>`${id} ${a.param}=${a.value}[${a.rules}]`);
+  document.getElementById('banner-items').textContent = items.join(' · ');
+  document.getElementById('banner-txt').textContent = `在制报警 ${alarms.size} 台`;
+  if(alarms.size>0) banner.classList.add('show'); else banner.classList.remove('show');
+}
+
+// ===================== 启动 =====================
+(async function init(){
+  await Promise.all([loadTools(), loadE10(), loadSpc(), loadWip(), loadMeta()]);
+  // 默认选中一台设备（优先第一台 RUN，否则第一台）
+  const firstRun = [...TOOLS.values()].find(t=>t.status==='RUN');
+  selectTool((firstRun||[...TOOLS.values()][0]||{}).id);
+  connect();
+  setInterval(()=>{ loadTools(); loadE10(); loadSpc(); loadWip(); loadMetrology(); loadFdc(); loadWafers(); loadRecipe(); }, 5000);
+  setInterval(loadChambers, 2000);   // 逐腔室真实遥测：高频刷选中的那一台
+  setInterval(loadChamberHist, 10000); // 腔室时序历史：供趋势 sparkline
+})();
+
+// 面板显隐开关
+(function(){
+  const btn=document.getElementById('hud-toggle');
+  if(!btn) return;
+  function toggle(){ const h=document.body.classList.toggle('hud-hidden'); btn.textContent=h?'👁 显示面板':'🙈 隐藏面板'; }
+  btn.addEventListener('click',toggle);
+  window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) toggle(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "fab-mes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "自研轻量 EAP/MES：设备状态机 + WebSocket 事件流 + REST + SQLite（数字孪生真实数据源）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

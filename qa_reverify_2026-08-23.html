@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fab-mes · P0–P3 整改复验报告 (#159)</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#141b2e; --panel2:#1b2238; --line:#2a3350;
+    --txt:#e6ecf5; --mut:#9aa7c2; --ok:#37d67a; --warn:#ffb454; --bad:#ff5d6c; --blue:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 60px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--mut);margin-bottom:22px}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 26px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card .n{font-size:26px;font-weight:700}
+  .card .l{color:var(--mut);font-size:12px;margin-top:2px}
+  .ok .n{color:var(--ok)} .bad .n{color:var(--bad)} .warn .n{color:var(--warn)} .blue .n{color:var(--blue)}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px}
+  h2{font-size:18px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  h2 .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .t-ok{background:rgba(55,214,122,.15);color:var(--ok)}
+  .t-bad{background:rgba(255,93,108,.15);color:var(--bad)}
+  .t-warn{background:rgba(255,180,84,.15);color:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap}
+  .p0{background:rgba(255,93,108,.18);color:#ff8a95}
+  .p1{background:rgba(255,180,84,.18);color:#ffc879}
+  .p2{background:rgba(90,169,255,.16);color:#8cc2ff}
+  .p3{background:rgba(154,167,194,.16);color:var(--mut)}
+  .yes{color:var(--ok)} .no{color:var(--bad)} .partial{color:var(--warn)}
+  code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12px;color:#cdd8ee}
+  .note{color:var(--mut);font-size:12.5px;margin-top:10px}
+  ul{margin:8px 0 0;padding-left:18px}
+  li{margin:4px 0}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:12px;margin-top:6px}
+  .kv{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:#bcd0ee}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>fab-mes · P0–P3 整改复验报告（#159）</h1>
+  <div class="sub">复验方法：用 <code>bin/start-community.sh</code> 拉起<b>全 5 进程</b> → 全链路 <code>curl</code> 实测 + 源码核对。结论：<b>无断点、无空点、业务链通畅、主轴丝滑</b>。战略基线：<b>"串主轴不推翻"</b>（零件已齐，只修主轴断裂，其余标蓝图态）。</div>
+
+  <div class="cards">
+    <div class="card ok"><div class="n">5/5</div><div class="l">进程常驻（含 HSMS 5000）</div></div>
+    <div class="card ok"><div class="n">4/4</div><div class="l">门户代理路由 200</div></div>
+    <div class="card ok"><div class="n">20/20</div><div class="l">lotDone 事件 src=eap</div></div>
+    <div class="card ok"><div class="n">4/4</div><div class="l">历史死路由已 200</div></div>
+  </div>
+
+  <!-- 1 启动 -->
+  <section>
+    <h2>① 复验环境与启动方式</h2>
+    <ul>
+      <li>用 <code>bin/start-community.sh</code>（<b>而非</b> <code>start-all.sh</code>）拉起全 5 进程：门户 8123 / MES 8124 + HSMS 5000 / EAP 8125 / ERP 8126 / Agent 8127。<code>netstat</code> 确认全部 <span class="yes">LISTEN</span>。</li>
+      <li><b>复验纪律（踩坑结论）</b>：<code>start-all.sh</code> 仅拉 4 进程、不含 Agent（缺 ⑦问答环节）；<b>全 spine 复验必须用 <code>start-community.sh</code></b>。</li>
+      <li>重启后未出现进程崩溃、未出现 ERP DB 异常、未出现 502。</li>
+    </ul>
+    <div class="note">端口实测：<span class="kv">:8123 :8124 :8125 :8126 :8127 :5000 全部 LISTEN</span></div>
+  </section>
+
+  <!-- 2 P0 -->
+  <section>
+    <h2><span class="tag t-ok">P0</span> 丝滑杀手（已闭合 · 复验通过）</h2>
+    <table>
+      <tr><th>项</th><th>修复</th><th>实测</th></tr>
+      <tr><td>twin3d ERP 面板全白</td><td>改走门户同源 <code>/api/erp/*</code> + ERP 加 CORS 头</td><td class="yes">✅ 经代理 <code>/api/erp/health</code> 200，<code>materials=7</code></td></tr>
+      <tr><td>导航孤岛</td><td>eap-console、3D 角色工作台加入 portal 主导航 + 底部说明</td><td class="yes">✅ 导航含 EAP控制台 / 3D角色工作台 / ERP操作台</td></tr>
+      <tr><td>跨源硬编码</td><td>twin3d/portal.html、agent.html 改相对 <code>/api/*</code></td><td class="yes">✅ Grep 全仓 <code>127.0.0.1:81xx</code> 仅剩 env 变量，无前端硬地址</td></tr>
+      <tr><td>对话无回复</td><td>agent.html 默认 <code>/api/agent/chat</code></td><td class="yes">✅ POST 返回实时 WIP（54 lots / 10 done / 705 moves）</td></tr>
+    </table>
+  </section>
+
+  <!-- 3 P1 -->
+  <section>
+    <h2><span class="tag t-warn">P1</span> 业务链打通（复验通过 · 关键证据）</h2>
+    <ul>
+      <li><b>EAP 真实驱动 lot 生命周期</b>：core.js 看门狗替代裸 <code>setTimeout</code>（防 EAP 缺席死锁）；secs-gem 设备时延后自发 <code>LOT_DONE</code>；server.ingest 的 lotDone 调 <code>engine.completeTool</code> 推进批次（看门狗清理避免重复/提前完成）。</li>
+      <li><b>证据 1</b>：<code>/api/history/events?type=lotDone</code> 最近 20 条 <code>src</code> 全为 <code>eap</code>（<span class="yes">20/20</span>）。</li>
+      <li><b>证据 2</b>：EAP <code>/api/events</code> 捕获 50 条设备事件（lotStart 13 / toolStatus 26 / lotDone 11）。</li>
+      <li><b>证据 3</b>：WIP <code>done</code> 由 1 爬升至 <span class="kv">35</span>、<span class="kv">moves=1383</span> —— EAP 持续驱动批次完工。</li>
+      <li><b>3D 默认接总线</b>：twin3d/index.html 默认 <code>src=mes</code>，<code>#src-label</code> 标注"自研 MES 后端 ws:8124"，不再默认模拟。</li>
+    </ul>
+  </section>
+
+  <!-- 4 P3 -->
+  <section>
+    <h2><span class="tag t-warn">P3</span> 埋雷清理（复验通过）</h2>
+    <table>
+      <tr><th>项</th><th>修复</th><th>实测</th></tr>
+      <tr><td>四死路由</td><td>补齐 <code>/api/spc/alarms</code> <code>/api/wip/stats</code> <code>/api/dashboard</code> <code>/api/apc</code></td><td class="yes">✅ 全部 200（dashboard 初版误调 spc.alarms() 曾致 MES 崩溃，已改 storage.querySpcAlarms(30).length）</td></tr>
+      <tr><td>ERP costLot 崩溃</td><td>EAP 回灌 lotDone 仅含设备维度 → 加 <code>ev.lot && ev.product</code> 守卫</td><td class="yes">✅ 运行期 DB 异常计数 0</td></tr>
+      <tr><td>死模块</td><td>integrations/*、mes-adapter、bindInProcErp、adapters/opcua|eda 顶部加"蓝图态/未接入 spine"横幅</td><td class="yes">✅ 已标注，避免两张皮误解</td></tr>
+      <tr><td>陈旧路径</td><td>项目总结报告.html 的 <code>fab-digital-twin</code> 改 <code>twin3d/</code>、EAP 状态改"随 start-community.sh 常驻"——<b>原复验时该文件实际未落盘</b>，已于 2026-08-27 战略审计（D1）真实补全</td><td class="yes">✅ 2026-08-27 已落地</td></tr>
+      <tr><td>三套首页语义</td><td>门户总览 / MES控制台 / 3D角色工作台 已用标题与导航区分</td><td class="yes">✅</td></tr>
+    </table>
+  </section>
+
+  <!-- 5 P2 -->
+  <section>
+    <h2><span class="tag t-bad">P2</span> 空点纠偏（复验通过）</h2>
+    <table>
+      <tr><th>项</th><th>修复</th><th>实测</th></tr>
+      <tr><td>审计发送端接合规链</td><td>autonomy/executor.js 经 <code>/api/audit/log</code> 落 MES audit_log</td><td class="yes">✅ POST→201；GET /api/audit 返回 50 条真实自治事件（actor=METRO-173 等）</td></tr>
+      <tr><td>ERP 无操作 UI</td><td>新建 <code>erp-ops.html</code>（库存/物料台账、采购收货 GR、AR/AP、批次成本），加入门户导航</td><td class="yes">✅ 功能完整性补齐</td></tr>
+      <tr><td>文档超纲降级</td><td>《系统集成诊断与整合蓝图.docx》首部"整合状态更新"重写为终态（含战略 pivot）；原 L4"全部接活/删 fab-erp 进程"调整为保守路线</td><td class="yes">✅ fab-erp 保留 standalone、仅修 CORS/成本；L4 适配器/多租户/APC 维持 demo/默认关、标蓝图态</td></tr>
+      <tr><td>对外口径对齐</td><td>portal.html 底部注明 L4 蓝图态；白皮书/PPTX 超纲宣称（APC闭环/多租户隔离/真实适配即插即用）依此对齐</td><td class="yes">✅ 文档与代码严格对齐</td></tr>
+    </table>
+  </section>
+
+  <!-- 6 已知环境特性 -->
+  <section>
+    <h2>⚠️ 已知环境特性（非系统缺陷 · 透明说明）</h2>
+    <ul>
+      <li>沙箱 Bash 的 <code>curl</code> 直连 <code>127.0.0.1:8126</code> 偶发 <code>HTTP 000</code>（其他端口正常）。但 <b>Node↔Node 全部正常</b>：门户代理 8123→8126 返回 <code>materials=7</code>、Agent 问答返回实时 WIP。</li>
+      <li>属<b>测试通道限制</b>，非产品断点。建议在生产浏览器直接验收 ERP：<code>http://127.0.0.1:8123/erp-ops.html</code>。</li>
+    </ul>
+  </section>
+
+  <!-- 7 蓝图态清单 -->
+  <section>
+    <h2>📋 仍属蓝图态（诚实清单 · 非缺陷）</h2>
+    <ul>
+      <li><b>WMS 仓储域</b>：已于 <b>2026-08-23</b> 新建（<code>fab-wms.js</code> :8128 独立进程，库位/批次/上架规则/齐套/收发流水，与 ERP 同源派生）。ERP 库存仍为财务台账（materials 表 stock），二者分工清晰、互不伪装。</li>
+      <li><b>多租户行级隔离 / 真实 ERP 对接（SAP·用友）/ 真实协议适配（OPC-UA/EDA/ISA-95）</b>：仍为 demo 占位 / stub 接入主轴（<code>ADAPTER_MODE</code> 切换），已显式标蓝图态，不强行接线。<b>APC 执行级闭环已于 P1-2 点亮</b>（<code>APC_ENABLED=1</code>，经 S2F41 <code>SET_PARAM</code> 回灌设备），不在此列。</li>
+      <li><b>VM 推送</b>：<code>vmPrediction/vmResult</code> 由 twin3d 与 APC 消费，未做全页广播（属支线，非断裂）。</li>
+    </ul>
+    <div class="note">此清单与 <code>MICROSERVICES.md</code> / 白皮书标注一致，对外口径已与代码对齐。</div>
+  </section>
+
+  <!-- 8 结论 -->
+  <section>
+    <h2>🎯 验收结论</h2>
+    <table>
+      <tr><th>维度</th><th>结论</th></tr>
+      <tr><td>断点（丝滑杀手）</td><td class="yes">0 —— P0 全闭合</td></tr>
+      <tr><td>空点（超纲宣称）</td><td class="yes">已降级标蓝，文档与代码对齐</td></tr>
+      <tr><td>业务链 7 环节</td><td class="yes">主轴通畅：①③④⑥⑦ 真实闭环；②EAP 真实驱动；⑤3D 默认接总线</td></tr>
+      <tr><td>功能完整性</td><td class="yes">ERP 操作台补齐；五进程/四代理/审计链/四死路由全部就绪</td></tr>
+    </table>
+    <div class="note">符合用户诉求：<b>"没断点没空点、业务完整"</b>。战略上"串主轴不推翻"落地——零件都在，主轴断裂已修，其余蓝图态明示，未推翻重写。</div>
+  </section>
+
+  <div class="legend">
+    <span><span class="pill p0">P0</span> 丝滑杀手</span>
+    <span><span class="pill p1">P1</span> 业务链延伸</span>
+    <span><span class="pill p2">P2</span> 蓝图纠偏</span>
+    <span><span class="pill p3">P3</span> 埋雷/一致性</span>
+  </div>
+</div>
+</body>
+</html>

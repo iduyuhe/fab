@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>登录 · 晶圆厂AI原生的智能制造平台</title>
+<style>
+  :root{ --bg:#0a0f24; --card:#0e1530; --line:#25304f; --blue:#7fd1ff; --txt:#cdd6f0; }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 700px at 70% -10%,#16224a 0%,var(--bg) 60%);font:15px/1.5 system-ui,'Segoe UI','Microsoft YaHei',sans-serif;color:var(--txt)}
+  .card{width:380px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--blue);box-shadow:0 0 12px var(--blue)}
+  h1{font-size:17px;margin:0;color:#fff;font-weight:700}
+  .sub{color:#8a96bf;font-size:12.5px;margin:4px 0 22px}
+  label{display:block;font-size:12.5px;color:#9fb0d8;margin:14px 0 6px}
+  input{width:100%;padding:11px 12px;background:#070c1e;border:1px solid var(--line);border-radius:9px;color:#eaf0ff;font-size:14px;outline:none}
+  input:focus{border-color:var(--blue)}
+  button{width:100%;margin-top:22px;padding:11px;border:0;border-radius:9px;background:linear-gradient(180deg,#2f7bff,#1f5fe0);color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .err{margin-top:14px;color:#ff8d8d;font-size:13px;min-height:18px}
+  .hint{margin-top:16px;color:#6f7da6;font-size:12px;line-height:1.6}
+  .hint code{background:#070c1e;padding:1px 6px;border-radius:5px;color:#9fb0d8}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand"><span class="dot"></span><h1>晶圆厂AI原生的智能制造平台</h1></div>
+    <div class="sub">Wafer Fab AI-Native Smart Manufacturing Platform · 安全访问门户</div>
+    <form id="f" autocomplete="off">
+      <label for="u">用户名</label>
+      <input id="u" name="user" placeholder="admin" autofocus />
+      <label for="p">密码</label>
+      <input id="p" name="pass" type="password" placeholder="••••••••" />
+      <button id="b" type="submit">登录</button>
+      <div class="err" id="e"></div>
+    </form>
+    <div class="hint">
+      默认管理员凭据 <code>admin / admin123</code><br/>
+      生产部署请设置环境变量 <code>FAB_AUTH_USER</code> / <code>FAB_AUTH_PASS</code> / <code>FAB_AUTH_SECRET</code>。
+    </div>
+  </div>
+<script>
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var next = qs.get('next') || '/';
+  var f = document.getElementById('f'), e = document.getElementById('e'), b = document.getElementById('b');
+  f.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    e.textContent=''; b.disabled=true;
+    fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:document.getElementById('u').value,pass:document.getElementById('p').value})})
+      .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j}; }); })
+      .then(function(x){
+        if(x.ok && x.j.ok){ location.replace(next); }
+        else { e.textContent='用户名或密码错误'; b.disabled=false; }
+      })
+      .catch(function(){ e.textContent='网络异常，请重试'; b.disabled=false; });
+  });
+})();
+</script>
+</body>
+</html>

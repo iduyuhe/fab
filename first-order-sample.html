@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第一单 · 平台独立跑通履约闭环</title>
+<style>
+body{font-family:system-ui,'Microsoft YaHei',sans-serif;background:#0d1117;color:#c9d1d9;margin:0;padding:32px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:24px;color:#e6edf3;border-left:4px solid #2f81f7;padding-left:12px;margin-bottom:6px}
+.sub{color:#8b949e;font-size:14px;line-height:1.8;margin:8px 0 24px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px}
+.card h2{font-size:15px;color:#58a6ff;margin:0 0 10px}
+.card p{font-size:13px;color:#8b949e;line-height:1.7;margin:0 0 14px}
+.btn{display:inline-block;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer}
+.btn:hover{background:#388bfd}
+.btn:disabled{background:#30363d;color:#8b949e;cursor:not-allowed}
+.btn.ghost{background:#21262d;border:1px solid #30363d}
+.kv{display:flex;gap:18px;margin-top:10px;font-size:13px}
+.kv div{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 14px;flex:1}
+.kv b{display:block;color:#7ee787;font-size:16px;margin-top:4px}
+#running{display:none;color:#d29922;font-size:13px;margin-top:12px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #d29922;border-top-color:transparent;border-radius:50%;animation:s 1s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes s{to{transform:rotate(360deg)}}
+#result{margin-top:12px;font-size:14px}
+.ok{color:#3fb950}.bad{color:#f85149}
+.note{margin-top:28px;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:18px 20px}
+.note h3{font-size:14px;color:#58a6ff;margin:0 0 8px}
+.note p{font-size:13px;color:#8b949e;line-height:1.9;margin:0}
+.note b{color:#e6edf3}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>第一单 · 平台独立跑通履约闭环</h1>
+  <p class="sub">这是 <b>晶圆厂 AI 原生的智能制造平台</b> 跑通一单完整履约的标杆样品：从接单（SO）→ 自动投料 → 主轴流转（量测 / SPC / FDC / APC / VM / APS 五大引擎实时参与）→ 发运 → 交付（CLOSED）→ 应收（AR）。全程由平台自主驱动，<b>不依赖、不绑定任何第三方商业套装软件</b>。</p>
+
+  <div class="cards">
+    <div class="card">
+      <h2>▶ 一键复现第一单</h2>
+      <p>点击后平台会在后台重新跑通一单完整履约，并自动生成新的交付凭证。约需 1–2 分钟，可实时看到进度。</p>
+      <button class="btn" id="runBtn" onclick="run()">▶ 开始复现</button>
+      <div id="running"><span class="spin"></span>复现任务运行中，平台正在自主跑通接单 → 交付 → 回款…</div>
+      <div id="result"></div>
+    </div>
+    <div class="card">
+      <h2>📄 交付凭证</h2>
+      <p>查看最近一次「第一单」的完整交付凭证：订单、履约状态机、数字主线事件、引擎参与证据、财务闭环与完整性声明。</p>
+      <button class="btn ghost" onclick="location.href='/first-order-delivery.html'">打开交付凭证</button>
+      <div class="kv">
+        <div>最近销售订单<b id="lastSo">—</b></div>
+        <div>应收金额<b id="lastAr">—</b></div>
+        <div>数字主线事件<b id="lastEv">—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>这一单证明了什么</h3>
+    <p>从接单到回款，全程由平台自己驱动，没有一个传统套装参与。事件总线实时捕获本单的每一条数字主线，就是「数字主线自动编织」的证据。该样品由 <b>first-order.mjs</b> 可复现生成，随时可一键重跑验证。</p>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+async function loadStatus(){ try{ const r=await fetch('/api/sample/first-order/status'); const j=await r.json(); render(j); return j; }catch(e){ return null; } }
+function render(j){
+  const last = (j&&j.last)||{};
+  $('#lastSo').textContent = last.soId || '—';
+  $('#lastAr').textContent = (last.ar&&last.ar.amount)?('¥'+last.ar.amount):'—';
+  $('#lastEv').textContent = (last.events!=null)?last.events:'—';
+  if(j&&j.running){ setRunning(true); }
+  else {
+    setRunning(false);
+    if(last.done){ $('#result').innerHTML='✅ 闭环达成 · 交付凭证已更新'; $('#result').className='ok'; }
+    else if(last.crashed){ $('#result').innerHTML='⚠️ 本次复现中断'; $('#result').className='bad'; }
+    else { $('#result').innerHTML='尚未运行 · 可随时一键复现'; $('#result').className=''; }
+  }
+}
+function setRunning(b){ $('#runBtn').disabled=b; $('#runBtn').textContent=b?'复现中…':'▶ 开始复现'; $('#running').style.display=b?'block':'none'; }
+async function run(){
+  const r=await fetch('/api/sample/first-order/run',{method:'POST'}); const j=await r.json();
+  if(!j.ok){ alert(j.msg||j.error||'启动失败'); return; }
+  setRunning(true); poll();
+}
+function poll(){ const t=setInterval(async()=>{ const j=await loadStatus(); if(!(j&&j.running)){ clearInterval(t); setRunning(false);} },2500); }
+window.addEventListener('load', loadStatus);
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# 数智晶圆厂平台 — L1 社区级编排
+# 单容器多进程：MES(8124) + 门户(8123) + ERP(8126)
+# WS 唯一事件源在 MES，门户/ERP 经 MES_WS/MES_HTTP 订阅
+services:
+  fab-mes:
+    build: .
+    image: fab-mes:community
+    container_name: fab-mes-community
+    ports:
+      - "${PORTAL_PORT:-8123}:8123"
+      - "${PORT:-8124}:8124"
+      - "${ERP_PORT:-8126}:8126"
+    environment:
+      # MES 主进程
+      PORT: "${PORT:-8124}"
+      # 门户进程
+      PORTAL_PORT: "${PORTAL_PORT:-8123}"
+      # ERP 进程
+      ERP_PORT: "${ERP_PORT:-8126}"
+      # 消费方指向 MES（容器内回环）
+      MES_WS: "${MES_WS:-ws://127.0.0.1:8124}"
+      MES_HTTP: "${MES_HTTP:-http://127.0.0.1:8124}"
+    restart: unless-stopped

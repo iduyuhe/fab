@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NPI 研发流 · 进度墙</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#141b2e; --panel2:#18213a; --line:#25304f;
+    --txt:#e6edf6; --muted:#8a97b5; --accent:#7fd1ff;
+    --ok:#3ecf8e; --warn:#f4b740; --bad:#ff6b6b; --blue:#5aa9ff; --purple:#b18cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 system-ui,'Segoe UI','Microsoft YaHei',sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:18px 20px 60px}
+  h1{font-size:20px;margin:6px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;border:1px solid var(--line);color:var(--muted)}
+  .pill b{color:var(--txt)}
+  .refresh{margin-left:auto;font-size:12px;color:var(--muted)}
+  .err{display:none;background:#3a1620;border:1px solid #6b2233;color:#ffb3c0;padding:8px 12px;border-radius:8px;margin-bottom:12px}
+
+  /* 投放工具条 */
+  .launch{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .launch .t{font-size:13px;color:var(--muted);margin-right:4px}
+  .launch select,.launch button{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px}
+  .launch button{cursor:pointer;background:var(--blue);color:#051327;font-weight:700;border:none}
+  .launch button:hover{filter:brightness(1.1)}
+  .launch .hint{font-size:12px;color:var(--muted)}
+  .launch .ok{color:var(--ok)} .launch .fail{color:var(--bad)}
+
+  /* 五段流水线 */
+  .flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:6px 0 14px}
+  .stage{flex:1 0 170px;min-width:170px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 12px 14px;position:relative;display:flex;flex-direction:column}
+  .stage .lab{font-size:13px;color:var(--muted)}
+  .stage .val{font-size:30px;font-weight:700;line-height:1.15;margin:4px 0 2px}
+  .stage .unit{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .stage .backlog{margin-top:auto;font-size:12px;color:var(--muted)}
+  .stage .backlog b{color:var(--txt)}
+  .arrow{flex:0 0 22px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px}
+  .stage.bottleneck{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset}
+  .stage.busy{border-color:var(--warn)}
+  .stage.idle{border-style:dashed;opacity:.72}
+  .tag{position:absolute;top:-9px;left:10px;font-size:11px;padding:1px 8px;border-radius:10px;font-weight:700}
+  .tag.bad{background:var(--bad);color:#1a0b0e}
+  .tag.warn{background:var(--warn);color:#241a05}
+  .tag.ok{background:var(--ok);color:#04231a}
+  .tag.idle{background:#2a3350;color:#9db4ff}
+
+  .bottleneck-note{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--bad);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13px}
+  .bottleneck-note b{color:var(--bad)}
+
+  .grid{display:grid;grid-template-columns:1fr 320px;gap:18px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card h2{font-size:15px;margin:0 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .st{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+  .st.DESIGN{background:#2a3350;color:#9db4ff}
+  .st.LAYOUT{background:#33284f;color:#b18cff}
+  .st.TAPEOUT{background:#3a2f12;color:#f4b740}
+  .st.QUAL{background:#13314a;color:#7fd1ff}
+  .st.PROD{background:#16331f;color:#3ecf8e}
+  .st.READY{background:#16331f;color:#3ecf8e}
+  .st.HOLD{background:#3a1620;color:#ffb3c0}
+  .st.DONE{background:#13331f;color:#7fe0b0}
+  .st.RUN{background:#13314a;color:#7fd1ff}
+  .st.ACTIVE{background:#13314a;color:#7fd1ff}
+  .age{color:var(--muted)}
+  .side .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .side .row b{font-size:15px}
+  .side .kpi-ok{color:var(--ok)} .side .kpi-warn{color:var(--warn)} .side .kpi-bad{color:var(--bad)}
+
+  /* 下钻弹层 */
+  .stage{cursor:pointer;transition:transform .12s ease, box-shadow .12s ease}
+  .stage:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .stage .dz{margin-top:6px;font-size:11px;color:var(--accent);opacity:0;transition:opacity .12s}
+  .stage:hover .dz{opacity:.92}
+  .drill-mask{position:fixed;inset:0;background:rgba(5,8,15,.66);display:none;align-items:flex-start;justify-content:center;padding:42px 16px;z-index:60;backdrop-filter:blur(2px)}
+  .drill-mask.show{display:flex}
+  .drill{width:min(980px,100%);max-height:84vh;background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .drill header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .drill header h3{margin:0;font-size:16px}
+  .drill header .cnt{font-size:12px;color:var(--muted)}
+  .drill header .x{margin-left:auto;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;background:none;border:none;padding:0 4px}
+  .drill header .x:hover{color:var(--txt)}
+  .drill .body{overflow:auto;padding:4px 16px 16px}
+  .drill .hint{color:var(--muted);font-size:12px;padding:8px 0 4px}
+  .drill table{margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NPI 研发流 · 进度墙</h1>
+  <div class="sub">从「设计」到「量产移交」一条数字主线，一屏看全每个研发项目走到哪、卡在哪。数据每 5 秒自动刷新，可点下方按钮真实投放工程批 / 流片批。</div>
+
+  <div class="bar">
+    <span class="pill">设计档案 <b id="k-design">–</b></span>
+    <span class="pill">光罩 <b id="k-mask">–</b></span>
+    <span class="pill">工程批 <b id="k-eng">–</b></span>
+    <span class="pill">流片批 <b id="k-tape">–</b></span>
+    <span class="pill">量产移交 <b id="k-vol">–</b></span>
+    <span class="refresh" id="updated">加载中…</span>
+  </div>
+
+  <div class="launch">
+    <span class="t">投放 NPI 批次：</span>
+    <select id="launch-design"></select>
+    <select id="launch-type">
+      <option value="engineering">工程批 (engineering)</option>
+      <option value="tapeout">流片批 (tapeout)</option>
+      <option value="volume">量产批 (volume)</option>
+    </select>
+    <button id="launch-btn">投放</button>
+    <span class="hint" id="launch-hint">真实调用 /api/npi/launch，流程会即时长出新批次</span>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <div class="bottleneck-note" id="bottleneck-note">正在分析卡点…</div>
+
+  <div class="flow" id="flow"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>研发项目明细（设计档案）</h2>
+      <table>
+        <thead><tr><th>设计</th><th>客户</th><th>产品</th><th>光罩</th><th>状态</th><th>最近投放</th></tr></thead>
+        <tbody id="design-body"><tr><td colspan="6" style="color:var(--muted)">加载中…</td></tr></tbody>
+      </table>
+      <h2 style="margin-top:18px">NPI 批次流（工程 / 流片 / 量产）</h2>
+      <table>
+        <thead><tr><th>批次</th><th>类型</th><th>产品</th><th>状态</th><th class="num">步数</th><th>龄期</th></tr></thead>
+        <tbody id="lot-body"><tr><td colspan="6" style="color:var(--muted)">暂无 NPI 批次，可在上方投放</td></tr></tbody>
+      </table>
+    </div>
+    <div class="card side">
+      <h2>研发侧支撑</h2>
+      <div class="row"><span>设计档案总数</span><b id="s-design">–</b></div>
+      <div class="row"><span>已就绪光罩</span><b id="s-mask" class="kpi-ok">–</b></div>
+      <div class="row"><span>工程批在制</span><b id="s-eng" class="kpi-warn">–</b></div>
+      <div class="row"><span>流片批总数</span><b id="s-tape" class="kpi-warn">–</b></div>
+      <div class="row"><span>已移交量产 (带设计来源)</span><b id="s-vol" class="kpi-ok">–</b></div>
+      <div class="row"><span>待投放工程批的设计数</span><b id="s-pending" class="kpi-bad">–</b></div>
+    </div>
+  </div>
+</div>
+
+<div class="drill-mask" id="drill">
+  <div class="drill">
+    <header><h3 id="drill-title">—</h3><span class="cnt" id="drill-cnt"></span><button class="x" id="drill-x" title="关闭">×</button></header>
+    <div class="body"><div class="hint" id="drill-hint"></div>
+      <table><thead id="drill-thead"></thead><tbody id="drill-body"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmtH = ms => { const h = ms/36e5; return h < 1 ? Math.round(ms/6e4)+' 分' : (h<48? h.toFixed(1)+' 时' : (h/24).toFixed(1)+' 天'); };
+
+async function getJSON(url){
+  const c = new AbortController(); const t = setTimeout(()=>c.abort(), 4500);
+  try { const r = await fetch(url, {signal:c.signal}); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+async function postJSON(url, body){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  return await r.json();
+}
+
+let last = null;
+async function refresh(){
+  try{
+    const [designs, masks, npi] = await Promise.all([
+      getJSON('/api/designs'), getJSON('/api/masks'), getJSON('/api/npi/lots')
+    ]);
+    last = { designs, masks, npi };
+    render(last);
+    $('err').style.display='none';
+    $('updated').textContent = '更新于 '+new Date().toLocaleTimeString('zh-CN');
+  }catch(e){
+    $('err').style.display='block';
+    $('err').textContent = '数据获取失败：'+e.message+'（可能门户代理偶发无响应，稍后自动重试）';
+  }
+}
+
+function render(d){
+  const designs = d.designs.designs||[];
+  const masks = d.masks.masks||[];
+  const lots = d.npi.lots||[];
+
+  const eng = lots.filter(l=>l.product_type==='engineering');
+  const tape = lots.filter(l=>l.product_type==='tapeout');
+  const vol = lots.filter(l=>l.product_type==='volume' && l.design_id);
+  const engActive = eng.filter(l=>!['DONE','CLOSED'].includes(l.status)).length;
+  const masksByDesign = masks.filter(m=>m.design_id).map(m=>m.design_id);
+  const designsWithMask = designs.filter(x=>masksByDesign.includes(x.id)).length;
+  const pendingDesigns = designs.filter(x=>!masksByDesign.includes(x.id)).length;
+
+  // 顶部 pill
+  $('k-design').textContent = designs.length;
+  $('k-mask').textContent = masks.length;
+  $('k-eng').textContent = eng.length;
+  $('k-tape').textContent = tape.length;
+  $('k-vol').textContent = vol.length;
+
+  // 侧栏
+  $('s-design').textContent = designs.length;
+  $('s-mask').textContent = masks.length;
+  $('s-eng').textContent = engActive + ' / ' + eng.length;
+  $('s-tape').textContent = tape.length;
+  $('s-vol').textContent = vol.length;
+  $('s-pending').textContent = pendingDesigns;
+
+  // 五段流水线
+  const stages = [
+    {key:'design', lab:'设计档案', unit:'项', val:designs.length, bl:pendingDesigns, blLab:'待配光罩', idle:designs.length===0},
+    {key:'mask',   lab:'光罩就绪', unit:'块', val:masks.length, bl:null, blLab:'', idle:false},
+    {key:'eng',    lab:'工程批',   unit:'批', val:eng.length, bl:engActive, blLab:'在制', idle:eng.length===0},
+    {key:'tape',   lab:'流片批',   unit:'批', val:tape.length, bl:tape.length, blLab:'在制', idle:tape.length===0},
+    {key:'vol',    lab:'量产移交', unit:'批', val:vol.length, bl:null, blLab:'', idle:vol.length===0},
+  ];
+
+  // 卡点：设计有了但工程批为 0 → 待投放；工程批有了但流片为 0 → 待流片
+  let bottleneckKey = null, busy = new Set();
+  if(designs.length>0 && eng.length===0){ bottleneckKey='eng'; }
+  else if(eng.length>0 && tape.length===0){ bottleneckKey='tape'; }
+  else if(tape.length>0){ busy.add('tape'); }
+  if(engActive>0) busy.add('eng');
+
+  const arrow = '<div class="arrow">→</div>';
+  $('flow').innerHTML = stages.map(s=>{
+    let cls='', tag='';
+    if(s.idle){ cls='idle'; tag='<span class="tag idle">空</span>'; }
+    if(s.key===bottleneckKey){ cls='bottleneck'; tag='<span class="tag bad">待投放</span>'; }
+    else if(busy.has(s.key)){ cls='busy'; tag='<span class="tag warn">进行中</span>'; }
+    const blHtml = s.bl!=null ? `<div class="backlog">${s.blLab} <b>${s.bl}</b></div>` : `<div class="backlog">累计计数</div>`;
+    return `<div class="stage ${cls}" data-key="${s.key}">${tag}<div class="lab">${s.lab}</div><div class="val">${s.val}</div><div class="unit">${s.unit}</div>${blHtml}<div class="dz">点击看明细 ›</div></div>`;
+  }).join(arrow);
+
+  // 卡点说明
+  const note = $('bottleneck-note');
+  if(bottleneckKey==='eng'){
+    note.innerHTML = `⚠️ <b>当前卡点：工程批</b> —— 已有 <b>${designs.length}</b> 个设计档案，但还没有投放任何工程批。点上方「投放 NPI 批次」即可让研发流流动起来。`;
+  }else if(bottleneckKey==='tape'){
+    note.innerHTML = `⚠️ <b>当前卡点：流片批</b> —— 已有 <b>${eng.length}</b> 个工程批，但还未投放流片批（tapeout）。`;
+  }else{
+    note.style.borderLeftColor='var(--ok)';
+    note.innerHTML = `✅ 研发流各段均有数据，设计→光罩→工程批→流片→量产 主线顺畅推进中。`;
+  }
+
+  // 设计档案明细
+  const drows = designs.slice(0,20).map(x=>{
+    const hasMask = masksByDesign.includes(x.id);
+    const recent = lots.find(l=>l.design_id===x.id);
+    return `<tr>
+      <td>${x.id}</td><td>${x.customer_id||'–'}</td><td>${x.name||x.product||'–'}</td>
+      <td>${hasMask?'<span class="st READY">已配</span>':'<span style="color:var(--muted)">未配</span>'}</td>
+      <td><span class="st ${x.status}">${x.status}</span></td>
+      <td>${recent?recent.id:'–'}</td></tr>`;
+  }).join('');
+  $('design-body').innerHTML = drows || '<tr><td colspan="6" style="color:var(--muted)">暂无设计档案</td></tr>';
+
+  // NPI 批次明细
+  const lrows = lots.slice(0,30).map(l=>{
+    const age = Date.now() - new Date(l.created).getTime();
+    const steps = (l.step||0)+(l.rem||0);
+    return `<tr>
+      <td>${l.id}</td><td>${l.product_type}</td><td>${l.product||'–'}</td>
+      <td><span class="st ${l.status}">${l.status}</span></td>
+      <td class="num">${steps}</td><td class="age">${fmtH(age)}</td></tr>`;
+  }).join('');
+  $('lot-body').innerHTML = lrows || '<tr><td colspan="6" style="color:var(--muted)">暂无 NPI 批次，可在上方投放</td></tr>';
+
+  // 刷新投放下拉
+  const sel = $('launch-design');
+  if(sel.options.length===0){
+    designs.forEach(x=>{ const o=document.createElement('option'); o.value=x.id; o.textContent=x.id+' · '+(x.name||x.product||''); sel.appendChild(o); });
+  }
+}
+
+// 投放 NPI 批次（真实 API）
+$('launch-btn').addEventListener('click', async () => {
+  const designId = $('launch-design').value;
+  const type = $('launch-type').value;
+  const hint = $('launch-hint');
+  if(!designId){ hint.textContent='请先选择设计档案'; hint.className='hint fail'; return; }
+  hint.textContent='投放中…'; hint.className='hint';
+  try{
+    const r = await postJSON('/api/npi/launch', { designId, type, qty:1 });
+    if(r.wo){ hint.textContent='已投放：'+r.wo.id+'（'+type+'）'; hint.className='hint ok'; refresh(); }
+    else { hint.textContent='投放返回异常：'+(r.error||'未知'); hint.className='hint fail'; }
+  }catch(e){ hint.textContent='投放失败：'+e.message; hint.className='hint fail'; }
+});
+
+// ---- 下钻弹层 ----
+function esc(s){ return (s==null?'':String(s)).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+function openDrill(key){
+  if(!last) return;
+  const D = last;
+  const designs = D.designs.designs||[];
+  const masks = D.masks.masks||[];
+  const lots = D.npi.lots||[];
+  const masksByDesign = masks.filter(m=>m.design_id).map(m=>m.design_id);
+  const lotByDesign = {};
+  lots.forEach(l=>{ if(l.design_id && !lotByDesign[l.design_id]) lotByDesign[l.design_id]=l.id; });
+  let title='', cols=[], rows=[], hint='';
+  const ageOf = t => fmtH(Date.now()-new Date(t).getTime());
+  const stepCnt = l => (l.step||0)+(l.rem||0);
+  if(key==='design'){
+    title='设计档案'; hint='全部 NPI 设计项目'; cols=['设计','客户','产品','光罩','状态','最近投放'];
+    rows = designs.map(x=>{
+      const hasMask = masksByDesign.includes(x.id);
+      return `<tr><td>${esc(x.id)}</td><td>${esc(x.customer_id||'–')}</td><td>${esc(x.name||x.product||'–')}</td><td>${hasMask?'<span class="st READY">已配</span>':'<span style="color:var(--muted)">未配</span>'}</td><td><span class="st ${x.status}">${x.status}</span></td><td>${lotByDesign[x.id]||'–'}</td></tr>`;
+    });
+  } else if(key==='mask'){
+    title='光罩就绪'; hint='已制版光罩（按设计归属）'; cols=['光罩','设计','层数','版次','状态'];
+    rows = masks.map(m=>`<tr><td>${esc(m.id)}</td><td>${esc(m.design_id||'–')}</td><td class="num">${m.layers||'–'}</td><td>${esc(m.rev||'–')}</td><td><span class="st ${m.status}">${m.status}</span></td></tr>`);
+  } else if(key==='eng'){
+    title='工程批 (engineering)'; hint='研发工程批在制'; cols=['批次','产品','状态','步数','龄期'];
+    rows = lots.filter(l=>l.product_type==='engineering').map(l=>`<tr><td>${esc(l.id)}</td><td>${esc(l.product||'–')}</td><td><span class="st ${l.status}">${l.status}</span></td><td class="num">${stepCnt(l)}</td><td class="age">${ageOf(l.created)}</td></tr>`);
+  } else if(key==='tape'){
+    title='流片批 (tapeout)'; hint='流片批（含 qualification 重入）'; cols=['批次','产品','状态','步数','龄期'];
+    rows = lots.filter(l=>l.product_type==='tapeout').map(l=>`<tr><td>${esc(l.id)}</td><td>${esc(l.product||'–')}</td><td><span class="st ${l.status}">${l.status}</span></td><td class="num">${stepCnt(l)}</td><td class="age">${ageOf(l.created)}</td></tr>`);
+  } else if(key==='vol'){
+    title='量产移交 (volume)'; hint='带设计来源的已移交量产批'; cols=['批次','设计来源','产品','状态','步数','龄期'];
+    rows = lots.filter(l=>l.product_type==='volume' && l.design_id).map(l=>`<tr><td>${esc(l.id)}</td><td>${esc(l.design_id)}</td><td>${esc(l.product||'–')}</td><td><span class="st ${l.status}">${l.status}</span></td><td class="num">${stepCnt(l)}</td><td class="age">${ageOf(l.created)}</td></tr>`);
+  }
+  $('drill-title').textContent = title;
+  $('drill-cnt').textContent = rows.length + ' 条';
+  $('drill-hint').textContent = hint;
+  $('drill-thead').innerHTML = '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  $('drill-body').innerHTML = rows.join('') || `<tr><td colspan="${cols.length}" style="color:var(--muted)">该阶段当前无在制记录</td></tr>`;
+  $('drill').classList.add('show');
+}
+function closeDrill(){ $('drill').classList.remove('show'); }
+
+$('flow').addEventListener('click', e=>{ const st=e.target.closest('.stage'); if(st&&st.dataset.key) openDrill(st.dataset.key); });
+$('drill-x').addEventListener('click', closeDrill);
+$('drill').addEventListener('click', e=>{ if(e.target.id==='drill') closeDrill(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrill(); });
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

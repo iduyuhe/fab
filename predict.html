@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>交期预测 · 跨阶段根因分析</title>
+<style>
+  :root{ --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --bd:#30363d; --tx:#e6edf3; --mut:#8b949e;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --blue:#58a6ff; --pur:#bc8cff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Microsoft YaHei',sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:24px 22px 60px}
+  h1{font-size:22px;margin:0 0 4px} .sub{color:var(--mut);font-size:13px;margin-bottom:18px}
+  h2{font-size:16px;margin:30px 0 12px;padding-left:10px;border-left:3px solid var(--blue)}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:8px}
+  .kpi{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
+  .kpi .n{font-size:24px;font-weight:700} .kpi .l{color:var(--mut);font-size:12px;margin-top:2px}
+  .kpi.ok .n{color:var(--ok)} .kpi.warn .n{color:var(--warn)} .kpi.bad .n{color:var(--bad)}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--bd);font-size:13px}
+  th{background:var(--panel2);color:var(--mut);font-weight:600;font-size:12px}
+  tr:hover td{background:var(--panel2)}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
+  .OK{background:rgba(63,185,80,.16);color:var(--ok)} .WATCH{background:rgba(210,153,34,.18);color:var(--warn)} .LATE{background:rgba(248,81,73,.18);color:var(--bad)} .HOLD{background:rgba(188,140,255,.2);color:var(--pur)}
+  .num{font-variant-numeric:tabular-nums;font-family:'SF Mono',Consolas,monospace}
+  .chip{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;margin:1px 3px 1px 0;border:1px solid var(--bd)}
+  .rcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+  .rccard{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+  .rccard h3{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+  .rccard .cnt{font-size:18px;font-weight:700}
+  .rclist{max-height:160px;overflow:auto;margin-top:6px}
+  .rclist div{font-size:12px;color:var(--mut);padding:3px 0;border-top:1px solid var(--bd)}
+  .rclist b{color:var(--tx)}
+  .stagebar{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .st{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:12px;text-align:center}
+  .st.bn{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset}
+  .st .m{font-weight:700;font-size:14px} .st .mut{color:var(--mut);font-size:11px}
+  .st .row{display:flex;justify-content:space-between;font-size:12px;margin-top:6px}
+  .st .bn-tag{color:var(--bad);font-size:11px;font-weight:700;margin-top:4px}
+  .muted{color:var(--mut)} .err{color:var(--bad)}
+  a{color:var(--blue);text-decoration:none}
+  .foot{margin-top:26px;color:var(--mut);font-size:12px;text-align:center}
+  #drillMask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none}
+  #drill{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(720px,92vw);max-height:82vh;overflow:auto;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:20px 22px;z-index:51;display:none;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  #drill.open,#drillMask.open{display:block}
+  #drill .dx{position:absolute;top:10px;right:12px;background:none;border:0;color:var(--mut);font-size:18px;cursor:pointer}
+  #drill h3{margin:0;font-size:17px}
+  #drill .ttl-row{margin-bottom:6px}
+  #drill .meta{color:var(--mut);font-size:12px;margin-bottom:6px}
+  #drill .rcitem{border:1px solid var(--bd);border-radius:8px;padding:9px 12px;margin-bottom:8px;background:var(--panel2)}
+  #drill .rcitem .t{font-weight:600;font-size:13px;display:flex;gap:8px;align-items:center}
+  #drill .rcitem .d{color:var(--mut);font-size:12px;margin-top:3px}
+  #drill .sev-h{color:var(--bad)} #drill .sev-m{color:var(--warn)}
+  #drill .lotline{font-size:12px;color:var(--mut);padding:3px 0;border-top:1px solid var(--bd)}
+  .clickable{color:var(--blue);cursor:pointer;text-decoration:underline;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>交期预测 · 跨阶段根因分析</h1>
+  <div class="sub" id="gen">加载中… · 周期基于设备真实 WPH 推导，拥堵基于实时队列与停机</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>① OTD 履约流 · 工单交期预测</h2>
+  <table id="wotab"><thead><tr>
+    <th>工单</th><th>产品</th><th>批次(风险/总)</th><th>承诺交期</th><th>预测交期</th><th>偏差(h)</th><th>风险</th><th>根因</th>
+  </tr></thead><tbody></tbody></table>
+
+  <h2>② 跨阶段根因聚合（为什么整体会晚）</h2>
+  <div class="rcgrid" id="rcgrid"><div class="muted">—</div></div>
+
+  <h2>③ 阶段瓶颈视图（卡在哪个环节）</h2>
+  <div class="stagebar" id="stage"><div class="muted">—</div></div>
+
+  <h2>④ NPI 研发流 · 设计到流片预测</h2>
+  <table id="npitab"><thead><tr>
+    <th>设计</th><th>产品</th><th>阶段</th><th>光罩</th><th>进度</th><th>预测 tapeout</th><th>风险</th><th>根因</th>
+  </tr></thead><tbody></tbody></table>
+
+  <div class="foot">数据经门户代理自 MES(8124) · 每 8 秒刷新 · 预测为基于当前态势的滚动估计，非承诺值</div>
+</div>
+
+<div id="drillMask" onclick="closeDrill()"></div>
+<div id="drill"><button class="dx" onclick="closeDrill()">✕</button><div id="drillBody"></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const getJSON = u => fetch(u).then(r => r.json()).catch(() => null);
+const fmt = ts => { if(!ts) return '—'; const d=new Date(ts); const p=n=>String(n).padStart(2,'0');
+  return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+const RC = {
+  EQUIPMENT:{t:'设备停机',c:'var(--bad)'}, PROCESS:{t:'工艺判异(SPC)',c:'var(--warn)'},
+  QUEUE:{t:'队列拥塞',c:'var(--blue)'}, HOLD:{t:'批次 Hold',c:'var(--bad)'},
+  MASK:{t:'光罩缺失/未就绪',c:'var(--pur)'}, FLOW:{t:'流转',c:'var(--mut)'}
+};
+function rcChips(rcs){ if(!rcs||!rcs.length) return '<span class="muted">—</span>';
+  return rcs.slice(0,3).map(r=>`<span class="chip" style="border-color:${RC[r.type]?RC[r.type].c:'var(--mut)'};color:${RC[r.type]?RC[r.type].c:'var(--mut)'}">${RC[r.type]?RC[r.type].t:r.type}</span>`).join(''); }
+
+async function refresh(){
+  const [otd,npi] = await Promise.all([getJSON('/api/analytics/otd'), getJSON('/api/analytics/npi')]);
+  if(!otd){ $('gen').innerHTML='<span class="err">无法获取 OTD 分析数据（MES 8124 未响应）</span>'; return; }
+  STATE.otd = otd; STATE.npi = npi;
+  $('gen').textContent = '生成于 ' + fmt(otd.generatedAt) + ' · 周期基于设备真实 WPH，拥堵基于实时队列/停机';
+
+  // KPI
+  const s = otd.summary, n = npi? npi.summary : null;
+  $('kpis').innerHTML = [
+    kpi(s.totalLots,'在制批次'),
+    kpi(s.lateLots,'逾期(LATE)','bad',s.lateLots>0),
+    kpi(s.heldLots,'被 Hold','bad',s.heldLots>0),
+    kpi(s.watchLots,'预警(WATCH)','warn',s.watchLots>0),
+    kpi((s.avgSlipH>0?'+':'')+s.avgSlipH,'平均偏差(h)','',s.avgSlipH>0),
+  ].join('');
+
+  // WO 表
+  $('wotab').querySelector('tbody').innerHTML = otd.wos.map(w=>`
+    <tr>
+      <td class="num"><span class="clickable" onclick="openDrill('wo','${w.id}')" title="点击查看根因链">${w.id}</span></td><td>${w.product}${w.soId?` <span class="muted">·${w.soId}</span>`:''}</td>
+      <td class="num">${w.atRisk}/${w.lots}</td>
+      <td class="num">${fmt(w.due)}</td><td class="num">${fmt(w.etaTs)}</td>
+      <td class="num" style="color:${w.slipH>0?'var(--bad)':'var(--ok)'}">${w.slipH>0?'+':''}${w.slipH}</td>
+      <td><span class="badge ${w.risk}">${w.risk}</span></td>
+      <td>${rcChips(w.rootCauses)}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="muted">无在制工单</td></tr>';
+
+  // 跨阶段根因聚合
+  const types = Object.keys(otd.rootCauseByType||{});
+  $('rcgrid').innerHTML = types.length ? types.map(t=>{
+    const items = otd.rootCauseByType[t];
+    return `<div class="rccard">
+      <h3><span style="color:${RC[t]?RC[t].c:'var(--mut)'}">${RC[t]?RC[t].t:t}</span><span class="cnt" style="color:${RC[t]?RC[t].c:'var(--mut)'}">${items.length}</span></h3>
+      <div class="rclist">${items.slice(0,30).map(i=>`<div><b>${i.lot}</b> · ${i.detail}</div>`).join('')}</div>
+    </div>`;
+  }).join('') : '<div class="muted">当前无根因告警 ✓</div>';
+
+  // 阶段瓶颈
+  $('stage').innerHTML = (otd.stage||[]).map(m=>`
+    <div class="st${m.bottleneck?' bn':''}">
+      <div class="m">${m.name}</div><div class="mut">${m.mod}</div>
+      <div class="row"><span class="muted">队列</span><b class="num">${m.queue}</b></div>
+      <div class="row"><span class="muted">在制</span><b class="num">${m.processing}</b></div>
+      <div class="row"><span class="muted">停机</span><b class="num" style="color:${m.down?'var(--bad)':'var(--ok)'}">${m.down}</b></div>
+      <div class="row"><span class="muted">拥堵(h)</span><b class="num">${m.congH}</b></div>
+      ${m.bottleneck?'<div class="bn-tag">⚠ 瓶颈</div>':''}
+    </div>`).join('');
+
+  // NPI 表
+  if(npi){
+    $('npitab').querySelector('tbody').innerHTML = npi.designs.map(d=>`
+      <tr>
+        <td><span class="clickable" onclick="openDrill('design','${d.id}')" title="点击查看根因链">${d.id}</span> <span class="muted">${d.name||''}</span></td><td>${d.product}</td>
+        <td>${d.status}</td>
+        <td>${d.maskReady?'<span class="badge OK">就绪</span>':'<span class="badge LATE">缺失/未就绪</span>'} <span class="muted">${d.maskId||'—'}</span></td>
+        <td><div style="background:var(--panel2);border-radius:4px;height:8px;width:90px;overflow:hidden"><div style="width:${d.progressPct}%;background:var(--blue);height:100%"></div></div><span class="num">${d.progressPct}%</span></td>
+        <td class="num">${fmt(d.etaTs)}</td>
+        <td><span class="badge ${d.risk}">${d.risk}</span></td>
+        <td>${rcChips(d.rootCauses)}</td>
+      </tr>`).join('') || '<tr><td colspan="8" class="muted">无 NPI 设计</td></tr>';
+  }
+}
+function kpi(n,l,cls,bad){ return `<div class="kpi ${bad?(cls||'bad'):''}"><div class="n num">${n}</div><div class="l">${l}</div></div>`; }
+
+// 下钻：点工单/设计 → 弹窗看完整根因链（与进度墙一致的交互）
+let STATE = { otd: null, npi: null };
+function rcItem(r){
+  const meta = RC[r.type] || { t:r.type, c:'var(--mut)' };
+  const sev = r.severity==='high' ? '<span class="sev-h">●高</span>' : '<span class="sev-m">●中</span>';
+  return `<div class="rcitem"><div class="t"><span class="chip" style="border-color:${meta.c};color:${meta.c}">${meta.t}</span>${sev}</div><div class="d">${r.detail}</div></div>`;
+}
+function openDrill(kind, id){
+  let title='', meta='', body='';
+  if(kind==='wo' && STATE.otd){
+    const w = STATE.otd.wos.find(x=>x.id===id); if(!w) return;
+    title = `工单 ${w.id} · ${w.product}`;
+    meta = `风险 <b class="${w.risk}">${w.risk}</b> · 批次 ${w.atRisk}/${w.lots} 风险 · 承诺 ${fmt(w.due)} · 预测 ${fmt(w.etaTs)} · 偏差 ${w.slipH>0?'+':''}${w.slipH}h` + (w.soId?` · 订单 ${w.soId}`:'');
+    body = `<h4 style="margin:14px 0 6px;color:var(--mut)">根因链（${w.rootCauses.length}）</h4>` + (w.rootCauses.length? w.rootCauses.map(rcItem).join('') : '<div class="muted">无</div>');
+    const lots = STATE.otd.lots.filter(l=>l.wo===id);
+    if(lots.length){
+      body += `<h4 style="margin:14px 0 6px;color:var(--mut)">该工单下批次（${lots.length}）</h4>`;
+      body += lots.map(l=>`<div class="lotline"><b>${l.id}</b> · 风险 <span class="${l.risk}">${l.risk}</span> · 根因 ${l.rootCauses.map(r=>RC[r.type]?RC[r.type].t:r.type).join('/')||'—'}</div>`).join('');
+    }
+  } else if(kind==='design' && STATE.npi){
+    const d = STATE.npi.designs.find(x=>x.id===id); if(!d) return;
+    title = `设计 ${d.id} · ${d.name||''}`;
+    meta = `阶段 ${d.status} · 光罩 ${d.maskReady?'就绪':'缺失/未就绪'} · 进度 ${d.progressPct}% · 预测 tapeout ${fmt(d.etaTs)} · 风险 <b class="${d.risk}">${d.risk}</b>`;
+    body = `<h4 style="margin:14px 0 6px;color:var(--mut)">根因链（${d.rootCauses.length}）</h4>` + (d.rootCauses.length? d.rootCauses.map(rcItem).join('') : '<div class="muted">无</div>');
+  }
+  $('drillBody').innerHTML = `<div class="ttl-row"><h3>${title}</h3></div><div class="meta">${meta}</div>${body}`;
+  $('drill').classList.add('open'); $('drillMask').classList.add('open');
+}
+function closeDrill(){ $('drill').classList.remove('open'); $('drillMask').classList.remove('open'); }
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeDrill(); });
+
+refresh();
+setInterval(refresh, 8000);
+</script>
+</body>
+</html>

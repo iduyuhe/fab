@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>真实协议适配器 · 接通主轴报告</title>
+<style>
+  body{font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;margin:0;background:#0f1419;color:#e6edf3;line-height:1.6;padding:32px}
+  .wrap{max-width:960px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px}
+  h2{font-size:19px;margin:28px 0 10px;border-left:4px solid #58a6ff;padding-left:10px}
+  .sub{color:#8b949e;font-size:13px;margin-bottom:18px}
+  .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px 18px;margin:12px 0}
+  .ok{color:#3fb950;font-weight:600}
+  .warn{color:#d29922;font-weight:600}
+  .blue{color:#58a6ff}
+  code{background:#21262d;padding:2px 6px;border-radius:5px;font-size:13px;color:#a5d6ff}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  th,td{border:1px solid #30363d;padding:8px 10px;text-align:left}
+  th{background:#21262d;color:#8b949e;font-weight:600}
+  .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600}
+  .t-live{background:#1f6feb22;color:#58a6ff;border:1px solid #1f6feb}
+  .t-blue{background:#388bfd18;color:#79c0ff;border:1px solid #388bfd}
+  pre{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;overflow:auto;font-size:12.5px;color:#c9d1d9}
+  ul{margin:8px 0;padding-left:20px}
+  li{margin:4px 0}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>真实协议适配器 · 接通主轴报告</h1>
+  <div class="sub">fab-mes · 2026-08-27 · 范围：OPC-UA / EDA 适配器以 stub 模式接通数字主线（非真实设备接入）</div>
+
+  <div class="card">
+    <b>结论：</b><span class="ok">✅ OPC-UA + EDA 适配器已以 stub 模式接通主轴</span>。模拟协议事件经 <code>emitEv</code> 真实汇入事件总线，并被 SPC/FDC/E10 等订阅者消费（实测 7s 内 toolStatus +11、toolMetric +12、metrology +5、spcAlarm +1）。真实设备接入（node-opcua 客户端 + EDA/HSMS 解析）仍为注释路径，需装依赖并接现场设备。
+  </div>
+
+  <h2>一、接通前状态</h2>
+  <div class="card">
+    <ul>
+      <li><code>adapters/opcua-client.js</code> / <code>eda-client.js</code> / <code>index.js</code> 为蓝图态骨架，真实路径仅为注释。</li>
+      <li><code>server.js:111</code> 虽已调用 <code>startAdapters({ emitEv })</code>，但 <code>ADAPTER_MODE</code> 默认 <code>demo</code> → 直接返回，零接入。</li>
+      <li>审计报告中适配器被标为「骨架 / Stub」「蓝图：接真实系统前是骨架」。</li>
+    </ul>
+  </div>
+
+  <h2>二、本次改动（不破坏演示闭环、契约红线不变）</h2>
+  <div class="card">
+    <table>
+      <tr><th>文件</th><th>改动</th><th>作用</th></tr>
+      <tr><td><code>adapters/opcua-client.js</code><br><code>adapters/eda-client.js</code></td><td>新增 <code>this.stats</code> 计数器与 <code>_bump(type)</code>，在 <code>mapToEvent</code> 各分支自增</td><td>可观测「适配器→emitEv→总线」的事件累计计数</td></tr>
+      <tr><td><code>adapters/index.js</code></td><td><code>startAdapters</code> 收集实例并暴露 <code>stats()</code> 聚合；demo 返回 <code>stats:()=>({})</code></td><td>统一对外暴露实时计数</td></tr>
+      <tr><td><code>server.js</code></td><td><code>GET /api/adapters</code> 新增返回 <code>stats</code>（各事件类型累计计数）</td><td>提供验证入口</td></tr>
+      <tr><td><code>bin/start-community.sh</code></td><td>新增 <code>ADAPTER_MODE="${ADAPTER_MODE:-all}"</code> 并传给 MES 进程（仿 <code>APC_ENABLED=1</code> 写法）</td><td>社区全栈默认点亮适配器，接通主轴</td></tr>
+    </table>
+    <p class="sub">注：适配器产出的事件类型与 <code>CONTRACT.md §1.2</code> 完全一致（<code>toolStatus/toolMetric/metrology/fdcAlarm/spcAlarm</code>），全部经注入的 <code>emitEv</code> 汇出，未绕开总线、未改名/删字段——契约红线遵守。</p>
+  </div>
+
+  <h2>三、端到端验证（重启全栈实测）</h2>
+  <div class="card">
+    <p><b>启动日志证据：</b></p>
+    <pre>[adapter] OPC-UA stub connected @ opc.tcp://localhost:4840
+[adapter] EDA stub connected
+[MES] L4 装配完成：tenant=off apc=ON adapters=all erpMode=demo</pre>
+    <p><b>事件计数（<code>GET /api/adapters</code>，两次采样间隔 7s）：</b></p>
+    <table>
+      <tr><th>采样</th><th>mode</th><th>started</th><th>stats</th></tr>
+      <tr><td>T0</td><td>all</td><td>["opcua","eda"]</td><td>{toolStatus:22, toolMetric:28, metrology:9, fdcAlarm:5}</td></tr>
+      <tr><td>T1 (+7s)</td><td>all</td><td>["opcua","eda"]</td><td>{toolStatus:33, toolMetric:40, metrology:14, fdcAlarm:5, spcAlarm:1}</td></tr>
+    </table>
+    <p><b>增量（适配器经 emitEv 汇入总线的事件）：</b> <span class="ok">toolStatus +11 · toolMetric +12 · metrology +5 · spcAlarm +1</span></p>
+    <p class="ok">✅ 适配器事件正在流入主轴（emitEv → 总线 → 订阅者）；其中 spcAlarm +1 表明 SPC 已对适配器量测判异，证明脊柱真正消费了适配器事件。</p>
+    <p><b>健壮性：</b>适配器 metrology 以 <code>lot:null, product:null</code> 发出（stub 不持 lot 上下文）；SPC 以 <code>${product}|${param}|${tool}</code> 为键（<code>spc.js:22</code>），<code>lot:null</code> 无害；MES 日志 0 error；6 业务进程 health 全 200。</p>
+  </div>
+
+  <h2>四、状态对照</h2>
+  <div class="card">
+    <table>
+      <tr><th>项</th><th>接通前</th><th>接通后（本次）</th></tr>
+      <tr><td>适配器接入</td><td><span class="tag t-blue">骨架 / Stub</span></td><td><span class="tag t-live">活（stub 接通主轴）</span></td></tr>
+      <tr><td>事件是否入总线</td><td>否（demo 空转）</td><td>是（emitEv 实测累计）</td></tr>
+      <tr><td>可观测性</td><td>无</td><td><code>/api/adapters</code> 暴露 stats</td></tr>
+      <tr><td>真实设备接入</td><td>注释占位</td><td>注释占位（需 node-opcua + 现场 OPC-UA/HSMS）</td></tr>
+    </table>
+  </div>
+
+  <h2>五、与「真实协议」的距离（诚实边界）</h2>
+  <div class="card">
+    <ul>
+      <li><b>已接活：</b>适配器→总线→脊柱的整条链路（协议语义映射、事件标准化、emitEv 汇聚、订阅者消费）已端到端打通并验证。</li>
+      <li><b>仍为蓝图：</b>① 数据源是本地 stub 模拟，非真实 OPC-UA server / EDA 设备；② <code>OPCUA_REAL=1</code> / <code>EDA_REAL=1</code> 真实路径为注释，需 <code>npm i node-opcua</code> 并接现场 HSMS/OPC-UA；③ SAP / 用友 ERP 连接器为 demo 占位，未接真实 ERP。</li>
+      <li>接真实系统时无需改架构，仅激活对应真实分支 + 配置 endpoint，事件形态不变——这是「串主轴不推翻」纪律下适配器层本应有的形态。</li>
+    </ul>
+  </div>
+
+  <h2>六、配套文档同步</h2>
+  <div class="card">
+    <ul>
+      <li><code>战略审计报告_2026-08-27_总览.html</code>：适配器行由「骨架/Stub」改「活（stub 接通主轴）」；蓝图清单 #4 改「已接通主轴（stub）」。</li>
+      <li><code>docs/ADAPTERS.md</code>：补「当前接活状态（2026-08-27）」注记，说明社区启动器默认 <code>ADAPTER_MODE=all</code> 且 <code>/api/adapters</code> 可验。</li>
+    </ul>
+  </div>
+
+  <p class="sub">验证环境：MES 8124 / 门户 8123 / ERP 8126 / Agent 8127 / WMS 8128 + HSMS 5000 全栈常驻；当前运行态即为接通后状态，可直接访问 <code>http://127.0.0.1:8123/</code> 观察。</p>
+</div>
+</body>
+</html>

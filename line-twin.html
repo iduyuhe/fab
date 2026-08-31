@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>晶圆厂智能制造平台 · 2D 产线孪生</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a30; --panel2:#0f1730; --line:#22304f;
+    --txt:#e6edf7; --sub:#93a3c2; --accent:#4ea1ff; --warn:#ffb02e; --bad:#ff4d5e; --ok:#39d98a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif}
+  body{display:flex;flex-direction:column;overflow:hidden}
+  header{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(90deg,#0e1730,#0b1020);
+    border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px}
+  header .tag{font-size:12px;color:var(--sub)}
+  header .nav{margin-left:auto;display:flex;gap:8px}
+  header .nav a{color:var(--accent);text-decoration:none;font-size:12px;padding:5px 10px;border:1px solid var(--line);
+    border-radius:6px;background:var(--panel)}
+  header .nav a:hover{background:#1a2547}
+  .wrap{flex:1 1 auto;min-height:0;display:flex}
+  .stage{flex:1;position:relative}
+  canvas{display:block;width:100%;height:100%;cursor:grab}
+  canvas:active{cursor:grabbing}
+  .side{width:340px;background:var(--panel2);border-left:1px solid var(--line);padding:14px;overflow-y:auto}
+  .side h2{font-size:13px;color:var(--sub);margin:0 0 10px;text-transform:uppercase;letter-spacing:1px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+  .card .lh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .card .lh .nm{font-weight:600;font-size:14px}
+  .badge{font-size:11px;padding:2px 8px;border-radius:20px;background:#1c2a4a;color:var(--sub)}
+  .badge.bottle{background:#3a1620;color:var(--bad)}
+  .kv{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin:4px 0}
+  .kv b{color:var(--txt);font-weight:600}
+  .bar{height:8px;border-radius:6px;background:#1a2547;overflow:hidden;margin:6px 0 2px}
+  .bar>i{display:block;height:100%}
+  .hot{font-size:11px;color:var(--warn);margin-top:6px}
+  .detail .row{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .detail .row:last-child{border-bottom:0}
+  .hint{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--sub);background:rgba(10,16,32,.7);
+    padding:6px 10px;border-radius:6px;border:1px solid var(--line)}
+  .legend{position:absolute;right:14px;top:12px;background:rgba(10,16,32,.8);border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;font-size:11px;color:var(--sub)}
+  .legend .it{display:flex;align-items:center;gap:6px;margin:3px 0}
+  .legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .banner{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:#2a1020;border:1px solid var(--bad);
+    color:#ffd5da;padding:8px 16px;border-radius:8px;font-size:13px;display:none;box-shadow:0 4px 18px rgba(255,77,94,.25)}
+  .toast{position:absolute;left:50%;bottom:54px;transform:translateX(-50%);background:#10243a;border:1px solid var(--accent);
+    color:#cfe6ff;padding:6px 14px;border-radius:20px;font-size:12px;opacity:0;transition:opacity .4s}
+  .toast.show{opacity:1}
+  .sel{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* 面板显隐开关 */
+  #hud-toggle{position:absolute;right:14px;bottom:14px;z-index:50;
+    font:12px/1.4 system-ui,'Segoe UI',sans-serif;color:var(--sub);white-space:nowrap;
+    background:rgba(78,161,255,0.18);border:1px solid rgba(78,161,255,0.4);
+    border-radius:8px;padding:6px 11px;cursor:pointer;transition:background .15s;}
+  #hud-toggle:hover{background:rgba(78,161,255,0.35);color:var(--txt);}
+  body.hud-hidden .hint,body.hid-den .legend,body.hid-hidden .banner{display:none !important;}
+
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line,#1f2b45)}
+  .nav a{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid var(--line,#1f2b45);color:var(--muted,#6b7a94);text-decoration:none}
+  .nav a:hover{color:var(--accent,#4ea1ff);border-color:var(--accent,#4ea1ff)}
+</style>
+</head>
+<body>
+<!-- UNIFIED NAV --><nav class="unav"><span class="unav-brand">晶圆厂智能制造平台</span><a href="/portal.html">门户总览</a><a href="/console.html">MES 控制台</a><a href="/eap-console.html">EAP 控制台</a><a href="/erp-ops.html">ERP 操作台</a><a href="/wms-ops.html">WMS 仓储</a><a href="/config-admin.html">主数据配置</a><a href="/npi-ops.html">NPI 流片</a><a href="/twin3d/">3D 物理工厂</a><a href="/twin3d/portal.html">角色工作台</a><a href="/twin.html">2D 装备孪生</a><a href="/line-twin.html">2D 产线孪生</a><a href="/fab-twin.html">2D 工厂孪生</a><a href="/sim.html">产能仿真</a><a href="/lab.html">教学实验台</a><a href="/agent.html">问答副驾</a></nav><style>.unav{position:sticky;top:0;z-index:999;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 14px;background:#0e1530;border-bottom:1px solid #25304f;font:13px/1.4 system-ui,'Segoe UI',sans-serif}.unav-brand{font-weight:700;color:#7fd1ff;margin-right:4px}.unav a{color:#cdd6f0;text-decoration:none;padding:3px 8px;border-radius:6px}.unav a:hover{background:#1a2444;color:#fff}</style>
+
+<header>
+  <h1>产线级数字孪生</h1>
+  <span class="tag">Factory → Line → Equipment｜实时负荷热力 / 瓶颈钻取</span>
+
+</header>
+<div class="wrap">
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="banner" id="banner"></div>
+    <div class="toast" id="toast"></div>
+    <div class="legend">
+      <div class="it"><span class="sw" style="background:#39d98a"></span>负荷 &lt;60%</div>
+      <div class="it"><span class="sw" style="background:#ffb02e"></span>负荷 60–85%</div>
+      <div class="it"><span class="sw" style="background:#ff4d5e"></span>负荷 &gt;85% / 瓶颈</div>
+      <div class="it"><span class="sw" style="background:#4ea1ff"></span>设备节点</div>
+    </div>
+    <div class="hint">滚轮缩放 · 拖拽平移 · 点击产线查看线级明细</div>
+    <button id="hud-toggle" title="隐藏/显示面板 (H)">🙈 隐藏面板</button>
+  </div>
+  <aside class="side" id="side">
+    <h2>产线概览</h2>
+    <div id="cards"></div>
+    <div id="detail"></div>
+  </aside>
+</div>
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const side = document.getElementById('side');
+const cardsEl = document.getElementById('cards');
+const detailEl = document.getElementById('detail');
+const banner = document.getElementById('banner');
+const toast = document.getElementById('toast');
+
+let TOPO = null;          // /api/topo
+let APS = null;           // /api/aps（含 lines / lineBottleneck）
+let TOOLS = [];           // /api/tools 全量（定位设备坐标）
+let view = { scale: 1, ox: 0, oy: 0, dragging: false, lx: 0, ly: 0 };
+let selLine = null;       // 选中产线 key
+let lineLayout = [];      // 计算后的产线几何
+const MOD_COLOR = { LITHO:'#4ea1ff', DEP:'#39d98a', ETCH:'#b98bff', CMP:'#ffb02e', IMPL:'#ff7ab6', METRO:'#5fd0e0' };
+const MOD_NAME = { LITHO:'光刻', DEP:'沉积', ETCH:'刻蚀', CMP:'CMP', IMPL:'注入', METRO:'量测' };
+
+function loadAll(){
+  Promise.all([
+    fetch('/api/topo').then(r=>r.json()),
+    fetch('/api/aps?horizon=24').then(r=>r.json()),
+    fetch('/api/tools').then(r=>r.json()),
+  ]).then(([topo,aps,tools])=>{
+    TOPO = topo; APS = aps; TOOLS = tools.tools || [];
+    layoutLines();
+    renderCards();
+    draw();
+  }).catch(e=>console.warn('loadAll err', e));
+}
+function refreshAps(){
+  fetch('/api/aps?horizon=24').then(r=>r.json()).then(aps=>{
+    APS = aps; renderCards(); if(selLine) renderDetail(selLine); draw();
+  }).catch(()=>{});
+}
+
+function lineStat(key){
+  const l = (APS&&APS.lines||[]).find(x=>x.key===key);
+  const bn = (APS&&APS.lineBottleneck||[]).find(x=>x.line===key);
+  return { l, bn };
+}
+function heatColor(pct){
+  if(pct>=85) return '#ff4d5e';
+  if(pct>=60) return '#ffb02e';
+  if(pct>=30) return '#9ad36a';
+  return '#39d98a';
+}
+
+// 计算 3 条产线的横向布局（每条线一块底板，内含 bay 分块 + 设备点阵）
+function layoutLines(){
+  const lines = TOPO.lines;
+  const W = cv.width / view.scale;
+  const pad = 60, gap = 50;
+  const top = 90;
+  const colW = Math.min(420, (W - pad*2 - gap*(lines.length-1)) / lines.length);
+  lineLayout = lines.map((ln, i)=>{
+    const x = pad + i*(colW+gap);
+    const stats = lineStat(ln.key);
+    const l = stats.l;
+    const tools = TOOLS.filter(t=>t.line===ln.key);
+    // 按 bay 分组，bir 内再按 module 排列
+    const bays = ln.bays;
+    const bayBlocks = bays.map(by=>{
+      const bt = tools.filter(t=>t.bay===by);
+      return { bay:by, tools:bt };
+    });
+    return { key:ln.key, name:ln.name, x, y:top, w:colW, tools, bays:bayBlocks, stats };
+  });
+}
+
+function resize(){
+  const r = cv.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = r.width*dpr; cv.height = r.height*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  view.W = r.width; view.H = r.height;
+  if(TOPO) layoutLines();
+  draw();
+}
+
+function draw(){
+  if(!TOPO) return;
+  ctx.clearRect(0,0,view.W,view.H);
+  ctx.save();
+  ctx.translate(view.ox, view.oy);
+  ctx.scale(view.scale, view.scale);
+  lineLayout.forEach(drawLine);
+  ctx.restore();
+}
+
+function drawLine(L){
+  const pct = L.stats.l ? L.stats.l.loadPct : 0;
+  const isBottle = L.stats.bn && L.stats.bn.line===L.key && (L.stats.bn.loadPct>=85 || L.stats.bn.status==='BOTTLENECK');
+  const sel = selLine===L.key;
+  // 底板
+  const h = 360;
+  ctx.fillStyle = sel ? 'rgba(78,161,255,.10)' : 'rgba(255,255,255,.03)';
+  ctx.strokeStyle = isBottle ? '#ff4d5e' : (sel ? '#4ea1ff' : '#22304f');
+  ctx.lineWidth = isBottle?2.5:1.5;
+  roundRect(L.x, L.y, L.w, h, 12); ctx.fill(); ctx.stroke();
+  // 产线标题栏
+  ctx.fillStyle = heatColor(pct);
+  roundRect(L.x, L.y, L.w, 38, 12); ctx.fill();
+  ctx.fillStyle = '#0b1020';
+  ctx.font = '600 14px Segoe UI';
+  ctx.textBaseline='middle';
+  ctx.fillText(L.key, L.x+12, L.y+19);
+  ctx.font = '12px Segoe UI';
+  ctx.fillText(Math.round(pct)+'%', L.x+L.w-30, L.y+19);
+  if(isBottle){ ctx.fillStyle='#2a1020'; ctx.fillText('瓶颈', L.x+L.w-72, L.y+19); }
+  // 负荷条
+  ctx.fillStyle='#0b1020'; ctx.globalAlpha=.25; roundRect(L.x+10, L.y+46, L.w-20, 10, 5); ctx.fill(); ctx.globalAlpha=1;
+  ctx.fillStyle=heatColor(pct); roundRect(L.x+10, L.y+46, (L.w-20)*Math.min(1,pct/100), 10, 5); ctx.fill();
+  ctx.fillStyle='#93a3c2'; ctx.font='11px Segoe UI';
+  ctx.fillText('运行 '+ (L.stats.l?L.stats.l.run:0) +' / 总 '+ (L.stats.l?L.stats.l.tools:0) +' · 在制需求 '+(L.stats.l?L.stats.l.needCount:0), L.x+10, L.y+72);
+
+  // bay 分块 + 设备点阵
+  const byTop = L.y+86;
+  const bayH = (h-86-16)/L.bays.length;
+  L.bays.forEach((bk,bi)=>{
+    const by = bk;
+    const bx = L.x+10, bw=L.w-20;
+    const byy = byTop+bi*bayH;
+    ctx.fillStyle='rgba(255,255,255,.04)';
+    roundRect(bx, byy, bw, bayH-8, 8); ctx.fill();
+    ctx.fillStyle='#93a3c2'; ctx.font='11px Segoe UI';
+    ctx.fillText(by+'  ·  '+MOD_NAME[by.replace('BAY-','')? Object.keys(MOD_COLOR).find(m=>TOPO.moduleLine[m]&&TOPO.moduleLine[m].bay===by):'']||'', bx+8, byy+14);
+    // 设备点：每行最多 12 个
+    const ts = by.tools;
+    const cols=12, gapx=10, gapy=10;
+    const dw=(bw-16-(cols-1)*gapx)/cols;
+    const dh=Math.min(dw, (bayH-30-(Math.ceil(ts.length/cols)-1)*gapy)/Math.ceil(ts.length/cols));
+    ts.forEach((t,ti)=>{
+      const cx=bx+8+(ti%cols)*(dw+gapx);
+      const cy=byy+22+Math.floor(ti/cols)*(dh+gapy);
+      const mc=MOD_COLOR[t.module]||'#4ea1ff';
+      ctx.fillStyle=mc;
+      ctx.globalAlpha = t.status==='DOWN'?0.35:(t.status==='RUN'?1:0.6);
+      roundRect(cx,cy,dw,dh,3); ctx.fill();
+      ctx.globalAlpha=1;
+      if(t.status==='DOWN'){ ctx.strokeStyle='#ff4d5e'; ctx.lineWidth=1; roundRect(cx,cy,dw,dh,3); ctx.stroke(); }
+    });
+  });
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function renderCards(){
+  if(!TOPO||!APS) return;
+  cardsEl.innerHTML='';
+  TOPO.lines.forEach(ln=>{
+    const {l,bn}=lineStat(ln.key);
+    const pct=l?l.loadPct:0;
+    const isB=sbn(ln.key);
+    const hot = l&&l.hotMods? l.hotMods.map(m=>MOD_NAME[m.module]+'×'+m.tools).join(' / '):'—';
+    const div=document.createElement('div');
+    div.className='card'; div.dataset.line=ln.key;
+    if(selLine===ln.key) div.classList.add('sel');
+    div.innerHTML=`
+      <div class="lh"><span class="nm">${ln.key}</span>
+        <span class="badge ${isB?'bottle':''}">${isB?'瓶颈':(l?l.status:'—')}</span></div>
+      <div class="kv"><span>${ln.name}</span></div>
+      <div class="bar"><i style="width:${Math.min(100,pct)}%;background:${heatColor(pct)}"></i></div>
+      <div class="kv"><span>负荷率</span><b>${Math.round(pct)}%</b></div>
+      <div class="kv"><span>设备 运行/总</span><b>${l?l.run:'-'}/${l?l.tools:'-'}</b></div>
+      <div class="kv"><span>24h 在制需求</span><b>${l?l.needCount:'-'}</b></div>
+      <div class="kv"><span>产能(wph)</span><b>${l?Math.round(l.cap24):'-'}</b></div>
+      <div class="hot">热模块：${hot}</div>`;
+    div.onclick=()=>{ selLine=ln.key; renderCards(); renderDetail(ln.key); draw(); };
+    cardsEl.appendChild(div);
+  });
+}
+function sbn(key){ const bn=(APS.lineBottleneck||[])[0]; return bn&&bn.line===key; }
+function renderDetail(key){
+  const ln=TOPO.lines.find(x=>x.key===key);
+  const {l,bn}=lineStat(key);
+  if(!l){ detailEl.innerHTML=''; return; }
+  detailEl.innerHTML=`<h2>${key} 线级明细</h2>
+    <div class="card detail">
+      <div class="row"><span>产线名称</span><span>${ln.name}</span></div>
+      <div class="row"><span>负荷率</span><span style="color:${heatColor(l.loadPct)}">${Math.round(l.loadPct)}%</span></div>
+      <div class="row"><span>设备总数</span><span>${l.tools}</span></div>
+      <div class="row"><span>运行中</span><span>${l.run}</span></div>
+      <div class="row"><span>故障 DOWN</span><span style="color:${l.down?'#ff4d5e':'#39d98a'}">${l.down}</span></div>
+      <div class="row"><span>24h 产能(wph)</span><span>${Math.round(l.cap24)}</span></div>
+      <div class="row"><span>24h 在制需求</span><span>${l.needCount}</span></div>
+      <div class="row"><span>瓶颈判定</span><span>${bn?bn.status:'—'}</span></div>
+      <div class="row"><span>热模块</span><span>${l.hotMods.map(m=>MOD_NAME[m.module]).join('/')||'—'}</span></div>
+      <div class="row"><span>所属工段</span><span>${ln.bays.join(' · ')}</span></div>
+    </div>
+    <div class="card">
+      <div class="kv"><b>说明</b></div>
+      <div class="hot">点击左侧「装备级」可下钻到单台设备实时状态；瓶颈产线以红线高亮。</div>
+    </div>`;
+}
+
+// 交互：缩放 / 平移 / 点击选中产线
+cv.addEventListener('wheel',e=>{ e.preventDefault();
+  const f=e.deltaY<0?1.1:0.9; view.scale=Math.max(0.4,Math.min(3,view.scale*f)); draw();
+},{passive:false});
+cv.addEventListener('mousedown',e=>{ view.dragging=true; view.lx=e.clientX; view.ly=e.clientY; });
+window.addEventListener('mouseup',()=>view.dragging=false);
+window.addEventListener('mousemove',e=>{
+  if(!view.dragging) return;
+  view.ox+=e.clientX-view.lx; view.oy+=e.clientY-view.ly;
+  view.lx=e.clientX; view.ly=e.clientY; draw();
+});
+cv.addEventListener('click',e=>{
+  const r=cv.getBoundingClientRect();
+  const mx=(e.clientX-r.left-view.ox)/view.scale;
+  const my=(e.clientY-r.top-view.oy)/view.scale;
+  const hit=lineLayout.find(L=>mx>=L.x&&mx<=L.x+L.w&&my>=L.y&&my<=L.y+360);
+  if(hit){ selLine=hit.key; renderCards(); renderDetail(hit.key); draw(); }
+});
+
+// 报警横幅（订阅 SPC 报警，提示产线级影响）
+function showBanner(txt){ banner.textContent=txt; banner.style.display='block';
+  clearTimeout(banner._t); banner._t=setTimeout(()=>banner.style.display='none',6000); }
+function showToast(txt){ toast.textContent=txt; toast.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>toast.classList.remove('show'),2500); }
+
+let wsTry=0;
+function connectWS(){
+  try{
+    const ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
+    ws.onmessage=ev=>{
+      let m; try{m=JSON.parse(ev.data);}catch(_){return;}
+      if(m.type==='spcAlarm'){
+        const t=TOOLS.find(x=>x.id===m.tool);
+        const ln=t?t.line:'?';
+        showBanner('⚠ 在制报警：'+m.tool+' ('+ln+') '+m.param+'='+m.value+' ['+(m.rules||[]).join(',')+']');
+      } else if(m.type==='lotStepDone'){
+        // 轻量提示：不刷全量，仅标记有活动
+      }
+    };
+    ws.onclose=()=>{ if(wsTry++<10) setTimeout(connectWS,3000); };
+    ws.onerror=()=>{};
+  }catch(e){}
+}
+
+window.addEventListener('resize',resize);
+resize(); loadAll(); refreshAps(); setInterval(refreshAps,5000); connectWS();
+
+// 面板显隐开关
+(function(){
+  const btn=document.getElementById('hud-toggle');
+  if(!btn) return;
+  function toggle(){ const h=document.body.classList.toggle('hud-hidden'); btn.textContent=h?'👁 显示面板':'🙈 隐藏面板'; }
+  btn.addEventListener('click',toggle);
+  window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) toggle(); });
+})();
+</script>
+</body>
+</html>

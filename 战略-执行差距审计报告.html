@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晶圆厂AI原生的智能制造平台 · 战略-执行差距审计报告</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#0f141c; --line:#263041;
+    --text:#c9d1e0; --muted:#8b97a8; --accent:#4ea1ff; --accent2:#7ee787;
+    --warn:#f2c14e; --bad:#ff6b6b; --ok:#39d98a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;padding:0 0 80px}
+  .top{padding:36px 40px 28px;background:linear-gradient(135deg,#101826,#0d1117);border-bottom:1px solid var(--line)}
+  .top h1{font-size:26px;letter-spacing:.5px;margin-bottom:6px}
+  .top .meta{color:var(--muted);font-size:13px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 40px}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 8px}
+  .toc a{font-size:12.5px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;color:var(--muted);text-decoration:none}
+  .toc a:hover{color:var(--accent);border-color:var(--accent)}
+  h2{font-size:19px;margin:38px 0 14px;padding-left:12px;border-left:4px solid var(--accent);letter-spacing:.5px}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--accent2)}
+  p{margin:8px 0;color:var(--text)}
+  .muted{color:var(--muted)}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:14px 0}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .kpi .n{font-size:26px;font-weight:700;color:var(--accent)}
+  .kpi .l{font-size:12px;color:var(--muted);margin-top:4px}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--accent);font-weight:600}
+  tr:nth-child(even) td{background:#11161f}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--muted);margin-right:4px}
+  .tag.ok{color:var(--ok);border-color:#1f4d3a}
+  .tag.bad{color:var(--bad);border-color:#5a2a2a}
+  .tag.warn{color:var(--warn);border-color:#5a4a1f}
+  .tag.blue{color:var(--accent);border-color:#1f3a5a}
+  .note{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0;font-size:13px;line-height:1.8}
+  .note b{color:var(--text)}
+  code{background:#0a0e16;padding:2px 6px;border-radius:5px;color:#9fd0ff;font-size:12.5px}
+  .file{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#9fd0ff}
+  ul{margin:8px 0 8px 20px} li{margin:5px 0}
+  .sepline{border:0;border-top:1px dashed var(--line);margin:30px 0}
+  .foot{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>晶圆厂AI原生的智能制造平台 · 战略-执行差距审计报告</h1>
+  <div class="meta">代码库 <span class="file">E:\Fab\fab-mes</span> · 审计终稿 2026-08-29 · 两批整改 + IA重组/双进度墙 + 预测·根因引擎 + Hold自愈 + 3D孪生找回 + <b style="color:var(--ok)">P0 基础鉴权已落地</b> · 统一回归 <b style="color:var(--ok)">6/6 · 25/0</b></div>
+</div>
+<div class="wrap">
+
+  <div class="toc">
+    <a href="#s0">0 摘要</a>
+    <a href="#s1">1 战略基线</a>
+    <a href="#s1b">1.5 战略定位</a>
+    <a href="#s2">2 审计方法</a>
+    <a href="#s3">3 总体判断</a>
+    <a href="#s4">4 第一批 UX+文档</a>
+    <a href="#s5">5 第二批 代码健壮性</a>
+    <a href="#s6">6 第二批 UX 收尾</a>
+    <a href="#s7">7 验证结果</a>
+    <a href="#s8">8 审计误判修正</a>
+    <a href="#s9">9 执行路线图 P0/P1/P2</a>
+    <a href="#s10">10 IA重组·双进度墙</a>
+    <a href="#s11">11 预测·自愈·3D孪生</a>
+    <a href="#app">附录 改动清单</a>
+  </div>
+
+  <!-- 0 摘要 -->
+  <h2 id="s0">0. 一页摘要</h2>
+  <div class="card-grid">
+    <div class="kpi"><div class="n">已贯通</div><div class="l">主轴：OTD / NPI / WMS / 五大引擎+Agent 均真实落码接线</div></div>
+    <div class="kpi"><div class="n">25/0</div><div class="l">统一回归 verify-all 全部通过（两批整改后仍成立）</div></div>
+    <div class="kpi"><div class="n" style="color:var(--ok)">P0 已落地</div><div class="l">基础鉴权上线（登录页+签名cookie+WS校验+网关令牌）；对外材料刷新</div></div>
+    <div class="kpi"><div class="n" style="color:var(--ok)">已增强</div><div class="l">predict 交期预测·跨阶段根因 / Hold 重启自愈 / 3D 孪生找回并接入四流，见 §11</div></div>
+  </div>
+  <div class="note">
+    <b>核心结论：</b>「串主轴、不推翻」范式执行得不错——<b>主轴本身已经贯通</b>，上一阶段差距在「默认态健壮性 + 旧文档/UX 残留」，已闭环。
+    本轮在<b>信任门槛（P0 基础鉴权）</b>与<b>对外可信度</b>上补齐，使平台从"演示 demo"迈向"可作为真实平台评估对象"。下一步按 <b>P0(已完)→P1(走向生产)→P2(深度)</b> 推进，并<b>明确保持蓝图态</b>（移动端、全量 SCADA）。
+  </div>
+
+  <!-- 1 战略基线 -->
+  <h2 id="s1">1. 审计背景与战略基线</h2>
+  <p>审计对象为 <span class="file">E:\Fab\fab-mes</span> 多进程 Node.js 工程。比对"战略宣称状态"与"代码/文档/UX 实况"。</p>
+  <ul>
+    <li><b>愿景：</b>晶圆厂"完整智能体系" = 数字孪生 + 工业互联网（EAP/SECS-GEM）+ 智能模型（五大引擎 SPC/FDC/PdM/VM/APS + APC + Agent），由"数字主线（digital thread）"焊成。</li>
+    <li><b>范式「串主轴，不推翻」：</b>只修主轴断裂；其余模块标"蓝图态/挂枝"，不假装完成。</li>
+    <li><b>进程与端口：</b>portal 8123 / MES 8124 / EAP 8125 / ERP 8126 / Agent 8127 / WMS 8128；HSMS 裸 TCP :5000。事件总线在 MES（<code>server.js emitEv</code>，WS :8124）为唯一出口；EAP 经 <code>/api/ingest</code> 桥入。</li>
+    <li><b>已宣称里程碑：</b>OTD 订单→交付主轴（P0）、P1 五大引擎+Agent 串主轴（verify-all 6/6）、P2 收尾对齐（14 页 UNIFIED NAV+六灯）、NPI 设计→流片（从零建表+端点+npi-ops.html）。</li>
+  </ul>
+
+  <!-- 1.5 战略定位（本轮关键更新） -->
+  <h2 id="s1b">1.5 战略定位（本轮校准 · 最高优先级）</h2>
+  <div class="note">
+    <b>一句话定位：</b><b>纯粹 AI 原生的智能制造平台</b>是主轴与主流；平台<b>不依赖、不受制于任何第三方商业套装软件</b>——外部系统仅作为可选的数据源与接口接入，原生闭环成熟即自然替代，主轴始终是自研 AI 原生能力。
+    <ul>
+      <li><b>AI 原生 = 主轴：</b>五大引擎 + APC + Agent 实时编排是平台自己的核心能力，闭环不依赖任何外部商业软件。</li>
+      <li><b>外部系统 = 可选接口（非主流）：</b>P1 仅做"通用外部接口 demo"证明平台可对接任意外部系统，定位为可插拔的下游/上游通道；不自研等价能力前即作为可选接入，不长期绑定。</li>
+      <li><b>多租户：</b>若平台定位为多客户 SaaS，则激活行级租户隔离；若为单一大客户部署，则标注为可选能力，不强启。</li>
+      <li><b>蓝图态（可做、不等商务）：</b>移动端（响应式 PWA）、全量 SCADA 对接（OPC-UA / Modbus / EDA 适配器矩阵）。属规划中的"挂枝"，不阻塞主轴。</li>
+    </ul>
+  </div>
+
+  <!-- 2 方法 -->
+  <h2 id="s2">2. 审计方法</h2>
+  <p>三路并行只读审计 + 代码测绘，先审计后整改，整改期不动用户未勾选的部分：</p>
+  <ul>
+    <li><b>代码层：</b>事件总线装配、6 进程、五大引擎、L4 模块、双库存储、OTD/NPI 链路、verify-all 真实度。</li>
+    <li><b>文档层：</b>PPTX/README/docs/*.md/诊断 docx/核查 docx/总结报告 html 与代码实况一致性。</li>
+    <li><b>UX 层：</b>portal 8123 各路由死链、14 页导航覆盖、六灯实现、孪生概念清晰度、命名一致性。</li>
+    <li><b>代码测绘：</b>对 C1–C5 逐项精确定位文件:行号，修正了初版审计的多处误判（见 §8）。</li>
+  </ul>
+
+  <!-- 3 总体判断 -->
+  <h2 id="s3">3. 总体判断</h2>
+  <p>主轴已贯通，差距集中在"默认态健壮性 + 旧文档/UX 残留（已闭环）"与"信任门槛/对外可信度（本轮补齐）"：</p>
+  <table>
+    <tr><th>类别</th><th>初判</th><th>实测</th><th>处置</th></tr>
+    <tr><td>OTD 主轴</td><td>已闭环</td><td><span class="tag ok">真实落地</span> 投料→量测→发运→WMS扣减→AR 串联</td><td>保留</td></tr>
+    <tr><td>五大引擎+Agent</td><td>已闭环</td><td><span class="tag ok">真实落地</span> FDC→pdmAlert / APC 真发S2F41 / VM→APC / APS→_pick / Agent连总线</td><td>保留 + C2/C3/C5 加固</td></tr>
+    <tr><td>NPI 设计→流片</td><td>已闭环</td><td><span class="tag ok">真实落地</span> designs/photomasks 表+7端点+npi-ops.html</td><td>保留</td></tr>
+    <tr><td>WMS 仓储</td><td>诊断称缺失</td><td><span class="tag ok">真实落地</span> fab-wms.js + fab-wms.db 已接主轴</td><td>D1/D3 纠偏文档</td></tr>
+    <tr><td>WIP 持久化</td><td>已落库</td><td><span class="tag ok">已修复</span> 落库 + 重启重建（C1）</td><td><b>C1</b></td></tr>
+    <tr><td>APC 默认态</td><td>已闭环</td><td><span class="tag ok">已校准</span> 验收态=默认态(开)（C2）</td><td><b>C2</b></td></tr>
+    <tr><td>事件重放</td><td>实时订阅</td><td><span class="tag ok">已修复</span> 运行期持续重放（C4）</td><td><b>C4</b></td></tr>
+    <tr><td>FDC 真实检测</td><td>已闭环</td><td><span class="tag ok">已修正</span> Wilson-Hilferty 阈值+真实样本验证（C3）</td><td><b>C3</b></td></tr>
+    <tr><td>Agent 编排</td><td>已闭环</td><td><span class="tag ok">已深化</span> 增量派发+结构化 state（C5）</td><td><b>C5</b></td></tr>
+    <tr><td>UX/文档残留</td><td>—</td><td><span class="tag ok">已纠偏</span> 双导航/进程数/WMS表述/主题/命名</td><td>U1–U5 + D1–D4</td></tr>
+    <tr><td>信任门槛</td><td>零鉴权</td><td><span class="tag ok">已补齐</span> 基础鉴权（登录+签名cookie+WS校验+网关令牌）</td><td><b>P0-①</b></td></tr>
+    <tr><td>预测/根因</td><td>未做</td><td><span class="tag ok">已增强</span> predict 引擎 + Hold 自愈 + 3D孪生找回</td><td>§11</td></tr>
+  </table>
+
+  <!-- 4 第一批 -->
+  <h2 id="s4">4. 第一批整改 · UX + 文档纠偏（低成本高回报）</h2>
+  <table>
+    <tr><th>项</th><th>问题</th><th>改动</th><th>文件</th></tr>
+    <tr><td>U1</td><td>4 页双导航并存，旧 nav 缺 WMS/配置/NPI</td><td>删除旧 <code>&lt;div class="nav"&gt;</code>，仅留 unav</td><td>4×.html</td></tr>
+    <tr><td>U2</td><td>portal 写"5 进程"漏 WMS</td><td>"5 进程"→"6 进程(补 WMS 8128)"</td><td>portal.html</td></tr>
+    <tr><td>D1/D2</td><td>诊断 docx 称"WMS 不存在"</td><td>中和为假陈述→"WMS(:8128)现已建成接入主轴"</td><td>两份 docx</td></tr>
+    <tr><td>D3</td><td>PPTX slide14 标题"六进程"却只画 5 框</td><td>克隆 Agent 框补 WMS :8128 框</td><td>平台介绍.pptx</td></tr>
+    <tr><td>D2</td><td>总结报告.html 仍"5进程/WMS未建"</td><td>5→6、WMS未建→已建、加 2026-08-29 状态注记</td><td>项目总结报告.html</td></tr>
+    <tr><td>D4</td><td>NPI 真实接线但 README 未提</td><td>补 NPI 设计→流片主线</td><td>README-社区版.md</td></tr>
+  </table>
+
+  <!-- 5 第二批代码 -->
+  <h2 id="s5">5. 第二批整改 · 代码健壮性（主轴最大风险）</h2>
+  <table>
+    <tr><th>项</th><th>缺口</th><th>最小改动</th><th>验证证据</th></tr>
+    <tr><td><b>C1</b> WIP 重启重建</td><td>WIP 已落库但重启不读库重建 → 丢全部在制</td><td><span class="file">storage/sqlite.js</span> 加 <code>so_id/customer</code> 列 + <code>queryActiveLots()</code>；<span class="file">services/wip.js</span> 新增 <code>loadAndHydrate</code></td><td>启动日志 <code>[WIP] 重启重载 N 批在制</code></td></tr>
+    <tr><td><b>C2</b> APC 默认开</td><td>验收态(开)≠默认态(关)</td><td><span class="file">apc/controller.js</span>：<code>APC_ENABLED = process.env.APC_ENABLED !== '0'</code></td><td>MES 启动 <code>apc=ON</code></td></tr>
+    <tr><td><b>C3</b> FDC 真实检测</td><td>阈值过松误报；缺真实样本验证</td><td><span class="file">fdc.js</span> 改 Wilson-Hilferty χ²₀.₉₅(9.46)；<span class="file">server.js:357</span> 传真实均值；新增 <span class="file">verify-fdc-real.mjs</span></td><td>5/5 通过</td></tr>
+    <tr><td><b>C4</b> 事件持续重放</td><td>仅断连一次性 reconcile</td><td><span class="file">erp-service.js</span>+<span class="file">wms-service.js</span> 加 <code>lastSeq</code>+<code>pollReplay</code></td><td><code>/api/events</code> 带 seq，重放成立</td></tr>
+    <tr><td><b>C5</b> Agent 编排深化</td><td>浅层缓冲播报</td><td><span class="file">agent/chat-server.js</span>：<code>ORCH_HANDLERS</code> 增量派发 + 结构化 <code>state</code></td><td>P1-5 新编排格式串 6 域通过</td></tr>
+  </table>
+
+  <!-- 6 第二批 UX -->
+  <h2 id="s6">6. 第二批整改 · UX 收尾（U3–U5）</h2>
+  <table>
+    <tr><th>项</th><th>问题</th><th>改动</th><th>验证</th></tr>
+    <tr><td><b>U3</b> 六灯注入</td><td>六灯仅 twin3d 实现，13 页无健康指示</td><td>新建 <span class="file">health-lamp.js</span>；<span class="file">portal.js</span> 注入全部根级页</td><td>/health-lamp.js → 200</td></tr>
+    <tr><td><b>U4</b> Agent 命名</td><td>"AI 助手" vs 实际"问答副驾"错位</td><td>16 处 "AI 助手"→"问答副驾"</td><td>全部 HTML 无残留</td></tr>
+    <tr><td><b>U5</b> 主题统一</td><td>文档变量命名各异</td><td>新建 <span class="file">theme.css</span>（单一事实来源）；portal 加受限静态兜底</td><td>/theme.css→200</td></tr>
+  </table>
+
+  <!-- 7 验证 -->
+  <h2 id="s7">7. 验证结果</h2>
+  <div class="card-grid">
+    <div class="kpi"><div class="n" style="color:var(--ok)">6/6</div><div class="l">verify-all.mjs 全部场景通过</div></div>
+    <div class="kpi"><div class="n" style="color:var(--ok)">25/0</div><div class="l">子断言全过</div></div>
+    <div class="kpi"><div class="n" style="color:var(--ok)">7/7</div><div class="l">端口在线（5000 裸TCP返回000属预期）</div></div>
+    <div class="kpi"><div class="n" style="color:var(--ok)">P0</div><div class="l">未登录 / →302 登录页；/api/* →401；登录后全 200</div></div>
+  </div>
+
+  <!-- 8 误判修正 -->
+  <h2 id="s8">8. 审计过程中的误判修正（诚实记录）</h2>
+  <div class="note">
+    初版三路审计存在若干代理误判，代码测绘阶段已修正：
+    <ul>
+      <li><b>WIP：</b>"仅内存无持久化" → 实测已落库，缺口是<b>重启不重建</b> → C1 只做 loadAndHydrate。</li>
+      <li><b>Agent：</b>"正则命中注入标记" → 实测无，短板是<b>编排深度</b> → C5 改为增量派发+结构化状态。</li>
+      <li><b>FDC：</b>"未见喂入路径" → 实测 server.js:357 已真实喂入，缺口是<b>阈值与验证</b> → C3 修阈值+补验证。</li>
+      <li><b>docx/PPTX：</b>实测大多已诚实标注；唯一真实缺陷是 <b>PPTX slide14 漏 WMS 框</b> → 仅补该框。</li>
+    </ul>
+  </div>
+
+  <!-- 9 执行路线图 -->
+  <h2 id="s9">9. 执行路线图：P0（已完）→ P1（走向生产）→ P2（深度）+ 蓝图态</h2>
+  <p>战略分三层推进，<b>AI 原生主轴</b>始终为主流；外部商业套装仅作为可选<b>接入</b>。</p>
+  <table>
+    <tr><th>层级</th><th>定位</th><th>状态</th><th>范围</th></tr>
+    <tr><td><b>P0</b> 信任门槛</td><td>低成本高回报 · 立即可信</td><td><span class="tag ok">已落地</span></td><td>① 基础鉴权（登录页 + 签名 httpOnly cookie + WS 隧道校验 + 门户→后端网关令牌）；② 刷新过时审计报告/对外材料，写入新战略定位。</td></tr>
+    <tr><td><b>P1</b> 走向生产</td><td>从演示到生产的核心</td><td><span class="tag warn">规划/进行中</span></td><td>① 通用外部系统适配器（不绑定任何具体厂商，做"可对接 demo"，证明平台可接任意外部系统；<b>仅可选接口</b>）；② 多租户行级隔离激活（<b>若</b>定位多客户 SaaS）。</td></tr>
+    <tr><td><b>P2</b> 深度</td><td>标准优先 · 不受实际约束</td><td><span class="tag blue">规划</span></td><td>① <b>真实 SECS/GEM 联调</b>（fab 行业标准协议，HSMS 已有基础，先打通一条线）；② 历史时序库（承接 WPH/SPC/FDC 采样，供 AI 取数）；③ AI 自学习（在线调 APC 模型 / SPC 控制限 / FDC 阈值）。<b>建议从标准协议 SECS/GEM 入手</b>。</td></tr>
+    <tr><td><b>蓝图态</b></td><td>可做 · 不等商务</td><td><span class="tag blue">蓝图</span></td><td>① 移动端响应式 PWA 外壳；② 全量 SCADA 对接（OPC-UA / Modbus / EDA 适配器矩阵）。属规划"挂枝"，不阻塞主轴。</td></tr>
+  </table>
+  <div class="note">
+    <b>关于外部商业套装定位：</b>平台主轴是自研 AI 原生闭环，外部系统仅作为可证明对接能力的可选接口，不围绕任何第三方套装构建。平台独立演进，不受任何外部厂商路线图约束。
+  </div>
+
+  <!-- 10 IA重组双进度墙 -->
+  <h2 id="s10">10. 门户信息架构（IA）重组 · OTD/NPI 双进度墙（已落地）</h2>
+  <div class="note">
+    <b>用户原话：</b>"现在的操作布局就是一个功能的罗列，没有站在用户的使用视角去布局，看不出业务流向，像迷宫。" —— 信息架构维度的议题，按<b>业务流</b>而非技术子系统重组。
+  </div>
+  <h3>10.1 决策与落地</h3>
+  <ul>
+    <li><b>四流全局导航：</b>门户顶栏按"业务流"分组（<span class="file">履约流 / 研发流 / 运维流 / 数字孪生 / 驾驶舱 / 工具</span>），<span class="file">portal.js</span> 的 <code>serveHtml</code> 向全部根级页幂等注入。</li>
+    <li><b>首页四流卡片 + 3D 入口：</b><span class="file">portal.html</span> 四张入口卡，OTD 卡挂"进度墙"链接；驾驶舱区新增"3D 工厂"直入口。</li>
+    <li><b>OTD 履约流进度墙（<span class="file">otd-flow.html</span>）：</b>七段漏斗实时计数 + 卡点标红 + 订单明细表 + 点击下钻。</li>
+    <li><b>NPI 研发流进度墙（<span class="file">npi-flow.html</span>）：</b>五段 + 真实"投放 NPI 批次"按钮（调 <code>/api/npi/launch</code>）。</li>
+    <li><b>3D 孪生找回（§11）：</b>新增独立"数字孪生"导航组，3D 工厂 / 3D 角色经门户代理接入主轴数据流。</li>
+  </ul>
+
+  <!-- 11 预测·自愈·3D -->
+  <h2 id="s11">11. 本轮新增能力（预测·根因引擎 / Hold 自愈 / 3D 孪生找回）</h2>
+  <table>
+    <tr><th>能力</th><th>缺口</th><th>落地</th><th>验证</th></tr>
+    <tr><td><b>预测·根因引擎</b></td><td>进度墙只有"数字"，无"为什么卡/还要多久"</td><td>新建 <span class="file">services/predict.js</span>（纯函数：ETA 按加速比折算墙钟；根因精确命中本批当前设备 SPC / 排队全停机才判 EQUIPMENT 硬阻塞；HOLD 单列风险态）；新增 <span class="file">/api/analytics/otd</span>·<span class="file">/api/analytics/npi</span>；<span class="file">predict.html</span> 工单/设计表 + 跨阶段根因聚合 + 点击批次看根因链下钻（复用进度墙 drill 交互）</td><td>lateLots=0（消除加速比误报）；heldLots 反映真实 SPC Hold</td></tr>
+    <tr><td><b>Hold 重启自愈</b></td><td>SPC 自动 Hold 靠 12s 定时器放行，重启后句柄全丢 → 永久卡死</td><td><span class="file">server.js</span> 新增 <code>selfHealHolds()</code>：重启扫描遗留 HOLD 重挂放行定时器（loadsAndHydrate 之后）；放行全部遗留 HOLD（等价只放行自动 SPC Hold）</td><td>重启前 862 批 HOLD → 重启后 1 批（已自愈）</td></tr>
+    <tr><td><b>3D 孪生找回</b></td><td>twin3d/ 仍存在但导航断链、且 6 处直连 :8124 跨源失效</td><td>门户新增独立"数字孪生"导航组（工厂/产线/3D工厂/3D角色）；<span class="file">twin3d/index.html</span> 6 处 <code>http://host:8124</code>→<code>location.origin</code>（走门户代理），WS→门户隧道；排查同类"断链/直连"并归一</td><td>3D 工厂 / 3D 角色经门户 8123 可访问且实时订阅</td></tr>
+  </table>
+
+  <hr class="sepline">
+  <h2 id="app">附录 · 改动文件清单</h2>
+  <table>
+    <tr><th>文件</th><th>批次/项</th><th>改动性质</th></tr>
+    <tr><td class="file">storage/sqlite.js</td><td>C1</td><td>lots 表加 so_id/customer 列 + queryActiveLots()</td></tr>
+    <tr><td class="file">services/wip.js</td><td>C1</td><td>新增 loadAndHydrate</td></tr>
+    <tr><td class="file">server.js</td><td>C1/C3/C4/P0-②</td><td>重建调用 / fdc 真实均值 / 事件总线 / <b>selfHealHolds</b> / analytics 端点</td></tr>
+    <tr><td class="file">apc/controller.js</td><td>C2</td><td>APC 默认开校准</td></tr>
+    <tr><td class="file">fdc.js</td><td>C3</td><td>阈值 Wilson-Hilferty 修正</td></tr>
+    <tr><td class="file">verify-fdc-real.mjs</td><td>C3</td><td>真实样本验证用例</td></tr>
+    <tr><td class="file">services/erp-service.js</td><td>C4</td><td>lastSeq + pollReplay</td></tr>
+    <tr><td class="file">services/wms-service.js</td><td>C4</td><td>lastSeq + pollReplay</td></tr>
+    <tr><td class="file">agent/chat-server.js</td><td>C5</td><td>ORCH_HANDLERS + state</td></tr>
+    <tr><td class="file">health-lamp.js</td><td>U3</td><td>六灯自举组件</td></tr>
+    <tr><td class="file">theme.css</td><td>U5</td><td>统一主题基座</td></tr>
+    <tr><td class="file">portal.js</td><td>U3/U5/IA重组/<b>P0-①</b></td><td>六灯注入 / 静态兜底 / 业务流导航 / <b>基础鉴权(登录+签名cookie+WS校验+网关令牌)</b></td></tr>
+    <tr><td class="file">auth.js</td><td><b>P0-①</b></td><td>新增轻量会话鉴权（HMAC 签名 cookie，零外部依赖）</td></tr>
+    <tr><td class="file">login.html</td><td><b>P0-①</b></td><td>新增安全登录页（默认 admin/admin123，env 可改）</td></tr>
+    <tr><td class="file">services/predict.js</td><td>§11</td><td>新增交期预测·跨阶段根因引擎</td></tr>
+    <tr><td class="file">predict.html</td><td>§11</td><td>预测·根因表 + 点击下钻</td></tr>
+    <tr><td class="file">twin3d/index.html</td><td>§11</td><td>6 处直连:8124 → 门户代理 + WS 隧道</td></tr>
+    <tr><td class="file">README-社区版.md</td><td>D4/<b>P0-②</b></td><td>补 NPI 主线；刷新官方名称与定位</td></tr>
+    <tr><td class="file">项目总结报告.html / 两份诊断 docx / 平台介绍.pptx</td><td>D1–D3/<b>P0-②</b></td><td>对齐 6 进程 / WMS 已建 / 状态注记；PPTX 刷定位</td></tr>
+  </table>
+
+  <div class="foot">
+    本报告由战略-执行差距审计自动汇总 · 数据源自 2026-08-29 两批整改 + P0/§11 实际代码改动与回归日志 · 全量回归 <b style="color:var(--ok)">verify-all 6/6 · 25/0</b>。
+    备份：<span class="file">*_bak_20260829.*</span>。
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>租户(tenant)模块代码审计报告 · 2026-08-27</title>
+<style>
+  :root{ --bg:#0f1420; --card:#171f30; --ink:#e8edf6; --sub:#9fb0c9; --line:#26344d;
+         --ok:#39d98a; --warn:#ffb454; --bad:#ff6b6b; --blue:#4aa8ff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 60px}
+  h1{font-size:24px;margin:0 0 4px}
+  .meta{color:var(--sub);font-size:13px;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:16px 0}
+  h2{font-size:17px;margin:0 0 12px;color:var(--blue)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--sub);font-weight:600}
+  code{background:#0c111c;padding:1px 6px;border-radius:5px;color:#cfe3ff;font-size:12.5px}
+  .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .p-bad{background:rgba(255,107,107,.16);color:var(--bad)}
+  .p-warn{background:rgba(255,180,84,.16);color:var(--warn)}
+  .p-ok{background:rgba(57,217,138,.16);color:var(--ok)}
+  .p-blue{background:rgba(74,168,255,.16);color:var(--blue)}
+  pre{background:#0c111c;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font-size:12.5px;color:#d6e6ff}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .kpi{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .kpi b{font-size:22px;display:block;margin-top:2px}
+  .ok{color:var(--ok)} .bad{color:var(--bad)}
+  ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
+  .tag{color:var(--sub);font-size:12px}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>租户(tenant)模块 · 代码审计报告</h1>
+  <div class="meta">fab-mes · 2026-08-27 · 审计面：<code>tenant/context.js</code> + <code>tenant/index.js</code> + <code>server.js:99-102,333-336</code> · 战略纪律：串主轴、不推翻</div>
+
+  <div class="row">
+    <div class="kpi"><span class="tag">审计结论</span><b class="ok">无断点 · 无空点</b></div>
+    <div class="kpi"><span class="tag">已修复</span><b class="ok">T1 + T2</b></div>
+    <div class="kpi"><span class="tag">诚实蓝图(不修)</span><b>T3</b></div>
+    <div class="kpi"><span class="tag">重启验证</span><b class="ok">6 端口全通</b></div>
+  </div>
+
+  <div class="card">
+    <h2>一、审计范围与方法</h2>
+    <p>对 <b>租户(tenant)</b> 模块做代码级审计，目标：<b>无业务断点（该通不通）、无空点（挂羊头卖狗肉的 stub/误导声明）</b>。方法：</p>
+    <ul>
+      <li>全仓 grep <code>tenant|Tenant|TENANT</code> 定位所有落点；</li>
+      <li>精读 <code>tenant/context.js</code>（AsyncLocalStorage 上下文）、<code>tenant/index.js</code>（装配器）、<code>server.js</code> 接线（require / emitEv 包裹 / <code>/api/tenant</code> 路由）；</li>
+      <li>核对 <code>docs/MULTITENANT.md</code> 声称能力 vs 实际交付；</li>
+      <li>隔离单元测试 <code>attachToEv</code> + 全栈重启实测。</li>
+    </ul>
+    <p class="tag">功能面唯一：仅 <code>tenant/</code> 与 <code>server.js</code> 接线；前端无调用，<code>/api/tenant</code> 为诊断端点（早前 qa 报告已标 P3 非致命）。</p>
+  </div>
+
+  <div class="card">
+    <h2>二、审计发现</h2>
+    <table>
+      <tr><th>ID</th><th>类型</th><th>位置</th><th>问题</th></tr>
+      <tr>
+        <td><b>T1</b></td>
+        <td><span class="pill p-bad">空点·伪功能</span></td>
+        <td><code>tenant/index.js:43-49</code><br><code>attachToEv</code></td>
+        <td>多租户分支 <code>ev.tenant = currentTenant()</code>；但 <code>withTenant</code> 全运行时<b>从不被调用</b>，AsyncLocalStorage 永不被填充 → <code>currentTenant()</code> 恒为 <code>'default'</code>。即"声称附 tenant"只盖 <code>'default'</code>，<b>无真实隔离</b>；且已 import 的 <code>getTenant</code> <b>从未使用</b>（死引用）。正是对早前"L4 多租户隔离实为零隔离"空点的落地确认。</td>
+      </tr>
+      <tr>
+        <td><b>T2</b></td>
+        <td><span class="pill p-warn">空点·误导声明</span></td>
+        <td><code>server.js:335</code><br><code>/api/tenant</code></td>
+        <td><code>note: 'MULTI_TENANT=1 激活隔离语义'</code> 过度声称——开启后并无真实隔离（T1 所致），属"挂羊头"。</td>
+      </tr>
+      <tr>
+        <td><b>T3</b></td>
+        <td><span class="pill p-blue">死属性·蓝图</span></td>
+        <td><code>tenant/index.js:22,31</code></td>
+        <td><code>initTenant({storage})</code> 接受并挂在返回对象上但<b>从不使用</b>；标注"预留行级过滤"。属<b>诚实蓝图态</b>（文档已明示），非缺陷，<b>不强行接活</b>。</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>三、修复（串主轴不推翻）</h2>
+    <p>按战略纪律：<b>不</b>去实现整条多租户行级隔离（那叫强行接活），而是把"声称的能力"与"实际交付"对齐——让透传真正生效，声明诚实化。</p>
+    <p><b>T1 · <code>tenant/index.js</code> attachToEv</b></p>
+    <pre>// 修复后：多租户下从事件中显式携带的 tenant 提取并附到 ev.tenant
+attachToEv(ev) {
+  if (!ev || typeof ev !== 'object') return ev;
+  if (!MULTI_TENANT) return ev;            // 单租户：原样返回（不新增字段）
+  ev.tenant = getTenant(ev);               // 改用已 import 的 getTenant，真正透传
+  return ev;
+}
+// getTenant 提取源：ev.tenant / ev.meta.tenant / ev.headers['x-tenant-id']，缺省回退 DEFAULT_TENANT</pre>
+    <p><b>T2 · <code>server.js</code> /api/tenant note</b></p>
+    <pre>note: '事件级 tenant 透传已接活（ev.tenant 显式携带即透传）；行级数据隔离(库/表)为蓝图态，未实现'</pre>
+  </div>
+
+  <div class="card">
+    <h2>四、验证结果</h2>
+    <ul>
+      <li><b>语法</b>：<code>node --check</code> 对 <code>tenant/context.js</code> / <code>tenant/index.js</code> / <code>server.js</code> 全部通过。</li>
+      <li><b>单元测试（MULTI_TENANT=1）</b>：
+        <ul>
+          <li><code>attachToEv({tenant:'fabA'})</code> → <code>ev.tenant="fabA"</code> ✅</li>
+          <li><code>attachToEv({meta:{tenant:'fabB'}})</code> → <code>ev.tenant="fabB"</code> ✅</li>
+          <li><code>attachToEv({headers:{'x-tenant-id':'fabC'}})</code> → <code>ev.tenant="fabC"</code> ✅</li>
+          <li><code>attachToEv({})</code> → <code>ev.tenant="default"</code>（回退）✅</li>
+        </ul>
+      </li>
+      <li><b>单租户回归</b>：<code>attachToEv({type:'x'})</code> 原样返回（无 <code>tenant</code> 字段）；<code>listTenants()</code> 返回 <code>[{id:'default',isDefault:true,active:true}]</code> ✅</li>
+      <li><b>全栈重启实测</b>：<code>/api/tenant</code> 返回诚实 note；6 端口全 LISTEN、MES 未崩溃；三路 health 200；<code>/api/tools</code> 200（192 设备，确认 2D 孪生循环引用修复仍生效）。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>五、结论</h2>
+    <p>租户模块<b>无业务断点、无空点</b>：</p>
+    <ul>
+      <li><b>T1/T2 已修复</b>——历史"L4 多租户隔离实为零隔离"空点已闭环为「<b>事件级 tenant 透传真实可用 + 行级数据隔离诚实标蓝图</b>」。</li>
+      <li><b>T3 为诚实蓝图态</b>，文档已明示预留，未强行接活，符合战略纪律。</li>
+      <li>单租户默认行为零侵入、无回归。</li>
+    </ul>
+    <p class="tag">当前 5 进程后台常驻：MES(8124) / PORTAL(8123) / ERP(8126) / AGENT(8127) / EAP(8125) + HSMS(5000)。可访问 <code>http://127.0.0.1:8123/api/tenant</code> 查看。</p>
+  </div>
+</div>
+</body>
+</html>

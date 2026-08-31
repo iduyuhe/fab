@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>战略审计 + 功能审计闭环复验报告 · 2026-08-23</title>
+<style>
+  :root{ --bg:#0f1419; --card:#161c24; --ink:#e6edf3; --muted:#9aa7b4; --ok:#3fb950; --warn:#d29922; --bd:#283340; --accent:#58a6ff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 64px}
+  header{border-bottom:1px solid var(--bd);padding-bottom:18px;margin-bottom:26px}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:.3px}
+  .sub{color:var(--muted);font-size:14px}
+  .banner{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 28px}
+  .pill{background:var(--card);border:1px solid var(--bd);border-radius:999px;padding:8px 16px;font-size:14px}
+  .pill b{color:var(--ok)}
+  h2{font-size:19px;margin:34px 0 12px;padding-left:10px;border-left:4px solid var(--accent)}
+  h3{font-size:15px;color:var(--muted);margin:18px 0 8px;text-transform:uppercase;letter-spacing:.5px}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--bd);font-size:13.5px;vertical-align:top}
+  th{background:#1c2530;color:var(--muted);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .ok{color:var(--ok);font-weight:600}
+  .warn{color:var(--warn);font-weight:600}
+  code{background:#0b0f14;border:1px solid var(--bd);border-radius:5px;padding:1px 6px;font-size:12.5px;color:#a5d6ff}
+  .note{background:var(--card);border:1px solid var(--bd);border-left:4px solid var(--warn);border-radius:8px;padding:12px 16px;margin:14px 0;color:var(--muted)}
+  .note b{color:var(--ink)}
+  .spine{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px 18px;margin:12px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.7;color:#9fd0ff;overflow-x:auto}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
+  .kpi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
+  .kpi .v{font-size:24px;font-weight:700;color:var(--ok)}
+  .kpi .l{color:var(--muted);font-size:12.5px;margin-top:4px}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--bd);color:var(--muted);font-size:12.5px}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>战略审计 + 功能审计 · 闭环复验报告</h1>
+    <div class="sub">fab-mes 智能晶圆厂平台 · 数字主线(spine)对齐 · 生成于 2026-08-23 · 启动器 <code>bin/start-community.sh</code></div>
+  </header>
+
+  <div class="banner">
+    <span class="pill">无断点 <b>✅</b></span>
+    <span class="pill">无空点 <b>✅</b></span>
+    <span class="pill">业务链通畅 <b>✅</b></span>
+    <span class="pill">主轴丝滑 <b>✅</b></span>
+    <span class="pill">说法一致 <b>✅</b></span>
+  </div>
+
+  <h2>一、战略审计结论：串主轴，不推翻</h2>
+  <p>本轮战略审计锁定用户 2026-08-27 拍板的终态基线——<b>以"数字主线(spine)"为焊点，把已齐全的零件（数字孪生 / 工业互联网 EAP·SECS-GEM / 五大智能引擎·APC·Agent）串成体系</b>，而非按层级(L1–L4)去填满每一层导致"表面积大、连通核心小"的碎片化。</p>
+  <div class="note">
+    <b>工作范式：</b>只修主轴本身断裂；其余 L4 模块（tenant / apc / adapters / integrations）明确标注<b>"蓝图态 / 挂枝"</b>，不假装完成、不强行接活；<b>停止"发现断点就补"的被动循环</b>。零件已齐，缺的是主轴与纪律，不推翻重写。
+  </div>
+
+  <h2>二、功能审计发现的真断点</h2>
+  <p>三路并行只读审计（代码 / 文档 / UX）收敛出的真实断点，按"是否打断数字主线"分级：</p>
+  <table>
+    <thead><tr><th>级别</th><th>编号</th><th>断点</th><th>类型</th></tr></thead>
+    <tbody>
+      <tr><td><span class="ok">🔴 真断点</span></td><td>U1</td><td><code>portal.js</code> 未注册 <code>/erp-ops.html</code> → 新建 ERP 操作台 404</td><td>代码</td></tr>
+      <tr><td><span class="ok">🔴 真断点</span></td><td>C2</td><td>ERP standalone 双库重放缺口：断连期已完工(lotDone)未进 <code>cost_batches</code></td><td>代码·双库</td></tr>
+      <tr><td><span class="ok">🔴 真断点</span></td><td>C5</td><td><code>audit/index.js</code> 幻影接线：预留事件(recipeLoad/amhs/copilot*)未标注，易误定位</td><td>代码·幻影</td></tr>
+      <tr><td><span class="warn">🟠 文档</span></td><td>D1–D7</td><td>总结报告/蓝图docx/核查docx/pptx/CONTRACT.md 与"串主轴不推翻"战略不一致</td><td>文档</td></tr>
+      <tr><td><span class="warn">🟠 UX</span></td><td>U2–U4</td><td>导航/命名/主题——早前会话已注入 UNIFIED NAV 且本段验证完整，无需重写</td><td>UX</td></tr>
+    </tbody>
+  </table>
+
+  <h2>三、已落地修复（代码 + 文档）</h2>
+  <table>
+    <thead><tr><th>编号</th><th>文件</th><th>改动</th><th>类型</th></tr></thead>
+    <tbody>
+      <tr><td>U1</td><td><code>portal.js</code></td><td>PAGES 白名单 + handler 注册 <code>/erp-ops.html</code></td><td>代码·真断点</td></tr>
+      <tr><td>C2</td><td><code>services/erp-service.js</code></td><td><code>reconcileWithMES()</code> 新增断连期 lotDone 成本重放（补 <code>cost_batches</code>）</td><td>代码·双库</td></tr>
+      <tr><td>C5</td><td><code>audit/index.js</code></td><td><code>AUDIT_EVENTS</code> 前加活事件/蓝图态/预留状态注记</td><td>代码·幻影</td></tr>
+      <tr><td>D1</td><td><code>项目总结报告.html</code></td><td>改"5进程在线 / EAP 已纳入编排 / 3D=twin3d 已并入"</td><td>文档</td></tr>
+      <tr><td>D2</td><td><code>系统集成诊断与整合蓝图.docx</code></td><td>改"串主轴不推翻"终态，保留 fab-erp standalone</td><td>文档</td></tr>
+      <tr><td>D3</td><td><code>完整性一致性整合性核查报告.docx</code></td><td>横幅/正文分裂态描述修正为蓝图态非缺陷</td><td>文档</td></tr>
+      <tr><td>D4</td><td><code>fab-mes-平台介绍.pptx</code></td><td>slide 11/15/16 加 7 处"（蓝图态…）"注记</td><td>文档</td></tr>
+      <tr><td>D5</td><td><code>docs/CONTRACT.md</code></td><td>端口图纠错（8125 = EAP 非 APS；APS 内置 8124）</td><td>文档</td></tr>
+      <tr><td>D6</td><td>ERP 财务台账</td><td>标注"财务台账，非仓储 WMS"免责</td><td>文档</td></tr>
+      <tr><td>D7</td><td><code>qa_reverify_2026-08-23.html</code></td><td>纠正此前误报（蓝图 docx 当时未真实落盘）</td><td>文档</td></tr>
+    </tbody>
+  </table>
+
+  <h2>四、实时复验矩阵（bin/start-community.sh 干净重启后实测）</h2>
+  <p>启动进程：<code>MES=715 PORTAL=716 ERP=717 AGENT=718 EAP=719</code> + <code>HSMS :5000</code>；6 端口全 LISTEN。下表经门户代理 <code>8123</code> 实测：</p>
+  <table>
+    <thead><tr><th>路由 / 检查项</th><th>预期</th><th>实测</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /erp-ops.html</code></td><td>200</td><td>200</td><td><span class="ok">✅ U1 修复（原 404）</span></td></tr>
+      <tr><td><code>GET</code> 9 个页面（agent/twin/line-twin/fab-twin/sim/lab/portal/eap-console/console + /twin3d/）</td><td>200</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/health</code>（MES via 8123）</td><td>200</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/eap/health</code></td><td>200</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/erp/health</code></td><td>200</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td>四死路由 <code>/api/spc/alarms</code> · <code>/api/wip/stats</code> · <code>/api/dashboard</code> · <code>/api/apc</code></td><td>200</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/wip</code>（wip=29, moves=156）</td><td>200+数据</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/lots</code>（34 lots）</td><td>200+数据</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/erp/inventory</code></td><td>200</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/erp/costs</code>（count=200）</td><td>200</td><td>200</td><td><span class="ok">✅ C2 双库重放生效</span></td></tr>
+      <tr><td><code>POST /api/agent/chat</code></td><td>200</td><td>200</td><td><span class="ok">✅</span></td></tr>
+      <tr><td><code>GET /api/eap/events</code>（lotStart/toolStatus）</td><td>200</td><td>200</td><td><span class="ok">✅ spine 实证</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>五、数字主线 spine 实证</h2>
+  <p>重启后 EAP 经 HSMS(:5000) 真实驱动 MES 生命周期，ERP 经 WS 订阅并重连补偿，全链路无人工缝合：</p>
+  <div class="spine">
+S6F11 CEID=1001 → ETCH-015 → toolStatus/RUN   → EAP ingest → MES<br>
+S6F11 CEID=2001 → ETCH-015 → lotStart/RUN     → EAP ingest → MES<br>
+S6F11 CEID=2002 → ETCH-015 → lotDone/RUN      → EAP ingest → MES → ERP 领料(LOT-xxxx)<br>
+MES → emitEv → ERP(WS订阅) → reconcileWithMES() 补成本归集 → cost_batches(200)<br>
+MES → WS(8123隧道) → 前端孪生 / Agent 问答实时读取 WIP(29)/moves(156)
+  </div>
+  <div class="grid">
+    <div class="kpi"><div class="v">29</div><div class="l">在制 WIP（MES 引擎）</div></div>
+    <div class="kpi"><div class="v">34</div><div class="l">在制批次 lots</div></div>
+    <div class="kpi"><div class="v">200</div><div class="l">ERP 成本归集批次（C2）</div></div>
+    <div class="kpi"><div class="v">6/6</div><div class="l">端口 LISTEN（含 HSMS 5000）</div></div>
+  </div>
+
+  <h2>六、残留与范围外说明</h2>
+  <div class="note">
+    <b>① 测试误差澄清：</b>本复验早期曾把 <code>/fab-twin/</code>、<code>/sim/</code>（无 .html）误判为 404；实际门户注册的是 <code>/fab-twin.html</code>、<code>/sim.html</code>，正确路径实测均 200。属测试脚本路径写错，非产品缺陷。<br>
+    <b>② 范围外（按"串主轴不推翻"策略保留蓝图态）：</b>tenant/apc/adapters/integrations、WMS 仓储执行、真实机台对接、多租户容器——均不强行接活，已在文档与门户标注"蓝图态/挂枝"。<br>
+    <b>③ 沙箱测试通道：</b>直连 <code>127.0.0.1:8126</code> 偶发 HTTP 000，经门户代理 8123 稳定 200，属测试环境限制非产品断点。
+  </div>
+
+  <h2>七、复现方式</h2>
+  <p>杀旧进程 → 干净重启 → 全路由复验：</p>
+  <div class="spine">
+taskkill /F /PID &lt;portal&gt; /PID &lt;mes&gt; /PID &lt;eap&gt; /PID &lt;erp&gt; /PID &lt;agent&gt;<br>
+bash bin/start-community.sh          # 拉全 5 进程 + HSMS :5000<br>
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8123/erp-ops.html   # → 200
+  </div>
+
+  <footer>
+    本报告为战略审计 + 功能审计闭环（任务 #165）的复验交付物。战略基线：串主轴不推翻；代码层 U1/C2/C5 已落盘并经干净重启验证；文档层 D1–D7 已对齐；UX 导航完整。临时脚本已清理。
+  </footer>
+</div>
+</body>
+</html>

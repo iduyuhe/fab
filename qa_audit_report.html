@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fab-mes 战略 + 代码审计报告</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#141b2e; --panel2:#1b2238; --line:#2a3350;
+    --txt:#e6ecf5; --mut:#9aa7c2; --ok:#37d67a; --warn:#ffb454; --bad:#ff5d6c; --blue:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 60px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--mut);margin-bottom:22px}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 26px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card .n{font-size:26px;font-weight:700}
+  .card .l{color:var(--mut);font-size:12px;margin-top:2px}
+  .ok .n{color:var(--ok)} .bad .n{color:var(--bad)} .warn .n{color:var(--warn)} .blue .n{color:var(--blue)}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px}
+  h2{font-size:18px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  h2 .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .t-ok{background:rgba(55,214,122,.15);color:var(--ok)}
+  .t-bad{background:rgba(255,93,108,.15);color:var(--bad)}
+  .t-warn{background:rgba(255,180,84,.15);color:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap}
+  .p0{background:rgba(255,93,108,.18);color:#ff8a95}
+  .p1{background:rgba(255,180,84,.18);color:#ffc879}
+  .p2{background:rgba(90,169,255,.16);color:#8cc2ff}
+  .p3{background:rgba(154,167,194,.16);color:var(--mut)}
+  .yes{color:var(--ok)} .no{color:var(--bad)} .partial{color:var(--warn)}
+  code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12px;color:#cdd8ee}
+  .note{color:var(--mut);font-size:12.5px;margin-top:10px}
+  ul{margin:8px 0 0;padding-left:18px}
+  li{margin:4px 0}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:12px;margin-top:6px}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>fab-mes · 战略审计 + 代码审计</h1>
+  <div class="sub">审计范围：portal(8123) 网关 + MES(8124) + EAP(8125) + ERP(8126) + Agent(8127) + 11 个前端页 + 文档/技能/PPT。方法：三路并行只读审计（代码数据流 / 战略蓝图 / UX导航），全部 curl 实测 + 源码核对。<b>本文件为只读审计结论，未改动任何代码。</b></div>
+
+  <div class="cards">
+    <div class="card ok"><div class="n">7/7</div><div class="l">数字主线 spine 已连通环节</div></div>
+    <div class="card bad"><div class="n">6</div><div class="l">断点（连接性 / 丝滑杀手）</div></div>
+    <div class="card warn"><div class="n">9</div><div class="l">空点（声称未落地 / 超纲宣称）</div></div>
+    <div class="card blue"><div class="n">2</div><div class="l">业务链软断裂（主轴延伸）</div></div>
+  </div>
+
+  <!-- 1 已连通 -->
+  <section>
+    <h2>✅ 已连通 / 已落地（经实测确认，非猜测）</h2>
+    <ul>
+      <li><b>数字主线 7 环节真实打通</b>：投料(lotRelease) → MES量测(metrology) → SPC/FDC判异(spcAlarm) → 2D孪生(WS实时) → ERP领料(ISSUE)+成本(costLot) → Agent问答。每个环节均有现场数据验证（inv_tx 真实领料、costs 200 条批次、/api/spc/inject 触发 violated、Agent 返回结构化回复）。</li>
+      <li><b>门户网关分流生效</b>：<code>/api/eap/*</code>→8125、<code>/api/agent/*</code>→8127、<code>/api/erp/*</code>→8126（其余→8124）全部 200，此前 eap-console 404 已修复。</li>
+      <li><b>五大引擎健全</b>：SPC/FDC/PDM/VM/APS 均被 server.js 实例化并真实调用，前端均有数据返回——这是装配最完整的一组。</li>
+      <li><b>所有 &lt;button&gt; 均有真实事件绑定</b>：console / eap-console / lab / sim / twin3d 的按钮全部指向 200 端点且有反馈（无"纯空按钮"）。</li>
+      <li><b>双库无重放/双写风险</b>：fab-mes.db 与 fab-erp.db 实体不重叠，ERP 仅经 WS 消费 + GET 只读，不回写 MES。</li>
+      <li><b>EAP / SECS-GEM 是真实 HSMS 协议实现</b>（S1F1/S2F17/S6F11 二进制编解码），非空壳。</li>
+    </ul>
+  </section>
+
+  <!-- 2 断点 -->
+  <section>
+    <h2><span class="tag t-bad">断点</span> 连接性 / 丝滑杀手（点了没反应、进不去、数据全白）</h2>
+    <table>
+      <tr><th style="width:46px">P</th><th style="width:150px">断点</th><th>现象 & 根因（已核实）</th><th style="width:120px">修复方向</th></tr>
+      <tr>
+        <td><span class="pill p0">P0</span></td>
+        <td>twin3d ERP 面板全白</td>
+        <td><code>twin3d/portal.html</code> 硬编码 <code>http://127.0.0.1:8126</code> 抓 ERP，而 <b>ERP(8126) 无 CORS 头</b> → 浏览器拦截，供应链/财务页永远"ERP 未连接"。这是用户"点了没回复"的直接来源之一。</td>
+        <td>改走相对 <code>/api/erp/*</code> 走门户同源；或给 ERP 加 CORS 头</td>
+      </tr>
+      <tr>
+        <td><span class="pill p0">P0</span></td>
+        <td>导航孤岛 ×2</td>
+        <td><code>/eap-console.html</code>（EAP控制台）与 <code>/twin3d/portal.html</code>（角色工作台）在门户/控制台主导航中<b>无任何 &lt;a href&gt;</b>，用户只能手输 URL 进入——"功能存在但进不去"。</td>
+        <td>加入 portal.html 卡片 + 控制台 nav</td>
+      </tr>
+      <tr>
+        <td><span class="pill p0">P0</span></td>
+        <td>跨源直连绕过门户</td>
+        <td><code>twin3d/portal.html</code>、<code>agent.html</code> 硬编码 <code>127.0.0.1:8125/8126/8127</code>，本地可用但<b>违背统一门户设计</b>，非 localhost 访问即全部失效。</td>
+        <td>统一改相对 <code>/api/eap|erp|agent/*</code></td>
+      </tr>
+      <tr>
+        <td><span class="pill p1">P1</span></td>
+        <td>EAP 不驱动真实 lot 生命周期</td>
+        <td>eap-host 经 <code>/api/ingest</code> 重发的 lot 事件<b>不回灌 WIPEngine</b>、缺 <code>mod</code> 不触发 VM、<code>src==='eap'</code> 不回推 secs → EAP 是镜像/演示而非 spine 执行源，"EAP设备执行"名实不符。</td>
+        <td>ingest 回灌 WIPEngine + 带 mod 触发 VM</td>
+      </tr>
+      <tr>
+        <td><span class="pill p1">P1</span></td>
+        <td>3D 孪生默认不接总线</td>
+        <td><code>twin3d/index.html</code> 默认 <code>src='sim'</code>（浏览器内模拟 EAP），需显式 <code>?src=mes</code> 才接真实事件总线——用户默认看到的是假数据。</td>
+        <td>默认连真实后端 + 显著标注数据源</td>
+      </tr>
+      <tr>
+        <td><span class="pill p3">P3</span></td>
+        <td>潜在死路由（埋雷）</td>
+        <td><code>/api/spc/alarms</code>、<code>/api/wip/stats</code>、<code>/api/dashboard</code>、<code>/api/apc</code> 返回 <b>404</b>。当前无前端引用，但一旦接按钮即断。</td>
+        <td>后端补齐或前端改用已存在路由</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- 3 空点 -->
+  <section>
+    <h2><span class="tag t-warn">空点</span> 声称有、代码未真落地 / 对外宣称超纲</h2>
+    <table>
+      <tr><th style="width:46px">P</th><th style="width:200px">空点</th><th>声称来源 → 代码实况</th></tr>
+      <tr><td><span class="pill p2">P2</span></td><td>APC「真实闭环」</td><td>白皮书/PPTX 称"APC 闭环"；实际 <code>APC_ENABLED</code> 默认 false、无自动触发点、emit <code>apc</code> 事件无人消费 → 仅"手动建议器"。<b>应降级标蓝图</b>。</td></tr>
+      <tr><td><span class="pill p2">P2</span></td><td>L4 多租户「隔离」</td><td>PPTX 写 <code>x-tenant-id</code> 隔离；实际开启也<b>零隔离</b>（仅字段透传，落库/查询无过滤）。<b>应改"字段透传，行级隔离待建"</b>。</td></tr>
+      <tr><td><span class="pill p2">P2</span></td><td>真实协议适配 SAP/用友/OPC-UA/EDA</td><td>PPTX 称"即插即用/指向真实系统"；实际全 stub/null，<code>mapErpData</code> 从未调用，适配器默认 demo 空转。<b>应改"适配骨架 demo 可用"</b>。</td></tr>
+      <tr><td><span class="pill p2">P2</span></td><td>ERP 无操作 UI + GR 无事件驱动</td><td>ERP 纯 API/数据层、无人类操作台；收货(GR)仅手动 API、无事件驱动，与 SHIP 自动闭环不对称。</td></tr>
+      <tr><td><span class="pill p2">P2</span></td><td>审计发送端真空白</td><td>A1 仅补接收端；副驾/自治动作未进 MES 合规链（<code>copilotSuggest/copilotAutoExec</code> 永不经总线触发，executor 仅 console 输出）。</td></tr>
+      <tr><td><span class="pill p3">P3</span></td><td>死模块</td><td><code>integrations/index.js</code> + <code>mes-adapter.js</code> 全仓从不 require；<code>bindInProcErp</code> 导出无调用；<code>adapters/opcua|eda</code> 默认空转。</td></tr>
+      <tr><td><span class="pill p3">P3</span></td><td>VM 推送缺消费入口</td><td><code>vmPrediction/vmResult</code> 无后端订阅者，除 twin3d 外多数页不渲染 VM WS 推送——事件总线产出的 VM 数据大部分"广播即丢弃"。</td></tr>
+      <tr><td><span class="pill p3">P3</span></td><td>诊断端点无前端入口</td><td><code>/api/tenant /api/adapters /api/integration/erp /api/e10dbg /api/apc/advise(GET) /api/history/events</code> 均 200 但无页面调用（信息端点，非致命）。</td></tr>
+      <tr><td><span class="pill p3">P3</span></td><td>陈旧文档路径</td><td><code>项目总结报告.html</code> 仍引用已删除的 <code>E:/Fab/fab-digital-twin/</code>（已并入 twin3d/），与 MICROSERVICES.md 矛盾。</td></tr>
+    </table>
+    <div class="note">⚠️ 重大澄清：未发现"把从未存在的模块伪装成已完成"的严重欺诈——平台自身 MICROSERVICES.md / 两份 .docx / PPTX slide17 已诚实标注 L4/真实对接为蓝图态。<b>真正风险在"对外宣称口径超过已承认的蓝图态边界"</b>（白皮书 APC 闭环、PPTX 多租户隔离/真实适配即插即用），以及少数真实缺口未被纳入蓝图清单。</div>
+  </section>
+
+  <!-- 4 业务链 -->
+  <section>
+    <h2><span class="tag t-ok">业务链</span> 数字主线 spine 逐环节判定</h2>
+    <table>
+      <tr><th style="width:40px">#</th><th style="width:200px">环节</th><th>判定</th><th style="width:120px">证据</th></tr>
+      <tr><td>①</td><td>投料 lotRelease</td><td class="yes">✅ 已连通</td><td>inv_tx 真实 ISSUE</td></tr>
+      <tr><td>②</td><td>EAP 设备执行 lotStart/Done</td><td class="partial">⚠️ 软断裂</td><td>不回灌 WIPEngine</td></tr>
+      <tr><td>③</td><td>MES 量测 metrology</td><td class="yes">✅ 已连通</td><td>/api/metrology 有数</td></tr>
+      <tr><td>④</td><td>SPC/FDC 判异</td><td class="yes">✅ 已连通</td><td>inject→violated</td></tr>
+      <tr><td>⑤</td><td>孪生映射（事件总线）</td><td class="partial">⚠️ 2D通 / 3D默认模拟</td><td>3D 需 ?src=mes</td></tr>
+      <tr><td>⑥</td><td>ERP 领料 + 成本</td><td class="yes">✅ 已连通</td><td>costs 200 批</td></tr>
+      <tr><td>⑦</td><td>Agent 问答</td><td class="yes">✅ 已连通</td><td>结构化回复</td></tr>
+    </table>
+    <div class="note">业务完整度判级：<b>主轴通、支线蓝图</b>。主轴 ①③④⑥⑦ 真实闭环；②EAP执行、⑤3D默认接总线为软断裂（恰属你刻意保留的 B 组）。ERP 全链路（投料→领料→成本→发运）已通，但缺操作 UI / GR 无事件驱动。</div>
+  </section>
+
+  <!-- 5 命名 -->
+  <section>
+    <h2><span class="tag t-warn">一致性</span> 命名 / 概念混用（认知负担）</h2>
+    <ul>
+      <li><b>门户 vs 控制台 vs 角色工作台三套首页语义并存</b>：portal.html=门户总览、console.html=MES控制台、twin3d/portal.html=角色工作台(S1-S5) 都是"工作台"语义，易混淆。</li>
+      <li><b>数字孪生 2D/3D 层级口径不一</b>：PPTX 称"四级孪生"，白皮书/docs 称"三级孪生"，同一"孪生"既指 2D 镜像又指 3D。</li>
+      <li><b>主线(spine) vs 孪生(镜像) 偶被混谈</b>，建议明文分工：主线=事件驱动 spine，孪生=镜像可视化。</li>
+    </ul>
+  </section>
+
+  <!-- 6 优先级 -->
+  <section>
+    <h2>🎯 整改分组（待你确认范围，本审计未改代码）</h2>
+    <table>
+      <tr><th style="width:120px">批次</th><th>内容</th><th style="width:140px">修复成本</th></tr>
+      <tr><td><b>P0 丝滑杀手</b></td><td>twin3d ERP CORS 全白 · 导航孤岛(eap-console/twin3d) · 跨源直连改相对路径</td><td>低（前端为主）</td></tr>
+      <tr><td><b>P1 业务链打通</b></td><td>EAP 回灌 WIPEngine 驱动真实 lot 生命周期 · 3D 默认接事件总线</td><td>中（EAP+前端）</td></tr>
+      <tr><td><b>P2 空点纠偏</b></td><td>APC/多租户/真实适配 超纲宣称降级标蓝图 · ERP 操作台或声明无UI · 审计发送端接合规链</td><td>中（文档+少量代码）</td></tr>
+      <tr><td><b>P3 埋雷清理</b></td><td>死路由补齐/改引用 · 死模块清理或标注 · VM 消费入口 · 陈旧路径修正 · 命名统一</td><td>低-中</td></tr>
+    </table>
+    <div class="note">战略对齐提示（你 2026-08-27 拍板"串主轴不推翻"）：P0/P1 是主轴本身的丝滑与延伸，建议优先；P2/P3 中"真实缺口"显式标蓝、"超纲宣称"降级，使文档与代码严格对齐，不推翻重写。</div>
+  </section>
+
+  <div class="legend">
+    <span><span class="pill p0">P0</span> 实操丝滑杀手（必修）</span>
+    <span><span class="pill p1">P1</span> 业务链延伸</span>
+    <span><span class="pill p2">P2</span> 蓝图纠偏/真实缺口</span>
+    <span><span class="pill p3">P3</span> 埋雷/一致性</span>
+  </div>
+</div>
+</body>
+</html>

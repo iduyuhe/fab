@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 晶圆工厂智能企业平台 · 战略白皮书</title>
+<style>
+  :root{ --bg:#0d1117; --panel:#161b22; --line:#30363d; --fg:#e6edf3; --muted:#8b949e;
+         --c1:#58a6ff; --c2:#3fb950; --c3:#d29922; --c4:#f85149; --accent:#bc8cff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 28px 80px}
+  h1{font-size:30px;margin:0 0 6px;background:linear-gradient(90deg,var(--c1),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+  h2{font-size:22px;margin:46px 0 14px;padding-left:12px;border-left:4px solid var(--c1)}
+  h3{font-size:17px;margin:26px 0 10px;color:var(--c1)}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:8px}
+  .tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--line);color:var(--muted);margin-right:6px}
+  p{margin:10px 0;color:#c9d1d9}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:16px 0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top}
+  th{background:#1c2330;color:var(--c1);font-weight:600}
+  tr:nth-child(even) td{background:#11161d}
+  .lv{font-weight:700}
+  .l1{color:var(--c2)} .l2{color:var(--c1)} .l3{color:var(--c3)} .l4{color:var(--c4)}
+  .note{background:#1a2030;border-left:3px solid var(--accent);padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0;color:#c9d1d9;font-size:14px}
+  .key{border-left:3px solid var(--c2)}
+  .warn{border-left:3px solid var(--c4)}
+  .arch{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+  .arch .layer{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+  .arch .layer b{color:var(--accent)}
+  code{background:#1c2330;padding:2px 6px;border-radius:5px;font-size:13px;color:#ffa657}
+  ul{margin:10px 0;padding-left:22px} li{margin:6px 0}
+  .foot{margin-top:56px;color:var(--muted);font-size:13px;text-align:center;border-top:1px solid var(--line);padding-top:20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+</style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>AI 晶圆工厂智能企业平台</h1>
+  <div class="sub">面向 AI 芯片（晶圆）工厂 · 四级演进战略白皮书</div>
+  <div>
+    <span class="tag">社区级 Community</span>
+    <span class="tag">教学级 Educational</span>
+    <span class="tag">专业级 Professional</span>
+    <span class="tag">工厂级 Fab</span>
+    <span class="tag">AI Agent 为核心</span>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">一句话定位</h3>
+    <p>构建一个<strong>以 AI Agent 为核心</strong>、专门服务于 <strong>AI 芯片（晶圆）工厂</strong> 的智能企业操作系统，
+    通过 <strong>社区 → 教学 → 专业 → 工厂</strong> 四级演进，从"开源可玩"逐级升档到"真实部署"，
+    用前两级养出的 AI 能力与生态反哺后两级，最终落地"面向新时代的智能企业"。</p>
+  </div>
+
+  <h2>一、核心认知：四级是"同一底座的四种交付形态"</h2>
+  <p>四级不是"功能由少到多"的线性堆叠，而是<strong>同一套底座按"可信度 / 复杂度 / 合规要求"逐级升档</strong>。
+  每一级都复用下一级的底座，但通过<strong>替换关键组件</strong>实现跃迁：</p>
+  <ul>
+    <li><b>工厂级不是最高级，而是"约束最多"的一级</b>——合规、安全、标准、可靠性要求最高。</li>
+    <li><b>社区级与教学级反而是"铺量、建生态、养模型"的土壤</b>——这是"面向新时代智能企业"的杠杆点：用生态养能力，反哺工厂级。</li>
+  </ul>
+
+  <table>
+    <tr><th>级别</th><th>核心命题</th><th>用户</th><th>数据真实性</th><th>AI Agent 角色</th></tr>
+    <tr><td class="lv l1">L1 社区级</td><td>让任何人 5 分钟跑起一个晶圆厂</td><td>爱好者 / 学生 / 极客</td><td>全仿真</td><td>聊天助手 / 可视化引导</td></tr>
+    <tr><td class="lv l2">L2 教学级</td><td>把半导体制造工艺 + MES 原理讲透</td><td>院校 / 培训机构</td><td>仿真 + 标准工艺库</td><td>带教导师（逐步解释 + 实验评测）</td></tr>
+    <tr><td class="lv l3">L3 专业级</td><td>工程师可建模、做 what-if、接真实数据</td><td>工艺 / IE / 良率工程师</td><td>仿真 + 可接真实接口</td><td>协作副驾（半自治、人审）</td></tr>
+    <tr><td class="lv l4">L4 工厂级</td><td>真实 FAB 上线运行</td><td>晶圆厂运营</td><td>真实设备 / 实时</td><td>自治体（人在回路监督）</td></tr>
+  </table>
+
+  <h2>二、四级边界设计</h2>
+
+  <h3 class="l1">L1 社区级（Community）—— 开源、轻量、可玩</h3>
+  <div class="card">
+    <ul>
+      <li><b>形态</b>：单文件 / 一键部署（Docker 一条命令），前端用既有 <code>twin.html</code> 系列做"晶圆厂沙盘"。</li>
+      <li><b>AI Agent</b>：对话式助手——"用自然语言让你看到光刻机瓶颈""讲讲 SPC 是什么"。</li>
+      <li><b>去工业化</b>：SQLite 即可、无鉴权、无合规负担。</li>
+      <li><b>AI 芯片针对性</b>：内置"AI 芯片典型工艺路线（5nm/3nm 逻辑、HBM 堆叠）"为默认场景。</li>
+      <li><b>价值</b>：生态入口、训练数据来源、品牌建设。</li>
+    </ul>
+  </div>
+
+  <h3 class="l2">L2 教学级（Educational）—— 课程化、实验化</h3>
+  <div class="card">
+    <ul>
+      <li><b>形态</b>：在社区级上加"课程模块 + 实验台 + 评测"。
+        例：实验一"用 SPC 拦截一次光刻 CD 漂移"；实验二"APS 排程让交期达标"。</li>
+      <li><b>AI Agent</b>：<b>带教导师</b>——学生做错步骤，Agent 提示但不代做；可生成个性化错题讲解。</li>
+      <li><b>工艺库</b>：引入 SEMI 标准工艺段、真实典型配方（脱敏）。</li>
+      <li><b>价值</b>：院校合作、人才输送、标准心智占领。</li>
+    </ul>
+  </div>
+
+  <h3 class="l3">L3 专业级（Professional）—— 工程可用、可接真实</h3>
+  <div class="card">
+    <ul>
+      <li><b>形态</b>：拆架构（解决单进程→微服务痛点）、加 OPC-UA / EDA 适配器。</li>
+      <li><b>AI Agent</b>：<b>协作副驾</b>——自动跑 what-if、生成排程方案、标记异常根因，每步留"人确认"锚点。</li>
+      <li><b>模型升级</b>：SPC 补 Cpk/Ppk、PdM 补 RUL、VM 补置信区间。</li>
+      <li><b>价值</b>：工程师日常工具、替代部分老旧 MES 模块、商业变现起点。</li>
+    </ul>
+  </div>
+
+  <h3 class="l4">L4 工厂级（Fab）—— 真实部署、合规自治</h3>
+  <div class="card">
+    <ul>
+      <li><b>形态</b>：多工厂 / 多租户、ISA-95 建模、等保 / 21 CFR Part 11、高可用。</li>
+      <li><b>AI Agent</b>：<b>自治体群</b>——设备健康 / 排程 / 质量 Agent 协同，人在回路监督异常升级。</li>
+      <li><b>闭环</b>：真实 PLC/设备数据 → 孪生 → 决策 → 回写控制（APC 闭环）。</li>
+      <li><b>价值</b>：真正的"智能企业"落地。</li>
+    </ul>
+  </div>
+
+  <h2>三、AI Agent 三层架构（贯穿四级的关键）</h2>
+  <div class="arch">
+    <div class="layer"><b>战略层 Agent（厂长大脑）</b>：产能规划、经营决策、跨域协调。</div>
+    <div class="layer"><b>领域层 Agent（专家群）</b>：SPC 质量 / PdM 设备 / VM 量测 / APS 排程 / ERP 成本——各为一个专业 Agent。</div>
+    <div class="layer"><b>执行层 Agent（设备协作者）</b>：单设备 / 单产线的实时监视与微决策。</div>
+  </div>
+  <ul>
+    <li><b>社区 / 教学级</b>：主要跑"领域层 Agent 的讲解态" + 战略层 Agent 的演示态。</li>
+    <li><b>专业级</b>：领域层 Agent 进入"协作态"（半自治）。</li>
+    <li><b>工厂级</b>：三层全激活，执行层 Agent 7×24 在线。</li>
+  </ul>
+  <div class="note key"><b>AI 芯片晶圆厂的 Agent 特殊性</b>：良率（yield）是生死线，故"质量 Agent"与"量测 VM Agent"优先级最高；
+  AI 芯片工艺（EUV 多重曝光、HBM 堆叠）的复杂度，使"排程 Agent"比传统 fab 更值钱。</div>
+
+  <h2>四、当前资产复用与缺口</h2>
+  <p>已积累的资产正是 L1→L3 的骨架，<strong>无需从零开始</strong>：</p>
+  <table>
+    <tr><th>已有资产</th><th>四级用途</th></tr>
+    <tr><td>事件驱动主线</td><td>四级通用</td></tr>
+    <tr><td>三级孪生（twin / line / fab）+ what-if</td><td>L1/L2 直接可用，L3/L4 升级渲染</td></tr>
+    <tr><td>原生 ERP（物料 / BOM / 成本 / ARAP）</td><td>L3 商业化财务基础</td></tr>
+    <tr><td>SPC / FDC / PdM / VM / APS 五大引擎</td><td>领域层 Agent 的知识底座</td></tr>
+    <tr><td>自建 SECS/GEM 子集</td><td>L3/L4 设备接入起点</td></tr>
+  </table>
+
+  <table>
+    <tr><th>级别</th><th>缺口（需新增）</th></tr>
+    <tr><td class="l1">L1</td><td>一键部署 + 开源包装 + 对话 Agent 接入</td></tr>
+    <tr><td class="l2">L2</td><td>课程 / 实验 / 评测外壳 + SEMI 标准工艺库</td></tr>
+    <tr><td class="l3">L3</td><td>架构拆分 + 标准接口 + 模型深度（Cpk/RUL/置信区间）</td></tr>
+    <tr><td class="l4">L4</td><td>合规 + 高可用 + 真实闭环（APC）</td></tr>
+  </table>
+
+  <h2>五、战略路线图建议</h2>
+  <div class="note key"><b>建议先打"社区级 + 教学级"组合拳</b></div>
+  <ul>
+    <li><b>零合规负担、能立刻出产品</b>，且能反哺 AI 模型（生态数据）。</li>
+    <li>现有演示系统改造成"社区级沙盘"工作量小（主要打包 + 对话 Agent 接入）。</li>
+    <li>教学级是半导体人才培养刚需，市场空白明显，易建立标准心智。</li>
+    <li>工厂级门槛高、周期长，<b>不宜作为第一枪</b>；但用 L4 架构思想<b>反向约束</b> L1–L3 的数据模型，避免返工。</li>
+  </ul>
+
+  <h2>六、待拍板的关键决策</h2>
+  <div class="card">
+    <ol>
+      <li><b>先做哪一级 MVP？</b> 建议"社区级沙盘"先做（快速出活、验证 Agent 接入范式）；若有院校资源，教学级变现更快。</li>
+      <li><b>AI Agent 形态？</b> 接大模型 API（对话式 Copilot） vs 轻量"规则 + 检索"Agent（可控、零 API 成本）——决定 L1 部署门槛。</li>
+      <li><b>"AI 芯片"针对性深度？</b> 场景模板层（默认加载 AI 芯片工艺路线）vs 物理模型层（真实 EUV/刻蚀机理，属 L3/L4）。L1 至少"看起来对"。</li>
+    </ol>
+  </div>
+
+  <h2>七、战略结论</h2>
+  <div class="note">
+    我们已建成一个<strong>架构思路现代、闭环验证完整</strong>的演示级智能工厂平台。
+    本战略将其重新定位为：<strong>以 AI Agent 为核心、专为 AI 芯片晶圆厂打造、分四级演进的智能企业操作系统</strong>。
+    用社区与教学级"铺量养能力"，用专业与工厂级"落地变现"——
+    四级共享同一底座，逐级替换关键组件，是从"演示闭环"走向"工业上岗"的最短路径。
+  </div>
+
+  <div class="foot">
+    战略白皮书 · 生成于 2026-08-23 · 基于 fab-mes 项目资产的四级演进框架<br>
+    定位：AI 芯片（晶圆）工厂 · 社区 / 教学 / 专业 / 工厂 四级 · AI Agent 为核心
+  </div>
+
+</div>
+</body>
+</html>

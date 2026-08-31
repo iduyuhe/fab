@@ -1,0 +1,15 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>OTD-5 人工走查报告</title>
+<style>body{font-family:system-ui,'Microsoft YaHei',sans-serif;background:#f5f7fa;margin:0;padding:24px;color:#1f2937}
+h1{font-size:22px}table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+th,td{padding:10px 12px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
+th{background:#1e3a8a;color:#fff}.ok{color:#16a34a}.bad{color:#dc2626}
+.sum{margin:16px 0;font-size:18px;font-weight:700}
+.flow{background:#fff;padding:16px;border-radius:8px;margin-bottom:16px;line-height:1.9;font-size:14px}.flow b{color:#1e3a8a}</style>  <link rel="stylesheet" href="theme.css">
+</head><body>
+<h1>fab-mes OTD-5 式人工走查报告</h1>
+<div class="flow"><b>走查路径：</b>打开控制台 → 建销售订单(SO)→ 自动投料 → 主轴流转 → 发运 → 回款(CLOSED) ｜ 打开 NPI 管理台 → 选设计档案 → 投放工程批 → 沿同主轴推进至 DONE → 投放流片批(资格验证)。全程事件经门户 8123 同一 WS 总线，孪生/控制台实时可见。</div>
+<div class="sum">结果：14/14 通过</div>
+<table><thead><tr><th>步骤</th><th>结果</th><th>证据</th></tr></thead><tbody><tr class="ok"><td>0.栈探活</td><td>✅</td><td>7/7 端口 UP (5000,8123,8124,8125,8126,8127,8128)</td></tr><tr class="ok"><td>1.打开控制台</td><td>✅</td><td>GET / (console.html) → 200</td></tr><tr class="ok"><td>2.建单 SO</td><td>✅</td><td>POST /api/erp/so → SO-MTDQC223 · 自动投料 1 批</td></tr><tr class="ok"><td>3.自动投料可见</td><td>✅</td><td>批次 LOT-0005 已出现在 MES 控制台 (soId=SO-MTDQC223)</td></tr><tr class="ok"><td>4.OTD 状态机贯通</td><td>✅</td><td>SO SO-MTDQC223: IN_TRANSIT=true DELIVERED=true CLOSED=true</td></tr><tr class="ok"><td>4b.回款闭环</td><td>✅</td><td>AR 发票 AR-MTDQCLJ7 金额=950000 状态=UNPAID</td></tr><tr class="ok"><td>5.打开 NPI 管理台</td><td>✅</td><td>GET /npi-ops.html → 200</td></tr><tr class="ok"><td>6.设计档案</td><td>✅</td><td>GET /api/designs → 4 个 (DES-MTDP0U94/N2, DES-001/N2, DES-002/CIS, DES-003/A16)</td></tr><tr class="ok"><td>7.投放工程批</td><td>✅</td><td>POST /api/npi/launch {DES-002,engineering} → WO WO-0005 · 路线 0 步</td></tr><tr class="ok"><td>8.工程批可见</td><td>✅</td><td>工程批 LOT-0010 已出现在 NPI 列表 (design=DES-002)</td></tr><tr class="ok"><td>9.工程批完工</td><td>✅</td><td>工程批 LOT-0010 已沿 MES 主轴流转至 DONE</td></tr><tr class="ok"><td>10.投放流片批</td><td>✅</td><td>POST /api/npi/launch {DES-002,tapeout} → WO WO-0008 (qualification 重入)</td></tr><tr class="ok"><td>11.孪生/控制台可加载</td><td>✅</td><td>五大实时页均经门户 8123 返回 200</td></tr><tr class="ok"><td>12.事件总线实时贯通</td><td>✅</td><td>总线捕获到本次走查批次事件 367 条，类型=[lotStepDone, amhs, lotRelease, lotStart, vmPrediction, metrology, vmResult, lotDone, apcSetpoint, lotHold, lotReleaseHold]（孪生页订阅同一总线即实时可见）</td></tr></tbody></table>
+<div style="margin-top:16px;font-size:14px">事件总线本次走查捕获类型：<b>lotStepDone, amhs, lotRelease, lotStart, vmPrediction, metrology, vmResult, lotDone, apcSetpoint, lotHold, lotReleaseHold</b></div>
+</body></html>

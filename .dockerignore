@@ -1,0 +1,24 @@
+# 数据库运行时文件（启动时自动建表，无需打包）
+*.db
+*.db-wal
+*.db-shm
+
+# 日志
+logs/
+*.log
+
+# 缓存
+node_modules/.cache
+
+# 版本控制
+.git/
+.gitignore
+
+# 本地编辑器/系统
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# 非交付物
+README*.md.bak
