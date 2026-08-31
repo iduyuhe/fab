@@ -40,6 +40,8 @@ class WIPEngine {
     this.queues = {}; ROUTE.forEach(m => { this.queues[m] = []; });
     this.lots = []; this.byLot = new Map();
     this.wos = [];
+    this.maxLots = +(opts.maxLots || 2000);   // 在制/历史 lot 上限：超则回收最旧已完成者，防内存无限增长
+    this.maxWos = +(opts.maxWos || 500);      // 工单上限：超则回收最旧已完成者
     this.woSeq = 0; this.lotSeq = 0;
     this.stats = { wip: 0, done: 0, cycSumH: 0, moves: 0, releases: 0 };
     this._processing = new Map();                       // toolId -> lot（引擎占用设备）
@@ -151,6 +153,28 @@ class WIPEngine {
     t.status = 'IDLE';
     this.emit({ type: 'toolStatus', id: toolId, status: 'IDLE' });
     this.dispatch(t.module);
+    this._pruneDone();   // 回收已完工的 lot/wo，锁死内存上限
+  }
+
+  // 内存护栏：在制/历史 lot、wo 超过上限时回收最旧已完成项，防止无限增长拖垮整机。
+  // 仅移除 DONE 的 lot 与「全部子批已完成」的 wo；在制/HOLD 绝不删，避免破坏派工对账。
+  _pruneDone() {
+    if (this.lots.length > this.maxLots) {
+      const over = this.lots.length - this.maxLots;
+      let removed = 0;
+      for (let i = 0; i < this.lots.length && removed < over; i++) {
+        if (this.lots[i].status === 'DONE') { this.byLot.delete(this.lots[i].id); this.lots.splice(i, 1); i--; removed++; }
+      }
+    }
+    if (this.wos.length > this.maxWos) {
+      const over = this.wos.length - this.maxWos;
+      let removed = 0;
+      for (let i = 0; i < this.wos.length && removed < over; i++) {
+        const wo = this.wos[i];
+        const allDone = (wo.lots || []).every(id => { const l = this.byLot.get(id); return !l || l.status === 'DONE'; });
+        if (allDone) { this.wos.splice(i, 1); i--; removed++; }
+      }
+    }
   }
 
   // 晶圆随 lot 步序推进：每步小概率工艺损耗标记为 SCRAP（全路线累计约 1 片）

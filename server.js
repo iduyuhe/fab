@@ -21,10 +21,14 @@ const { createEventBus } = require('./services/eventbus');  // §6 事件总线
 const { LINES, MODULE_LINE } = require('./config/topo');    // §4.4 拓扑单源
 const { initAudit } = require('./audit');                   // §L4 合规审计层
 const { createWIP, loadAndHydrate } = require('./services/wip');            // §6 WIP 服务
+const { createGovernor } = require('./governance');                       // 资源治理层：锁死 CPU/内存/队列上限
+const gov = createGovernor();
 
 const PORT = process.env.PORT || 8124;
 const TICK_MS = 600;                       // 与前端 SimulatedEAP rate 一致
 const AUTO_WO_MS = 8000;                   // M2 自动投料：每 8s 一个工单
+const IDLE_MS = +(process.env.GOV_IDLE_MS || 180000);          // 空闲降频阈值：无用户操作超此值即降频/暂停（默认 3 分钟，可配）
+const TICK_IDLE_MS = +(process.env.GOV_TICK_IDLE_MS || 60000); // tick 空闲放慢阈值（默认 1 分钟，可配）
 
 // ---------- LDA 有机衔接（上游设计 → 下游制造）常驻看门狗配置 ----------
 const LDA_BASE = process.env.LDA_BASE || 'http://127.0.0.1:3006';   // 同机 LDA（lda.weomnitech.com.cn）
@@ -77,29 +81,49 @@ async function importLdaPackage(pkg, opts = {}) {
 const ldaImported = new Set();
 let ldaLastSync = null, ldaLastError = null, ldaImportCount = 0;
 
+// ---- LDA 看门狗改造：增量 + 缓存 + 退避（护栏④）----
+//  - 货架列表走 gov.fetch（指数退避，断连不刷堆栈），并加短 TTL 缓存，避免每轮全量重拉
+//  - 仅对"候选（未导入 + 未标记）"货架才拉包，非全量逐拉
+//  - 空闲态拉长轮询到 60s
+const ldaCache = { list: null, ts: 0, ttl: +(process.env.LDA_CACHE_TTL_MS || 10000) };
+async function ldaGetShelfList() {
+  const now = Date.now();
+  if (ldaCache.list && now - ldaCache.ts < ldaCache.ttl) return ldaCache.list;
+  const r = await gov.fetch(LDA_BASE + '/api/shelf', { timeoutMs: 5000 });
+  if (!r) return ldaCache.list || [];           // 失败用旧缓存，避免重试风暴
+  const list = (await r.json().catch(() => ({ rows: [] }))).rows || [];
+  ldaCache.list = list; ldaCache.ts = now;
+  return list;
+}
+async function ldaGetPackage(id) {
+  const r = await gov.fetch(LDA_BASE + '/api/shelf/' + encodeURIComponent(id) + '/package', { timeoutMs: 5000 });
+  if (!r) return null;
+  return r.json().catch(() => null);
+}
+
 async function ldaSyncOnce({ force = false, burst = LDA_WATCH_BURST } = {}) {
   // 首启（内存集合与 DB 均空）且非强制：把当前已就绪货架种子化，仅未来"新交付"触发自动 NPI（避免一次性灌入）
   if (!force && ldaImported.size === 0 && storage.listLdaImported().length === 0) {
     try {
-      const list = await (await fetch(LDA_BASE + '/api/shelf')).json().catch(() => ({ rows: [] }));
-      for (const s of (list.rows || [])) {
-        const pres = await (await fetch(LDA_BASE + '/api/shelf/' + encodeURIComponent(s.id) + '/package')).json().catch(() => ({}));
+      const list = await ldaGetShelfList();
+      for (const s of list) {
+        const pres = await ldaGetPackage(s.id);
         if (pres && pres.ready === true) ldaImported.add(String(s.id));
       }
       log(`[LDA看门狗] 首启种子化 ${ldaImported.size} 个已就绪货架（仅未来新交付触发自动 NPI）`);
-    } catch (e) { ldaLastError = e.message; }
+    } catch (e) { ldaLastError = e.message; }   // gov.fetch 已吞掉断连/超时，此处仅记短消息
     return { seeded: ldaImported.size };
   }
   const cap = force ? 1000 : burst;
   let imported = 0;
   try {
-    const list = await (await fetch(LDA_BASE + '/api/shelf')).json().catch(() => ({ rows: [] }));
-    for (const s of (list.rows || [])) {
+    const list = await ldaGetShelfList();           // 带缓存 + 退避，单次响应体小
+    for (const s of list) {
       if (imported >= cap) break;
       const id = String(s.id).replace(/[^A-Za-z0-9_\-]/g, '_').slice(0, 40);  // 与 importLdaPackage 落库 id 完全一致
       if (storage.isLdaImported(id)) continue;          // DB 已落库：永不重复（幂等）
       if (!force && ldaImported.has(id)) continue;        // 非强制且内存已知：跳过
-      const pres = await (await fetch(LDA_BASE + '/api/shelf/' + encodeURIComponent(s.id) + '/package')).json().catch(() => ({}));
+      const pres = await ldaGetPackage(id);          // 仅候选货架才拉包（增量：非全量逐拉）
       if (!pres || pres.ready !== true) continue;          // 放行门：仅"设计交付(ready)"触发
       try {
         const pkg = await resolveLdaShelf(s.id);
@@ -114,7 +138,7 @@ async function ldaSyncOnce({ force = false, burst = LDA_WATCH_BURST } = {}) {
     }
     ldaLastSync = new Date().toISOString();
     ldaLastError = null;
-  } catch (e) { ldaLastError = e.message; }
+  } catch (e) { ldaLastError = e.message; }   // 断连/超时已被 gov.fetch 捕获，不会刷堆栈
   return { imported, total: ldaImportCount };
 }
 
@@ -122,8 +146,13 @@ function startLdaWatcher() {
   if (ldaImported.size === 0) { try { for (const r of storage.listLdaImported()) ldaImported.add(r.id); } catch (_) {} }  // 启动加载（跨重启幂等）
   if (!LDA_WATCHER) { log('[LDA看门狗] 已禁用 (LDA_WATCHER=0)'); return; }
   ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; });   // 首轮（可能种子化）
-  setInterval(() => { ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); }, LDA_WATCH_MS);
-  log(`[LDA看门狗] 已启动：轮询 ${LDA_BASE} 每 ${LDA_WATCH_MS / 1000}s，单轮突发上限 ${LDA_WATCH_BURST}`);
+  // 空闲态拉长轮询到 60s（保活但省资源）；退避由 gov.fetch 保证
+  function scheduleLdaWatch() {
+    const iv = gov.isIdle(IDLE_MS) ? Math.max(LDA_WATCH_MS, 60000) : LDA_WATCH_MS;
+    setTimeout(() => { ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); scheduleLdaWatch(); }, iv);
+  }
+  scheduleLdaWatch();
+  log(`[LDA看门狗] 已启动：轮询 ${LDA_BASE} 每 ${LDA_WATCH_MS / 1000}s（空闲拉长至60s），单轮突发上限 ${LDA_WATCH_BURST}，全量拉取已改为缓存+增量+退避`);
 }
 
 // ---------- 设备模型（与数字孪生前端完全同构） ----------
@@ -747,7 +776,20 @@ function countByStatus() {
 function handler(req, res) {
   const u = new URL(req.url, `http://${req.headers.host}`);
   const route = u.pathname;
+  gov.touch();   // 任意 API 调用即记为"有用户活动"，解除空闲降频
   if (route === '/api/health') return json(res, 200, { ok: true, service: 'fab-mes', version: 'M3-S1', tools: tools.length, clients: wss.clients.size, uptime: +process.uptime().toFixed(1) });
+  // 资源治理自监控：实时查看并发数 / 队列长度 / 任务耗时 / 各周期任务开关与 CPU 增量（护栏验收依据）
+  if (route === '/api/governor') {
+    const snap = gov.snapshot();
+    return json(res, 200, {
+      ...snap,
+      wip: { wip: engine.stats.wip, done: engine.stats.done, releases: engine.stats.releases,
+        lots: engine.lots.length, wos: engine.wos.length,
+        queues: Object.fromEntries(Object.keys(engine.queues).map(m => [m, engine.queues[m].length])) },
+      lda: { lastSync: ldaLastSync, lastError: ldaLastError, imported: ldaImportCount, watching: LDA_WATCHER },
+      autoWo: { on: autoWo, paused: autoWoPaused, atCap: autoWo_atCap, cap: WIP_CAP },
+    });
+  }
   // P1-2：设备工艺参数模型（APC setpoint 经 EAP S2F41 真实回灌后的落点），供孪生/验收读取
   if (route === '/api/secs') return json(res, 200, { deviceParams: secs.deviceParams, devices: SECS_DEVICES });
   // ERP 集成路由（in-proc 模式挂载；standalone 模式由 fab-erp.js :8126 提供）
@@ -1295,8 +1337,28 @@ loadAndHydrate(engine, storage);   // C1：重启从 fab-mes.db 重建在制 WIP
   if (n) console.log(`[自愈] 重启后重新调度 ${n} 个 SPC 自动 Hold 批次的兜底放行（${SPC_HOLD_RELEASE_MS}ms 后自动释放）`);
 })();
 let autoWo = true;
-function log(msg) { console.log(`[${new Date().toTimeString().slice(0, 8)}] ${msg}`); }
-setInterval(() => { if (autoWo) { const prod = Math.random() < 0.5 ? 'N2' : 'A16'; const wo = engine.createWO({ product: prod, qty: 3 + Math.floor(Math.random() * 3), dueHours: 24 + Math.floor(Math.random() * 49) }); log(`自动投料 ${wo.id} · ${wo.productLabel} × ${wo.qty}`); } }, AUTO_WO_MS);
+let autoWo_atCap = false;
+let autoWoPaused = false;
+const WIP_CAP = process.env.WIP_CAP ? +process.env.WIP_CAP : 240;   // 在制上限：达到即暂停自动投料，防止内存/CPU 失控
+function log(msg) { gov.logger.log(`[${new Date().toTimeString().slice(0, 8)}] ${msg}`); }
+setInterval(() => {
+  if (!autoWo) return;
+  // 空闲降频：无用户操作超 3 分钟，暂停自动投料，整机回落（满足稳态 CPU ≤10%）
+  if (gov.isIdle(IDLE_MS)) {
+    if (!autoWoPaused) { autoWoPaused = true; log('⏸ 空闲(>3min 无操作) 自动投料暂停，整机降频'); }
+    return;
+  }
+  autoWoPaused = false;
+  // 在制封顶：到达上限即停，队列不再膨胀
+  if (engine.stats.wip >= WIP_CAP) {
+    if (!autoWo_atCap) { autoWo_atCap = true; log(`⏸ 自动投料已达在制上限 ${WIP_CAP}，暂停（避免内存/CPU 失控）`); }
+    return;
+  }
+  autoWo_atCap = false;
+  const prod = Math.random() < 0.5 ? 'N2' : 'A16';
+  const wo = engine.createWO({ product: prod, qty: 3 + Math.floor(Math.random() * 3), dueHours: 24 + Math.floor(Math.random() * 49) });
+  log(`自动投料 ${wo.id} · ${wo.productLabel} × ${wo.qty}（在制 ${engine.stats.wip}/${WIP_CAP}）`);
+}, AUTO_WO_MS);
 
 server.listen(PORT, () => {
   console.log(`fab-mes (自研 EAP/MES) M3 已启动（MES核心 + SECS/GEM + E10/E58）[阶段0 多进程拆分]`);
@@ -1307,11 +1369,42 @@ server.listen(PORT, () => {
   console.log(`  孪生页 : 由门户进程托管 http://127.0.0.1:${process.env.PORTAL_PORT || 8123}/`);
   try { secs.start(); } catch (e) { log('HSMS 启动失败: ' + e.message); }
 });
-setInterval(tick, TICK_MS);
-// 主动预测告警：启动 20s 后首次扫描，之后每 30s 自动扫描关键质量/设备指标，预测越界即主动上报告警（进事件总线 + 持久化）
-setTimeout(() => { try { const a = predScan(); if (a.length) log(`[预测告警] 自动扫描发现 ${a.length} 条预测告警`); } catch (_) {} }, 20000);
-setInterval(() => { try { const a = predScan(); if (a.length) log(`[预测告警] 自动扫描发现 ${a.length} 条预测告警`); } catch (_) {} }, 30000);
-// P1-4：周期性把 APS 计划回填为 MES 派工指令（计划→执行闭环），默认 5s
+// 主仿真心跳：空闲(无在制加工且无操作>60s)时放慢到 5s，省 CPU；有活则满速 600ms。曲线呈锯齿（有升有降），杜绝阶梯单调上升。
+function scheduleTick() {
+  const processing = engine._processing ? engine._processing.size : 0;
+  const iv = (processing === 0 && gov.isIdle(TICK_IDLE_MS)) ? Math.max(TICK_MS, 5000) : TICK_MS;
+  setTimeout(() => { tick(); scheduleTick(); }, iv);
+}
+scheduleTick();
+// 主动预测告警：进入统一并发闸门（≤2 并发 / 30s 时间预算），空闲态(>3min)跳过扫描省 CPU。
+const PRED_SCAN_MS = process.env.PRED_SCAN_MS ? +(process.env.PRED_SCAN_MS) : 30000;
+const PRED_IDLE_MS = process.env.PRED_IDLE_MS ? +(process.env.PRED_IDLE_MS) : 60000;
+function schedulePredScan() {
+  const idle = gov.isIdle(IDLE_MS);
+  setTimeout(() => {
+    if (!idle) {
+      gov.runTask('predScan', () => predScan(), []).then(a => { if (a && a.length) log(`[预测告警] 自动扫描发现 ${a.length} 条预测告警`); }).catch(() => {});
+    }
+    schedulePredScan();
+  }, idle ? Math.max(PRED_SCAN_MS, PRED_IDLE_MS) : PRED_SCAN_MS);
+}
+setTimeout(schedulePredScan, 20000);
+// P1-4：APS 计划回填（计划→执行闭环）。改为事件驱动：仅当 WIP 指纹变化才重算；
+//       空闲态(>3min 无操作)拉长到 60s。间隔/开关全部 env 可调（护栏①）。
 const APS_RECOMPUTE_MS = process.env.APS_RECOMPUTE_MS ? +(process.env.APS_RECOMPUTE_MS) : 5000;
-setInterval(recomputeApsDirective, APS_RECOMPUTE_MS);
-recomputeApsDirective();   // 启动即首算，确保派工指令立即可用
+const APS_IDLE_MS = process.env.APS_IDLE_MS ? +(process.env.APS_IDLE_MS) : 60000;
+let _apsSig = '';
+function _apsSigNow() { return engine.lots.length + '|' + engine.stats.wip + '|' + tools.filter(t => t.status === 'RUN').length; }
+function scheduleAps() {
+  const idle = gov.isIdle(IDLE_MS);
+  const interval = idle ? Math.max(APS_RECOMPUTE_MS, APS_IDLE_MS) : APS_RECOMPUTE_MS;
+  setTimeout(() => {
+    try {
+      const sig = _apsSigNow();
+      if (sig !== _apsSig) { recomputeApsDirective(); _apsSig = sig; }   // 事件驱动：变化才算
+    } catch (e) { log('APS 指令重算异常: ' + e.message); }
+    scheduleAps();
+  }, interval);
+}
+recomputeApsDirective();    // 启动即首算，确保派工指令立即可用
+scheduleAps();

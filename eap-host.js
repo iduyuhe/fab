@@ -96,6 +96,7 @@ class HsmsClient {
         type: isLot ? (mapped === 'LOT_START' ? 'lotStart' : 'lotDone') : 'toolStatus',
         status: isLot ? 'RUN' : mapped };
       this.lastEvent = ev; this.events.push(ev);
+      if (this.events.length > 200) this.events.shift();   // 背压：事件缓冲封顶 200，避免无界增长
       this.pushTraffic('RX', 'S6F11', `CEID=${ceid} → ${ev.type}/${ev.status}`);
       log(`${this.name}: S6F11 CEID=${ceid} → ${ev.type}/${ev.status}`);
       forwardToMES(ev);

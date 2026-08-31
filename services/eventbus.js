@@ -13,9 +13,20 @@ const { WebSocketServer } = require('ws');
 function createEventBus({ storage }) {
   const wss = new WebSocketServer({ noServer: true });
 
+  // WS 背压（护栏②）：单客户端发送缓冲超阈值即丢弃本次发送，不堆积；
+  //   极端慢客户端（缓冲 >1MB）直接断开，避免把 MES 主进程拖死（对应 Send-Q ≤100KB 验收线）。
+  let backpressureDrops = 0;
+  const BP_BYTES = process.env.EV_BP_BYTES ? +process.env.EV_BP_BYTES : 100 * 1024;
+  const BP_KILL_BYTES = process.env.EV_BP_KILL_BYTES ? +process.env.EV_BP_KILL_BYTES : 1024 * 1024;
   function broadcast(ev) {
     const data = JSON.stringify(ev);
-    for (const c of wss.clients) if (c.readyState === 1) c.send(data);
+    for (const c of wss.clients) {
+      if (c.readyState !== 1) continue;
+      const buffered = c.bufferedAmount || 0;
+      if (buffered > BP_KILL_BYTES) { try { c.terminate(); } catch (_) {} backpressureDrops++; continue; }
+      if (buffered > BP_BYTES) { backpressureDrops++; continue; }
+      try { c.send(data); } catch (_) { backpressureDrops++; }
+    }
   }
 
   // 可选 MQ 发布钩子（阶段0 默认 no-op）
@@ -39,6 +50,7 @@ function createEventBus({ storage }) {
     broadcast,
     emitEv,
     onEmit,
+    backpressureStats: () => ({ drops: backpressureDrops, thresholdBytes: BP_BYTES, killBytes: BP_KILL_BYTES }),
     registerMQ: (fn) => { mqPublish = typeof fn === 'function' ? fn : mqPublish; },
   };
 }

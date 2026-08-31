@@ -298,7 +298,9 @@ class SQLiteStorage extends StorageAdapter {
 
   // ---- 事件落库（队列 + 批写，与原 server.js flushEvts 等价） ----
   enqueueEvent(ts, type, payloadStr) {
-    if (!this._evtQueue) this._evtQueue = [];
+    if (!this._evtQueue) { this._evtQueue = []; this._evtDropped = 0; }
+    // 背压：事件缓冲封顶 20000，满则丢弃最旧并计数，避免生产者(emitEv)快于消费者(flushEvents)导致无界堆积（护栏②）
+    if (this._evtQueue.length >= 20000) { this._evtQueue.shift(); this._evtDropped++; }
     this._evtQueue.push([ts, type, payloadStr]);
   }
   flushEvents() {
@@ -309,6 +311,7 @@ class SQLiteStorage extends StorageAdapter {
       for (const r of batch) this.stmt.insEvt.run(r[0], r[1], r[2]);
     } catch (e) { /* WAL+busy_timeout 下极少失败；丢弃不重试，防队列膨胀卡死 */ }
   }
+  eventQueueStats() { return { queued: this._evtQueue ? this._evtQueue.length : 0, dropped: this._evtDropped || 0, cap: 20000 }; }
 
   queryEvents({ after = 0, limit = 100, from, to, type } = {}) {
     if (from || to || type) {

@@ -1,0 +1,17 @@
+# fab-mes 日志轮转（兜底）
+# 安装（需在服务器上执行）：
+#   cp deploy/fab-mes.logrotate /etc/logrotate.d/fab-mes
+#   logrotate -d /etc/logrotate.d/fab-mes   # 先 dry-run 校验
+# 说明：fab 各进程默认经 systemd 输出到 journald，主日志由 journald 统一留存（建议同时配置
+# /etc/systemd/journald.conf 的 SystemMaxUse=200M 限制 journal 体积）。本文件覆盖任何重定向到
+# 文件的 *.log（如手动 nohup 启动），20MB 轮转保留 3 份，copytruncate 不中断进程写句柄。
+
+/opt/fab-mes/*.log {
+    size 20M
+    rotate 3
+    copytruncate
+    missingok
+    notifempty
+    compress
+    delaycompress
+}
