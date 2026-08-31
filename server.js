@@ -1042,6 +1042,59 @@ function handler(req, res) {
   if (route === '/api/npi/lots') {
     return json(res, 200, { lots: storage.listNpiLots() });
   }
+  // ---------- NPI：从 LDA 设计包导入（上游设计 → 下游制造，有机衔接） ----------
+  // 战略：LDA 是设计上游（光子/量子芯片设计软件），fab-mes 是制造下游（NPI 流片）。
+  // 衔接的"有机接缝" = LDA 统一设计包 DesignPackage(schema v0.1)。
+  // 唯一放行门 = verification.passed（死标量比对，LLM 不进判决路径）——未通过验证的设计不进入流片，
+  // 即 fab-mes 成为 LDA 设计的下游"验证/可制造性"证明。
+  if (route === '/api/npi/import-lda') {
+    if (req.method === 'POST') {
+      let body = ''; req.on('data', c => body += c);
+      req.on('end', async () => {
+        let cfg = {}; try { cfg = body ? JSON.parse(body) : {}; } catch (_) {}
+        try {
+          let pkg = cfg.package || null, mode = 'package', shelf = null;
+          if (!pkg && cfg.shelfId) {
+            mode = 'shelf';
+            const listResp = await fetch('http://127.0.0.1:3006/api/shelf');
+            const list = await listResp.json().catch(() => ({}));
+            shelf = (list.rows || []).find(r => r.id === cfg.shelfId) || null;
+            if (!shelf) return json(res, 404, { error: 'LDA shelf not found: ' + cfg.shelfId });
+            let pres = {}; try { pres = await (await fetch('http://127.0.0.1:3006/api/shelf/' + encodeURIComponent(cfg.shelfId) + '/package')).json(); } catch (_) {}
+            pkg = {
+              package_id: shelf.id,
+              domain: shelf.domain || (shelf.system_type ? 'photon' : 'photon'),
+              title: shelf.title,
+              kind: shelf.system_type || 'mixed_system',
+              ir: { n_components: (shelf.composition || []).length, n_nets: 0 },
+              design: { targets: shelf.default_req || {}, params: {} },
+              verification: { passed: !!pres.ready || (pres.package_tier || '').includes('design_ready') || shelf.honest_tier === '设计就绪', verdict: pres.package_tier || 'shelf-validated' },
+              honest_notes: 'Imported from LDA shelf ' + shelf.id + ' via fab-mes organic bridge.'
+            };
+          }
+          if (!pkg || !pkg.package_id) return json(res, 400, { error: 'missing package_id（provide {package} DesignPackage JSON or {shelfId}）' });
+          const domain = (pkg.domain === 'quantum' || pkg.domain === 'hybrid') ? pkg.domain : 'photon';
+          const passed = !!(pkg.verification && pkg.verification.passed === true);
+          if (!passed) return json(res, 422, { error: 'LDA 设计未通过验证 (verification.passed=false)，不进入流片', package_id: String(pkg.package_id) });
+          const id = String(pkg.package_id).replace(/[^A-Za-z0-9_\-]/g, '_').slice(0, 40);
+          const maskId = id + '-MSK-' + Date.now().toString(36);
+          let design = storage.getDesign(id);
+          if (!design) design = storage.insertDesign({ id, customer_id: 'LDA', name: pkg.title || id, gds_ref: (pkg.artifacts && pkg.artifacts.gds) || null, pdk: 'LDA-v0.1', product: domain === 'quantum' ? 'A16' : 'N2', mask_id: maskId, status: 'DESIGN' });
+          else storage.updateDesign(id, { mask_id: maskId, status: 'DESIGN', product: design.product || (domain === 'quantum' ? 'A16' : 'N2') });
+          const layers = Math.max(7, Math.min(70, Math.round(((pkg.ir && pkg.ir.n_components) || 4) * 3 + 4)));
+          const mask = storage.insertMask({ id: maskId, design_id: id, layers, status: 'READY' });
+          const product = design.product || (domain === 'quantum' ? 'A16' : 'N2');
+          const passes = Math.max(1, Math.round(layers / 7));
+          const type = cfg.type || 'tapeout';
+          const wo = engine.createWO({ product, qty: Math.max(1, Math.min(20, cfg.qty || 1)), dueHours: cfg.dueHours || 120, designId: id, maskId, productType: type, passes, qualification: type !== 'volume' });
+          log(`NPI[LDA] 导入设计 ${id} (${product}) · 光罩 ${maskId} ${layers}层/${passes}重入 · 投放 ${type} 批 ${wo.id}`);
+          return json(res, 201, { ok: true, mode, design, mask, wo: engine.woView(wo), route: wo.lots[0] ? wo.lots[0].route : [] });
+        } catch (e) { return json(res, 500, { error: 'import-lda failed: ' + e.message }); }
+      });
+      return;
+    }
+    return json(res, 405, { error: 'POST only' });
+  }
   // ---------- 分析层：跨阶段交期预测 + 根因（P3 收口） ----------
   if (route === '/api/analytics/otd') {
     const { analyzeOTD } = require('./services/predict');
