@@ -139,6 +139,9 @@ class SQLiteStorage extends StorageAdapter {
       CREATE TABLE IF NOT EXISTS photomasks(
         id TEXT PRIMARY KEY, design_id TEXT, layers INTEGER, reticle TEXT, rev TEXT, status TEXT, created TEXT
       );
+      CREATE TABLE IF NOT EXISTS lda_sync(
+        id TEXT PRIMARY KEY, domain TEXT, imported_at TEXT, wo_id TEXT, lot_id TEXT, status TEXT
+      );
     `);
     // 既有 lots/wos 表增量加列（SQLite 不支持 ADD COLUMN IF NOT EXISTS，逐列 try/catch 幂等）
     ['lots:design_id:TEXT', 'lots:mask_id:TEXT', 'lots:product_type:TEXT', 'lots:so_id:TEXT', 'lots:customer:TEXT',
@@ -157,6 +160,9 @@ class SQLiteStorage extends StorageAdapter {
       insMask: db.prepare('INSERT INTO photomasks(id,design_id,layers,reticle,rev,status,created) VALUES(?,?,?,?,?,?,?)'),
       getMask: db.prepare('SELECT * FROM photomasks WHERE id=?'),
       listMasksByDesign: db.prepare('SELECT * FROM photomasks WHERE design_id=? ORDER BY id'),
+      insLdaSync: db.prepare('INSERT OR REPLACE INTO lda_sync(id,domain,imported_at,wo_id,lot_id,status) VALUES(?,?,?,?,?,?)'),
+      getLdaSync: db.prepare('SELECT * FROM lda_sync WHERE id=?'),
+      listLdaSync: db.prepare('SELECT * FROM lda_sync ORDER BY imported_at DESC'),
     };
   }
 
@@ -182,6 +188,14 @@ class SQLiteStorage extends StorageAdapter {
     return this.stmt.npi.getMask.get(id);
   }
   listMasks(designId) { return designId ? this.stmt.npi.listMasksByDesign.all(designId) : this.db.prepare('SELECT * FROM photomasks ORDER BY created DESC').all(); }
+
+  // ---- LDA 有机衔接：导入去重（幂等，跨重启保留） ----
+  markLdaImported(rec) {
+    this.stmt.npi.insLdaSync.run(rec.id, rec.domain || null, rec.imported_at || new Date().toISOString(),
+      rec.wo_id || null, rec.lot_id || null, rec.status || 'IMPORTED');
+  }
+  isLdaImported(id) { return !!this.stmt.npi.getLdaSync.get(id); }
+  listLdaImported() { return this.stmt.npi.listLdaSync.all(); }
 
   // NPI 批次查询：工程批 / 流片批（product_type != volume）
   listNpiLots() {

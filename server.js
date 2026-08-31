@@ -26,6 +26,106 @@ const PORT = process.env.PORT || 8124;
 const TICK_MS = 600;                       // 与前端 SimulatedEAP rate 一致
 const AUTO_WO_MS = 8000;                   // M2 自动投料：每 8s 一个工单
 
+// ---------- LDA 有机衔接（上游设计 → 下游制造）常驻看门狗配置 ----------
+const LDA_BASE = process.env.LDA_BASE || 'http://127.0.0.1:3006';   // 同机 LDA（lda.weomnitech.com.cn）
+const LDA_WATCHER = process.env.LDA_WATCHER !== '0';                 // 默认开启：设计交付自动触发 NPI
+const LDA_WATCH_MS = +(process.env.LDA_WATCH_MS || 20000);          // 轮询周期
+const LDA_WATCH_BURST = Math.max(1, +(process.env.LDA_WATCH_BURST || 5)); // 单轮最大自动导入数
+
+// ---------- LDA 有机衔接：可复用导入函数（手动端点 + 常驻看门狗共用） ----------
+// 战略：LDA 是设计上游（光子/量子芯片设计软件），fab-mes 是制造下游（NPI 流片）。
+// 衔接的"有机接缝" = LDA 统一设计包 DesignPackage；唯一放行门 = verification.passed（死标量比对，LLM 不进判决路径）。
+async function resolveLdaShelf(shelfId) {
+  const listResp = await fetch(LDA_BASE + '/api/shelf');
+  const list = await listResp.json().catch(() => ({}));
+  const shelf = (list.rows || []).find(r => r.id === shelfId) || null;
+  if (!shelf) return null;
+  let pres = {}; try { pres = await (await fetch(LDA_BASE + '/api/shelf/' + encodeURIComponent(shelfId) + '/package')).json(); } catch (_) {}
+  return {
+    package_id: shelf.id,
+    domain: shelf.domain || 'photon',
+    title: shelf.title,
+    kind: shelf.system_type || 'mixed_system',
+    ir: { n_components: (shelf.composition || []).length, n_nets: 0 },
+    design: { targets: shelf.default_req || {}, params: {} },
+    verification: { passed: !!pres.ready || (pres.package_tier || '').includes('design_ready') || shelf.honest_tier === '设计就绪', verdict: pres.package_tier || 'shelf-validated' },
+    honest_notes: 'Imported from LDA shelf ' + shelf.id + ' via fab-mes organic bridge.'
+  };
+}
+
+async function importLdaPackage(pkg, opts = {}) {
+  if (!pkg || !pkg.package_id) throw new Error('missing package_id');
+  const domain = (pkg.domain === 'quantum' || pkg.domain === 'hybrid') ? pkg.domain : 'photon';
+  const passed = !!(pkg.verification && pkg.verification.passed === true);
+  if (!passed) { const e = new Error('LDA 设计未通过验证 (verification.passed=false)，不进入流片'); e.code = 422; throw e; }
+  const id = String(pkg.package_id).replace(/[^A-Za-z0-9_\-]/g, '_').slice(0, 40);
+  const maskId = id + '-MSK-' + Date.now().toString(36);
+  let design = storage.getDesign(id);
+  if (!design) design = storage.insertDesign({ id, customer_id: 'LDA', name: pkg.title || id, gds_ref: (pkg.artifacts && pkg.artifacts.gds) || null, pdk: 'LDA-v0.1', product: domain === 'quantum' ? 'A16' : 'N2', mask_id: maskId, status: 'DESIGN' });
+  else storage.updateDesign(id, { mask_id: maskId, status: 'DESIGN', product: design.product || (domain === 'quantum' ? 'A16' : 'N2') });
+  const layers = Math.max(7, Math.min(70, Math.round(((pkg.ir && pkg.ir.n_components) || 4) * 3 + 4)));
+  const mask = storage.insertMask({ id: maskId, design_id: id, layers, status: 'READY' });
+  const product = design.product || (domain === 'quantum' ? 'A16' : 'N2');
+  const passes = Math.max(1, Math.round(layers / 7));
+  const type = opts.type || 'tapeout';
+  const wo = engine.createWO({ product, qty: Math.max(1, Math.min(20, opts.qty || 1)), dueHours: opts.dueHours || 120, designId: id, maskId, productType: type, passes, qualification: type !== 'volume' });
+  log(`NPI[LDA] 导入设计 ${id} (${product}) · 光罩 ${maskId} ${layers}层/${passes}重入 · 投放 ${type} 批 ${wo.id}`);
+  return { design, mask, wo, id, product, type, domain, layers, passes };
+}
+
+// ---------- LDA 常驻看门狗：定时轮询 LDA，设计交付（package.ready）即自动触发 NPI 投放 ----------
+const ldaImported = new Set();
+let ldaLastSync = null, ldaLastError = null, ldaImportCount = 0;
+
+async function ldaSyncOnce({ force = false, burst = LDA_WATCH_BURST } = {}) {
+  // 首启（内存集合与 DB 均空）且非强制：把当前已就绪货架种子化，仅未来"新交付"触发自动 NPI（避免一次性灌入）
+  if (!force && ldaImported.size === 0 && storage.listLdaImported().length === 0) {
+    try {
+      const list = await (await fetch(LDA_BASE + '/api/shelf')).json().catch(() => ({ rows: [] }));
+      for (const s of (list.rows || [])) {
+        const pres = await (await fetch(LDA_BASE + '/api/shelf/' + encodeURIComponent(s.id) + '/package')).json().catch(() => ({}));
+        if (pres && pres.ready === true) ldaImported.add(String(s.id));
+      }
+      log(`[LDA看门狗] 首启种子化 ${ldaImported.size} 个已就绪货架（仅未来新交付触发自动 NPI）`);
+    } catch (e) { ldaLastError = e.message; }
+    return { seeded: ldaImported.size };
+  }
+  const cap = force ? 1000 : burst;
+  let imported = 0;
+  try {
+    const list = await (await fetch(LDA_BASE + '/api/shelf')).json().catch(() => ({ rows: [] }));
+    for (const s of (list.rows || [])) {
+      if (imported >= cap) break;
+      const id = String(s.id).replace(/[^A-Za-z0-9_\-]/g, '_').slice(0, 40);  // 与 importLdaPackage 落库 id 完全一致
+      if (storage.isLdaImported(id)) continue;          // DB 已落库：永不重复（幂等）
+      if (!force && ldaImported.has(id)) continue;        // 非强制且内存已知：跳过
+      const pres = await (await fetch(LDA_BASE + '/api/shelf/' + encodeURIComponent(s.id) + '/package')).json().catch(() => ({}));
+      if (!pres || pres.ready !== true) continue;          // 放行门：仅"设计交付(ready)"触发
+      try {
+        const pkg = await resolveLdaShelf(s.id);
+        if (!pkg) continue;
+        const r = await importLdaPackage(pkg, { type: 'tapeout' });
+        storage.markLdaImported({ id: r.id, domain: r.domain, wo_id: r.wo.id, lot_id: r.wo.lots[0] && r.wo.lots[0].id });
+        ldaImported.add(r.id); ldaImportCount++;
+        emitEv({ type: 'npi.lda.auto', design: r.id, product: r.product, wo: r.wo.id, lot: r.wo.lots[0] && r.wo.lots[0].id, domain: r.domain, layers: r.layers, passes: r.passes, ts: Date.now() });
+        log(`[LDA看门狗] 自动触发 NPI：${r.id} → ${r.wo.id}`);
+        imported++;
+      } catch (e) { log(`[LDA看门狗] 导入 ${id} 失败：${e.message}`); }
+    }
+    ldaLastSync = new Date().toISOString();
+    ldaLastError = null;
+  } catch (e) { ldaLastError = e.message; }
+  return { imported, total: ldaImportCount };
+}
+
+function startLdaWatcher() {
+  if (ldaImported.size === 0) { try { for (const r of storage.listLdaImported()) ldaImported.add(r.id); } catch (_) {} }  // 启动加载（跨重启幂等）
+  if (!LDA_WATCHER) { log('[LDA看门狗] 已禁用 (LDA_WATCHER=0)'); return; }
+  ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; });   // 首轮（可能种子化）
+  setInterval(() => { ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); }, LDA_WATCH_MS);
+  log(`[LDA看门狗] 已启动：轮询 ${LDA_BASE} 每 ${LDA_WATCH_MS / 1000}s，单轮突发上限 ${LDA_WATCH_BURST}`);
+}
+
 // ---------- 设备模型（与数字孪生前端完全同构） ----------
 const MODULES = [
   { key: 'LITHO', name: '光刻 Litho (EUV/ArF)', count: 14 },
@@ -395,6 +495,7 @@ tools.forEach(t => storage.upsertTool(t));
 // ---- TSDB 历史回填 + 加载 AI 自学习参数（仅 TSDB 为空时回填，幂等；学习参数跨重启保留） ----
 storage.backfillTsdb();
 applyLearnedParams();
+startLdaWatcher();   // LDA 有机衔接常驻看门狗：设计交付自动触发 NPI 投放
 // 事件批量落库：队列 + 定时 flush（无事务；失败丢弃防队列膨胀卡死事件循环）
 setInterval(() => storage.flushEvents(), 800);
 // 事件循环心跳诊断：延迟 >2s 说明卡死，打印定位
@@ -1043,57 +1144,42 @@ function handler(req, res) {
     return json(res, 200, { lots: storage.listNpiLots() });
   }
   // ---------- NPI：从 LDA 设计包导入（上游设计 → 下游制造，有机衔接） ----------
-  // 战略：LDA 是设计上游（光子/量子芯片设计软件），fab-mes 是制造下游（NPI 流片）。
-  // 衔接的"有机接缝" = LDA 统一设计包 DesignPackage(schema v0.1)。
-  // 唯一放行门 = verification.passed（死标量比对，LLM 不进判决路径）——未通过验证的设计不进入流片，
-  // 即 fab-mes 成为 LDA 设计的下游"验证/可制造性"证明。
+  // 复用模块级 resolveLdaShelf / importLdaPackage；唯一放行门 = verification.passed（未通过 422 拒绝）。
   if (route === '/api/npi/import-lda') {
     if (req.method === 'POST') {
       let body = ''; req.on('data', c => body += c);
       req.on('end', async () => {
         let cfg = {}; try { cfg = body ? JSON.parse(body) : {}; } catch (_) {}
         try {
-          let pkg = cfg.package || null, mode = 'package', shelf = null;
-          if (!pkg && cfg.shelfId) {
-            mode = 'shelf';
-            const listResp = await fetch('http://127.0.0.1:3006/api/shelf');
-            const list = await listResp.json().catch(() => ({}));
-            shelf = (list.rows || []).find(r => r.id === cfg.shelfId) || null;
-            if (!shelf) return json(res, 404, { error: 'LDA shelf not found: ' + cfg.shelfId });
-            let pres = {}; try { pres = await (await fetch('http://127.0.0.1:3006/api/shelf/' + encodeURIComponent(cfg.shelfId) + '/package')).json(); } catch (_) {}
-            pkg = {
-              package_id: shelf.id,
-              domain: shelf.domain || (shelf.system_type ? 'photon' : 'photon'),
-              title: shelf.title,
-              kind: shelf.system_type || 'mixed_system',
-              ir: { n_components: (shelf.composition || []).length, n_nets: 0 },
-              design: { targets: shelf.default_req || {}, params: {} },
-              verification: { passed: !!pres.ready || (pres.package_tier || '').includes('design_ready') || shelf.honest_tier === '设计就绪', verdict: pres.package_tier || 'shelf-validated' },
-              honest_notes: 'Imported from LDA shelf ' + shelf.id + ' via fab-mes organic bridge.'
-            };
-          }
-          if (!pkg || !pkg.package_id) return json(res, 400, { error: 'missing package_id（provide {package} DesignPackage JSON or {shelfId}）' });
-          const domain = (pkg.domain === 'quantum' || pkg.domain === 'hybrid') ? pkg.domain : 'photon';
-          const passed = !!(pkg.verification && pkg.verification.passed === true);
-          if (!passed) return json(res, 422, { error: 'LDA 设计未通过验证 (verification.passed=false)，不进入流片', package_id: String(pkg.package_id) });
-          const id = String(pkg.package_id).replace(/[^A-Za-z0-9_\-]/g, '_').slice(0, 40);
-          const maskId = id + '-MSK-' + Date.now().toString(36);
-          let design = storage.getDesign(id);
-          if (!design) design = storage.insertDesign({ id, customer_id: 'LDA', name: pkg.title || id, gds_ref: (pkg.artifacts && pkg.artifacts.gds) || null, pdk: 'LDA-v0.1', product: domain === 'quantum' ? 'A16' : 'N2', mask_id: maskId, status: 'DESIGN' });
-          else storage.updateDesign(id, { mask_id: maskId, status: 'DESIGN', product: design.product || (domain === 'quantum' ? 'A16' : 'N2') });
-          const layers = Math.max(7, Math.min(70, Math.round(((pkg.ir && pkg.ir.n_components) || 4) * 3 + 4)));
-          const mask = storage.insertMask({ id: maskId, design_id: id, layers, status: 'READY' });
-          const product = design.product || (domain === 'quantum' ? 'A16' : 'N2');
-          const passes = Math.max(1, Math.round(layers / 7));
-          const type = cfg.type || 'tapeout';
-          const wo = engine.createWO({ product, qty: Math.max(1, Math.min(20, cfg.qty || 1)), dueHours: cfg.dueHours || 120, designId: id, maskId, productType: type, passes, qualification: type !== 'volume' });
-          log(`NPI[LDA] 导入设计 ${id} (${product}) · 光罩 ${maskId} ${layers}层/${passes}重入 · 投放 ${type} 批 ${wo.id}`);
-          return json(res, 201, { ok: true, mode, design, mask, wo: engine.woView(wo), route: wo.lots[0] ? wo.lots[0].route : [] });
-        } catch (e) { return json(res, 500, { error: 'import-lda failed: ' + e.message }); }
+          let pkg = cfg.package || null, mode = cfg.shelfId ? 'shelf' : 'package';
+          if (!pkg && cfg.shelfId) { pkg = await resolveLdaShelf(cfg.shelfId); if (!pkg) return json(res, 404, { error: 'LDA shelf not found: ' + cfg.shelfId }); }
+          if (!pkg) return json(res, 400, { error: 'missing package_id（provide {package} DesignPackage JSON or {shelfId}）' });
+          const r = await importLdaPackage(pkg, { type: cfg.type, qty: cfg.qty, dueHours: cfg.dueHours });
+          storage.markLdaImported({ id: r.id, domain: r.domain, wo_id: r.wo.id, lot_id: r.wo.lots[0] && r.wo.lots[0].id });
+          ldaImported.add(r.id); ldaImportCount++;
+          return json(res, 201, { ok: true, mode, design: r.design, mask: r.mask, wo: engine.woView(r.wo), route: r.wo.lots[0] ? r.wo.lots[0].route : [] });
+        } catch (e) { return json(res, e.code || 500, { error: 'import-lda failed: ' + e.message }); }
       });
       return;
     }
     return json(res, 405, { error: 'POST only' });
+  }
+  // ---------- LDA 常驻看门狗：状态查询 + 手动强制同步（首批量接入 LDA 已验证目录） ----------
+  if (route === '/api/lda/sync') {
+    if (req.method === 'GET') {
+      return json(res, 200, {
+        enabled: LDA_WATCHER, base: LDA_BASE, watchMs: LDA_WATCH_MS, burst: LDA_WATCH_BURST,
+        lastSync: ldaLastSync, lastError: ldaLastError, importCount: ldaImportCount,
+        knownCount: ldaImported.size, imported: storage.listLdaImported().slice(0, 50)
+      });
+    }
+    if (req.method === 'POST') {
+      ldaSyncOnce({ force: true })
+        .then(r => log(`[LDA看门狗] 强制同步完成：${JSON.stringify(r)}`))
+        .catch(e => log('[LDA看门狗] 强制同步失败 ' + e.message));
+      return json(res, 202, { accepted: true, note: '强制扫描已在后台启动，稍后 GET /api/lda/sync 查看结果' });
+    }
+    return json(res, 405, { error: 'GET/POST only' });
   }
   // ---------- 分析层：跨阶段交期预测 + 根因（P3 收口） ----------
   if (route === '/api/analytics/otd') {
