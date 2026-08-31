@@ -15,7 +15,7 @@ class SQLiteStorage extends StorageAdapter {
   constructor() {
     super();
     this.db = new DatabaseSync(DB_PATH);
-    this.db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=1000;');
+    this.db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
     this.initSchema();        // 必须先建表，再 prepare 语句（否则全新 DB 报 no such table）
     this.initNpiSchema();     // NPI：设计主数据 / 光罩 / lot·wo 扩展列（幂等迁移）
     this._initStatements();

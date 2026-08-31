@@ -408,7 +408,8 @@ setInterval(() => {
 // M3 SECS/GEM：3 台演示设备可被 EAP Host 建立 HSMS 会话（id 必须存在于合成工厂 byId）
 const SECS_DEVICES = { 1: 'LITHO-001', 2: 'ETCH-015', 3: 'DEP-060' };
 const secsDevId = {}; Object.entries(SECS_DEVICES).forEach(([d, t]) => { secsDevId[t] = +d; });
-const secs = new SecsGemGateway({ port: 5000, devices: SECS_DEVICES, onLog: m => log(m),
+const HSMS_PORT = process.env.HSMS_PORT ? +process.env.HSMS_PORT : 5000;
+const secs = new SecsGemGateway({ port: HSMS_PORT, devices: SECS_DEVICES, onLog: m => log(m),
   onControl: (deviceId, rcmd, params) => {
     const toolId = SECS_DEVICES[deviceId];
     const t = byId.get(toolId);
@@ -1162,7 +1163,7 @@ server.listen(PORT, () => {
   console.log(`fab-mes (自研 EAP/MES) M3 已启动（MES核心 + SECS/GEM + E10/E58）[阶段0 多进程拆分]`);
   console.log(`  REST   : http://127.0.0.1:${PORT}/api/{health,tools,events,wip,wos,lots,lots/:id,config,e10}`);
   console.log(`  WS     : ws://127.0.0.1:${PORT}  (唯一事件源, ${TICK_MS}ms tick)`);
-  console.log(`  SECS   : HSMS :5000 (Select/S1F1/S2F17/S6F11, 演示设备 ${Object.keys(SECS_DEVICES).length} 台)`);
+  console.log(`  SECS   : HSMS :${HSMS_PORT} (Select/S1F1/S2F17/S6F11, 演示设备 ${Object.keys(SECS_DEVICES).length} 台)`);
   console.log(`  MES    : WIP 引擎 ${engine.lots.length} lots · 派工规则 ${engine.rule} · 自动投料 ${AUTO_WO_MS/1000}s/工单`);
   console.log(`  孪生页 : 由门户进程托管 http://127.0.0.1:${process.env.PORTAL_PORT || 8123}/`);
   try { secs.start(); } catch (e) { log('HSMS 启动失败: ' + e.message); }

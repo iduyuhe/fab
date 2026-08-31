@@ -15,16 +15,14 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 
-function openConfig(dbPath) {
+function openConfig(dbPath, readOnly = false) {
   const DB_PATH = dbPath || path.join(__dirname, '..', 'fab-config.db');
-  // ERP（读写）与 WMS（只读）可同时开 WAL；WMS 用 readOnly 保护
-  let db;
-  try {
-    db = new DatabaseSync(DB_PATH, { readOnly: true });
-  } catch (e) {
-    // 配置库尚未建立（ERP 没先起），退回读写以便首次 seed；WMS 场景下 ERP 必先于 WMS 启动
-    db = new DatabaseSync(DB_PATH);
-  }
+  // ERP（读写，需 seed）与 WMS（只读）共用 WAL。默认以可写方式打开，避免“已存在的库被 readOnly 打开后 seed 写失败”。
+  // WMS 如需只读保护，可显式传入 readOnly=true（仅读不写，无副作用）。
+  // 注意：Node 22 的 DatabaseSync 不接受 undefined 作为 options 参数，故分两种构造，绝不传 undefined。
+  const db = readOnly
+    ? new DatabaseSync(DB_PATH, { readOnly: true })
+    : new DatabaseSync(DB_PATH);
   db.exec(`
     PRAGMA journal_mode=WAL;
     PRAGMA busy_timeout=3000;
