@@ -13,18 +13,18 @@ const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 
-// ---- 默认采集频率（低频起步；旧 env 名兼容 + 新 TELE_* 名，均可覆盖） ----
+// ---- 默认采集频率（用户定稿 2026-09-01：默认采集时间统一 ≥30s，演示更稳更省资源） ----
 const _env = (a, b, def) => +(process.env[a] ?? process.env[b] ?? def);
 const DEFAULTS = {
-  tickMs:        _env('TELE_TICK_MS', 'TICK_MS', 1000),        // 仿真心跳（演示动感，非采集，保留 1s）
-  flushMs:       _env('TELE_FLUSH_MS', 'EVT_FLUSH_MS', 5000),  // 事件批量落库
-  autoWoMs:      _env('TELE_AUTOWO_MS', 'AUTO_WO_MS', 8000),   // 自动投料（演示节奏）
+  tickMs:        _env('TELE_TICK_MS', 'TICK_MS', 1000),        // 仿真心跳（产线动感引擎，非采集；客户可调）
+  flushMs:       _env('TELE_FLUSH_MS', 'EVT_FLUSH_MS', 30000), // 事件批量落库
+  autoWoMs:      _env('TELE_AUTOWO_MS', 'AUTO_WO_MS', 30000),  // 自动投料节奏
   predScanMs:    _env('TELE_PREDSCAN_MS', 'PRED_SCAN_MS', 60000), // 预测扫描
   apsMs:         _env('TELE_APS_MS', 'APS_RECOMPUTE_MS', 30000),  // APS 计划重算
   ldaMs:         _env('TELE_LDA_MS', 'LDA_WATCH_MS', 60000),   // LDA 设计导入轮询
-  eapPollMs:     _env('TELE_EAP_POLL_MS', 'EAP_POLL_MS', 15000),  // EAP 设备轮询
-  opcuaMs:       _env('TELE_OPCUA_MS', 'ADAPTER_OPCUA_MS', 10000), // OPC-UA 设备数据采集
-  edaMs:         _env('TELE_EDA_MS', 'ADAPTER_EDA_MS', 15000),     // EDA 设备数据采集
+  eapPollMs:     _env('TELE_EAP_POLL_MS', 'EAP_POLL_MS', 30000),  // EAP 设备轮询
+  opcuaMs:       _env('TELE_OPCUA_MS', 'ADAPTER_OPCUA_MS', 30000), // OPC-UA 设备数据采集
+  edaMs:         _env('TELE_EDA_MS', 'ADAPTER_EDA_MS', 30000),     // EDA 设备数据采集
   erpReplayMs:   _env('TELE_ERP_REPLAY_MS', 'ERP_REPLAY_MS', 30000), // ERP 事件重放
   wmsReplayMs:   _env('TELE_WMS_REPLAY_MS', 'WMS_REPLAY_MS', 30000), // WMS 事件重放
   wmsReplenishMs: _env('TELE_WMS_REPLENISH_MS', 'WMS_REPLENISH_MS', 60000), // WMS 补货巡检
@@ -43,7 +43,7 @@ const LABELS = {
   wmsReplayMs: 'WMS 事件重放',
   wmsReplenishMs: 'WMS 补货巡检',
 };
-const NOTE = '单位：毫秒。默认已是最低演示档；自动化关闭时不采集（这些项不生效）。演示时按需调高/调低。';
+const NOTE = '单位：毫秒。默认采集时间统一不低于 30 秒（演示省资源、更稳定）；自动化关闭时不采集（这些项不生效）。客户可按演示需要调高/调低，保存即生效。';
 
 const DB_PATH = process.env.FAB_DB_PATH || path.join(__dirname, '..', 'fab-mes.db');
 let _overrides = {};        // DB 覆盖（客户设置）
