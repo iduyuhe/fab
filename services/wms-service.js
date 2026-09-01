@@ -660,6 +660,25 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
         try { checkReplenish(); } catch (e) { /* 忽略瞬时错误 */ }
       }, +(process.env.WMS_REPLENISH_MS || 30000));
       if (autoTimer.unref) autoTimer.unref();
+      // WMS 库保留封顶（2026-09-01 真机教训：wms_tx 158万行/tasks 24万行 → fab-wms.db 216MB）。
+      // wms_tx 20万 / tasks 10万 / inventory 5万行，每 60s 截尾（间隔/上限可配）。
+      const wmsRetention = () => {
+        try {
+          const cap = (t, keep) => {
+            const n = db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
+            if (n > keep) {
+              const cut = db.prepare(`SELECT MAX(id) m FROM ${t}`).get().m - keep;
+              if (cut > 0) db.prepare(`DELETE FROM ${t} WHERE id <= ?`).run(cut);
+            }
+          };
+          cap('wms_tx', +(process.env.WMS_TX_RETENTION || 200000));
+          cap('tasks', +(process.env.WMS_TASK_RETENTION || 100000));
+          cap('inventory', +(process.env.WMS_INV_RETENTION || 50000));
+        } catch (_) { /* 裁剪失败不阻断 */ }
+      };
+      try { wmsRetention(); } catch (_) {}
+      const retTimer = setInterval(wmsRetention, +(process.env.WMS_RETENTION_MS || 60000));
+      if (retTimer.unref) retTimer.unref();
       return server;
     },
   };
