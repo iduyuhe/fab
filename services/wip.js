@@ -8,7 +8,7 @@ const { WIPEngine } = require('../core');
 // safe: DB 写异常隔离，不阻塞事件循环（与原 server.js 一致）
 const safe = fn => { try { fn(); } catch (e) { console.log('DB 写异常(已忽略): ' + e.message); } };
 
-function createWIP({ byId, tools, emitEv, storage }) {
+function createWIP({ byId, tools, emitEv, storage, shouldRun }) {
   const persist = {
     woCreate: wo => safe(() => storage.insertWO(wo)),
     lotCreate: lot => safe(() => storage.insertLot(lot)),
@@ -17,7 +17,7 @@ function createWIP({ byId, tools, emitEv, storage }) {
     waferCreate: (lot, wafers) => safe(() => storage.insertWafers(lot.id, wafers)),
     waferUpdate: lot => safe(() => storage.updateWafersByLot(lot.id, lot.wafers)),
   };
-  const engine = new WIPEngine(byId, tools, emitEv, { rule: 'HYBRID', speed: 180, persist });
+  const engine = new WIPEngine(byId, tools, emitEv, { rule: 'HYBRID', speed: 180, persist, shouldRun });
   return { engine, persist };
 }
 

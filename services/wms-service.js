@@ -609,7 +609,10 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
   // （与现实 WS 订阅并存；handleMesEvent 内部以 wms_tx PICK 去重，重放不产生重复实物动作）
   let lastSeq = 0;
   let replayStarted = false;
+  // 演示系统"自动化总开关"：默认关，需人为干预开启；关时本模块不做任何自动动作（手工接口不受限）
+  const { isAutomationEnabled } = require('../automation-flag');
   async function pollReplay() {
+    if (!isAutomationEnabled()) return;   // 总开关关：不自动重放事件（省资源、不造数据）
     try {
       const r = await fetch(`${MES_HTTP}/api/events?after=${lastSeq}&limit=500`);
       if (!r.ok) return;
@@ -650,7 +653,11 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
         log(`fab-wms 仓储执行域已启动 :${port}（${inProc ? 'in-proc 底座模式' : 'standalone 独立进程'}）`);
       });
       // 安全库存联动补货：周期性自动检查（每 30s），低于安全库存自动生成补货建议
-      const autoTimer = setInterval(() => { try { checkReplenish(); } catch (e) { /* 忽略瞬时错误 */ } }, +(process.env.WMS_REPLENISH_MS || 30000));
+      // 受自动化总开关管制：关时跳过（定时器保活，人工开启后自动恢复巡检）
+      const autoTimer = setInterval(() => {
+        if (!isAutomationEnabled()) return;
+        try { checkReplenish(); } catch (e) { /* 忽略瞬时错误 */ }
+      }, +(process.env.WMS_REPLENISH_MS || 30000));
       if (autoTimer.unref) autoTimer.unref();
       return server;
     },

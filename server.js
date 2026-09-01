@@ -23,6 +23,7 @@ const { initAudit } = require('./audit');                   // §L4 合规审计
 const { createWIP, loadAndHydrate } = require('./services/wip');            // §6 WIP 服务
 const { createGovernor } = require('./governance');                       // 资源治理层：锁死 CPU/内存/队列上限
 const gov = createGovernor();
+const { isAutomationEnabled, setAutomationEnabled, onAutomationChange } = require('./automation-flag');  // 演示系统"自动化总开关"：默认关、每次重启强制关
 
 const PORT = process.env.PORT || 8124;
 const TICK_MS = +(process.env.TICK_MS || 1000);                // 仿真 tick 周期（默认 1s；可配；前端 SimulatedEAP rate 建议同步）
@@ -147,14 +148,15 @@ async function ldaSyncOnce({ force = false, burst = LDA_WATCH_BURST } = {}) {
 function startLdaWatcher() {
   if (ldaImported.size === 0) { try { for (const r of storage.listLdaImported()) ldaImported.add(r.id); } catch (_) {} }  // 启动加载（跨重启幂等）
   if (!LDA_WATCHER) { log('[LDA看门狗] 已禁用 (LDA_WATCHER=0)'); return; }
-  ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; });   // 首轮（可能种子化）
+  // 受"自动化总开关"管制：关闭时仅保活轮询、不导入（避免无人值守时空转造数据）
+  if (isAutomationEnabled()) ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; });   // 首轮（可能种子化）
   // 空闲态拉长轮询到 60s（保活但省资源）；退避由 gov.fetch 保证
   function scheduleLdaWatch() {
     const iv = gov.isIdle(IDLE_MS) ? Math.max(LDA_WATCH_MS, 60000) : LDA_WATCH_MS;
-    setTimeout(() => { ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); scheduleLdaWatch(); }, iv);
+    setTimeout(() => { if (isAutomationEnabled()) ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); scheduleLdaWatch(); }, iv);
   }
   scheduleLdaWatch();
-  log(`[LDA看门狗] 已启动：轮询 ${LDA_BASE} 每 ${LDA_WATCH_MS / 1000}s（空闲拉长至60s），单轮突发上限 ${LDA_WATCH_BURST}，全量拉取已改为缓存+增量+退避`);
+  log(`[LDA看门狗] 已启动(受自动化总开关管制：关闭时仅保活不导入)：轮询 ${LDA_BASE} 每 ${LDA_WATCH_MS / 1000}s（空闲拉长至60s），单轮突发上限 ${LDA_WATCH_BURST}`);
 }
 
 // ---------- 设备模型（与数字孪生前端完全同构） ----------
@@ -527,6 +529,9 @@ tools.forEach(t => storage.upsertTool(t));
 storage.backfillTsdb();
 applyLearnedParams();
 startLdaWatcher();   // LDA 有机衔接常驻看门狗：设计交付自动触发 NPI 投放
+// ---- 演示系统"自动化总开关"开机状态播报 ----
+log(`⚙ 自动化总开关：${isAutomationEnabled() ? '【开】实时仿真全速运行' : '【关】演示闲置——仿真心跳与全部自动循环已冻结，仅监控/健康检查/事件持久化运行'}`);
+log('   人工开启方式：① 重启时带环境变量 FAB_AUTOMATION=1（仅本次生效）；② 运行时 POST /api/admin/automation {"enabled":true}。每次重启强制回到【关】。');
 // 事件批量落库：队列 + 定时 flush（无事务；失败丢弃防队列膨胀卡死事件循环）
 setInterval(() => storage.flushEvents(), FLUSH_MS);
 // 事件循环心跳诊断：延迟 >2s 说明卡死，打印定位
@@ -682,6 +687,7 @@ const audit = initAudit({ storage, eventbus: { onEmit } });
 
 // 设备随机扰动：只作用于未被派工引擎占用的设备（_lot 为空），转回 IDLE 时尝试派工
 function tick() {
+  if (!isAutomationEnabled()) return;   // 自动化总开关关：冻结仿真心跳，整条产线静止（演示闲置/省资源）
   const n = 1 + Math.floor(Math.random() * 3);
   for (let i = 0; i < n; i++) {
     const t = tools[Math.floor(Math.random() * tools.length)];
@@ -800,6 +806,7 @@ function handler(req, res) {
       wip: { wip: engine.stats.wip, done: engine.stats.done, releases: engine.stats.releases,
         lots: engine.lots.length, wos: engine.wos.length,
         queues: Object.fromEntries(Object.keys(engine.queues).map(m => [m, engine.queues[m].length])) },
+      automation: isAutomationEnabled(),
       lda: { lastSync: ldaLastSync, lastError: ldaLastError, imported: ldaImportCount, watching: LDA_WATCHER },
       autoWo: { on: autoWo, paused: autoWoPaused, atCap: autoWo_atCap, cap: WIP_CAP },
     });
@@ -1260,7 +1267,29 @@ function handler(req, res) {
       });
       return;
     }
-    return json(res, 200, { rule: engine.rule, autoWo, speed: engine.speed, rules: ['FIFO', 'SPT', 'CR', 'EDD', 'BN', 'HYBRID'] });
+    return json(res, 200, { rule: engine.rule, autoWo, speed: engine.speed, automation: isAutomationEnabled(), rules: ['FIFO', 'SPT', 'CR', 'EDD', 'BN', 'HYBRID'] });
+  }
+  // ---------- 演示系统"自动化总开关"：默认关，需人为干预开启；每次重启强制关（不持久化） ----------
+  if (route === '/api/admin/automation') {
+    if (req.method === 'GET') return json(res, 200, {
+      enabled: isAutomationEnabled(),
+      note: '默认关；开启=实时仿真全开，关闭=演示闲置(冻结仿真心跳与全部自动循环，仅监控/健康检查/事件持久化运行)。env FAB_AUTOMATION=1 仅影响本次启动默认值，重启后回到关。'
+    });
+    if (req.method === 'POST') {
+      const tok = process.env.FAB_ADMIN_TOKEN;     // 若部署时设了管理令牌，则要求头 x-fab-admin 匹配（未设则放行，仅内网可达）
+      if (tok && req.headers['x-fab-admin'] !== tok) return json(res, 401, { error: 'admin token required (header x-fab-admin)' });
+      let body = '';
+      req.on('data', c => body += c);
+      req.on('end', () => {
+        let b = {}; try { b = body ? JSON.parse(body) : {}; } catch (_) {}
+        const nv = !!b.enabled;
+        setAutomationEnabled(nv);
+        log(`⚙ 自动化总开关被人工切换为 ${nv ? '开(实时仿真)' : '关(演示闲置/冻结)'}`);
+        return json(res, 200, { ok: true, enabled: isAutomationEnabled() });
+      });
+      return;
+    }
+    return json(res, 405, { error: 'GET/POST only' });
   }
   // ---------- 时序库（TSDB）数据资产接口 ----------
   if (route === '/api/tsdb/stats') {
@@ -1326,7 +1355,7 @@ wss.on('connection', ws => {
 });
 
 // ---------- M2 WIP 引擎（工单/派工/lot 追踪），经 services/wip 注入（C9/C10） ----------
-const { engine } = createWIP({ byId, tools, emitEv, storage });
+const { engine } = createWIP({ byId, tools, emitEv, storage, shouldRun: () => isAutomationEnabled() });
 // 在制/工单上限可配（护栏②：队列封顶防内存无界增长）；默认 2000 lots / 500 wos
 engine.maxLots = +(process.env.WIP_MAX_LOTS || 2000);
 engine.maxWos = +(process.env.WIP_MAX_WOS || 500);
@@ -1359,8 +1388,9 @@ let autoWoPaused = false;
 const WIP_CAP = process.env.WIP_CAP ? +process.env.WIP_CAP : 240;   // 在制上限：达到即暂停自动投料，防止内存/CPU 失控
 function log(msg) { gov.logger.log(`[${new Date().toTimeString().slice(0, 8)}] ${msg}`); }
 setInterval(() => {
-  if (!autoWo) return;
-  // 空闲降频：无用户操作超 3 分钟，暂停自动投料，整机回落（满足稳态 CPU ≤10%）
+  if (!autoWo || !isAutomationEnabled()) return;   // 受自动化总开关管制：关时不自动投料
+  // 空闲降频：仅在自动化已开启、且确实无用户操作超 3 分钟时暂停（满足稳态 CPU ≤10%）。
+  // 注意：刚开启自动化时 server 已 gov.touch() 重置空闲计时，不会因"冷启无操作"误判暂停。
   if (gov.isIdle(IDLE_MS)) {
     if (!autoWoPaused) { autoWoPaused = true; log('⏸ 空闲(>3min 无操作) 自动投料暂停，整机降频'); }
     return;
@@ -1396,13 +1426,26 @@ function scheduleTick() {
   setTimeout(() => { tick(); scheduleTick(); }, iv);
 }
 scheduleTick();
+// 演示系统"自动化总开关"订阅：开启瞬间重置空闲计时并立即唤醒一拍 tick，
+// 避免"冷启无操作"被空闲降频误判为暂停；关闭时无动作（tick 自动回到冻结）。
+onAutomationChange((on) => {
+  if (on) {
+    gov.touch();
+    try { tick(); } catch (_) {}
+    scheduleTick();
+    const resumed = engine.resume ? engine.resume() : 0;   // 关闸期间停驻的在制批次重新入队续跑
+    log(`▶ 自动化已开启：空闲计时重置，仿真心跳/自动循环恢复全速${resumed ? `，续跑停驻批次 ${resumed} 个` : ''}`);
+  }
+});
 // 主动预测告警：进入统一并发闸门（≤2 并发 / 30s 时间预算），空闲态(>3min)跳过扫描省 CPU。
 const PRED_SCAN_MS = process.env.PRED_SCAN_MS ? +(process.env.PRED_SCAN_MS) : 30000;
 const PRED_IDLE_MS = process.env.PRED_IDLE_MS ? +(process.env.PRED_IDLE_MS) : 60000;
 function schedulePredScan() {
+  if (!isAutomationEnabled()) { setTimeout(schedulePredScan, PRED_SCAN_MS); return; }   // 总开关关：跳过预测扫描（保活，恢复后自动续扫）
   const idle = gov.isIdle(IDLE_MS);
   setTimeout(() => {
-    if (!idle) {
+    // 执行前再查一次闸：即使排队期间被人为关闭，也不再启动扫描（杜绝"关后仍跑"尾巴）
+    if (isAutomationEnabled() && !idle) {
       gov.runTask('predScan', () => predScan(), []).then(a => { if (a && a.length) log(`[预测告警] 自动扫描发现 ${a.length} 条预测告警`); }).catch(() => {});
     }
     schedulePredScan();

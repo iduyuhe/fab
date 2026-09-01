@@ -717,7 +717,10 @@ function createErpService({ dbPath, mesHttp, inProc = false } = {}) {
   // （实时 WS 已消费 live 事件；此处专门闭合「断连期间」丢失的 lotRelease/lotHold 等中间事件）
   let lastSeq = 0;
   let replayStarted = false;
+  // 演示系统"自动化总开关"：默认关，需人为干预开启；关时本模块不做任何自动动作（手工接口不受限）
+  const { isAutomationEnabled } = require('../automation-flag');
   async function pollReplay() {
+    if (!isAutomationEnabled()) return;   // 总开关关：不自动重放事件（省资源、不造数据）
     try {
       const r = await fetch(`${MES_HTTP}/api/events?after=${lastSeq}&limit=500`);
       if (!r.ok) return;
@@ -748,9 +751,10 @@ function createErpService({ dbPath, mesHttp, inProc = false } = {}) {
   let autoOrderPaused = false; // 复现/演示期间可暂停，避免拥堵单张样品 SO
   function startAutoOrders(ms) {
     const interval = Math.max(5000, ms || +(process.env.ERP_AUTO_ORDER_MS || 20000));
-    log(`🤖 ERP 自动接单器已启动（每 ${(interval / 1000)}s 一张 SO）`);
+    log(`🤖 ERP 自动接单器已装载（每 ${(interval / 1000)}s 一张 SO；受自动化总开关管制，当前${isAutomationEnabled() ? '开' : '关'}）`);
     setInterval(() => {
       if (autoOrderPaused) return;
+      if (!isAutomationEnabled()) return;   // 总开关关：不自动接单（演示闲置期零产出、零资源占用）
       try {
         const product = Math.random() < 0.5 ? 'N2' : 'A16';
         const qty = (1 + Math.floor(Math.random() * 3)) * 25;   // 25/50/75 片

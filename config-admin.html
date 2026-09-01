@@ -37,6 +37,22 @@
   <a href="/console.html">← 返回控制台</a>
   <span class="hint" style="margin:0 0 0 auto">数据存于 fab-config.db（ERP/WMS 共用真相源）</span>
 </header>
+
+<!-- 演示系统 · 自动化总开关（人为干预闸门；默认关，每次服务重启强制回到关） -->
+<div class="wrap" style="padding-top:12px;padding-bottom:0">
+  <div class="card">
+    <div class="bar">
+      <b>🎛 演示系统 · 自动化总开关</b>
+      <span class="hint">关 = 演示闲置（仿真心跳与全部自动循环冻结，机器安静、不造数据）；开 = 实时仿真全速。<b>每次服务重启强制回到「关」，必须人工再开一次。</b></span>
+      <span id="autoState" style="font-weight:700">读取中…</span>
+      <button id="autoBtn" onclick="toggleAuto()">切换</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span class="hint">开：产线推进 / LDA 自动接设计 / 自动投料 / 预测扫描 / ERP 自动接单 / WMS 自动补料。关：以上全自动动作全停，监控与健康检查照常；手工导入设计、手工建单任何时候都能用。</span>
+    </div>
+  </div>
+</div>
+
 <div class="tabs" id="tabs"></div>
 <div class="wrap" id="view"></div>
 
@@ -202,6 +218,32 @@ window.saveCus=async()=>{ const b={id:val('cu_id'),name:val('cu_name'),region:va
   if(!b.id){msg('代码必填',false);return;} const r=await post('/customers',b); msg(r.ok?'已保存':'失败',r.ok); render(); };
 
 function val(id){ const e=document.getElementById(id); return e?e.value.trim():''; }
+
+// ---------- 演示系统 · 自动化总开关 ----------
+async function loadAuto(){
+  try{
+    const r=await fetch('/api/admin/automation'); const j=await r.json();
+    const on=!!j.enabled;
+    const st=document.getElementById('autoState');
+    st.textContent = on ? '● 开（实时仿真）' : '○ 关（演示闲置）';
+    st.style.color = on ? '#1a7f37' : '#8b949e';
+    const b=document.getElementById('autoBtn');
+    b.textContent = on ? '停止自动化' : '启动自动化';
+    b.className = on ? 'sec' : '';
+  }catch(e){ const st=document.getElementById('autoState'); if(st){ st.textContent='读取失败（后端未启动？）'; st.style.color='#cf222e'; } }
+}
+window.toggleAuto=async()=>{
+  const b=document.getElementById('autoBtn'); if(b) b.disabled=true;
+  try{
+    const cur=await (await fetch('/api/admin/automation')).json();
+    const r=await fetch('/api/admin/automation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!cur.enabled})});
+    const j=await r.json();
+    if(!r.ok){ alert('切换失败：'+(j.error||r.status)); return; }
+    alert(j.enabled?'已【开启】自动化：实时仿真开始运行。\n提醒：服务重启后会自动回到「关」。':'已【关闭】自动化：演示闲置，机器安静、不再造数据。');
+  }catch(e){ alert('切换失败：'+e.message); }
+  finally{ if(b) b.disabled=false; loadAuto(); }
+};
+loadAuto(); setInterval(loadAuto, 15000);   // 15s 自检一次，和后端实际状态保持一致
 renderTabs(); render();
 </script>
 </body>

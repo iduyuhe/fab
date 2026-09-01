@@ -45,6 +45,10 @@ class WIPEngine {
     this.woSeq = 0; this.lotSeq = 0;
     this.stats = { wip: 0, done: 0, cycSumH: 0, moves: 0, releases: 0 };
     this._processing = new Map();                       // toolId -> lot（引擎占用设备）
+    // 演示系统"自动化总开关"闸：shouldRun() 返回 false 时，引擎完成当前步后停在原地，
+    // 不再自动进入下一站（产线冻结）；开闸后 resume() 把停驻批次重新入队续跑。
+    this.shouldRun = typeof opts.shouldRun === 'function' ? opts.shouldRun : () => true;
+    this._parked = [];                                  // 关闸期间完成当前步、等待续跑的在制批次
     // P1-4 APS→dispatch 指令：由 APS 计划回填，驱动派工（而非硬编码 LITHO）。
     // bottleneckMods：APS 实时识别的瓶颈模块（HYBRID 在这些模块上用 BN 优先清瓶颈）；
     // criticalLots：APS 排程判为 LATE/吃紧的工单关键 lot，派工时绝对优先。
@@ -104,6 +108,7 @@ class WIPEngine {
   }
 
   dispatch(modKey) {
+    if (!this.shouldRun()) return;   // 演示系统"自动化总开关"关：不派工（产线冻结，队列等待开闸）
     const q = this.queues[modKey];
     if (!q || q.length === 0) return;
     const free = this.tools.filter(t => t.module === modKey && t._lot == null && t.status === 'IDLE' && !t._hold);
@@ -144,6 +149,10 @@ class WIPEngine {
     } else if (lot.status === 'HOLD') {
       this._finalizeWafers(lot, 'HOLD');
       this.emit({ type: 'lotHold', lot: lot.id, reason: lot.holdReason || 'SPC' });   // SPC 停线：完成当前步后不入队
+    } else if (!this.shouldRun()) {
+      // 演示系统"自动化总开关"关：完成当前步后停在原地（不推进下一站），
+      // 批次进入 _parked 等待开闸；resume() 时重新入队续跑（产线冻结语义）。
+      this._parked.push(lot);
     } else {
       this.stats.moves++;
       this._advanceWafers(lot);
@@ -154,6 +163,18 @@ class WIPEngine {
     this.emit({ type: 'toolStatus', id: toolId, status: 'IDLE' });
     this.dispatch(t.module);
     this._pruneDone();   // 回收已完工的 lot/wo，锁死内存上限
+  }
+
+  // 演示系统"自动化总开关"开闸续跑：把关闸期间完成当前步后停驻的批次重新入队，
+  // 继续下一站流转（与 loadAndHydrate 的入队语义一致）。
+  resume() {
+    if (!this._parked.length) return 0;
+    const n = this._parked.length;
+    for (const lot of this._parked) {
+      if (lot.status === 'WIP' && lot.route[lot.step] != null) this._enqueue(lot, lot.route[lot.step]);
+    }
+    this._parked = [];
+    return n;
   }
 
   // 内存护栏：在制/历史 lot、wo 超过上限时回收最旧已完成项，防止无限增长拖垮整机。
