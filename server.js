@@ -541,14 +541,19 @@ setInterval(() => {
   if (lag > 2000) log(`⚠ 事件循环延迟 ${lag}ms`);
   hbLast = now;
 }, HEARTBEAT_MS);
-// 历史数据保留：落库表（events/tsdb/chamber_hist）封顶裁剪，防无限膨胀（护栏②）。
-// 默认 events 20万 / tsdb 50万 / chamber_hist 20万行，每 60s 巡检一次（间隔可配）。
+// 历史数据保留：落库表全量封顶裁剪，防无限膨胀（护栏②）。
+// 2026-09-01 真机教训：仅封 events/tsdb/chamber_hist 不够，audit_log 等表照样涨到 2.4GB。
+// 默认 events 20万 / tsdb 50万 / chamber_hist 20万 / audit 20万 / 量测 10万 / SPC 5万 / VM 10万 / 批次历史 20万，每 60s 巡检（均可配）。
 const EVENTS_RETENTION = +(process.env.EVENTS_RETENTION || 200000);
 const TSDB_RETENTION = +(process.env.TSDB_RETENTION || 500000);
 const HIST_RETENTION = +(process.env.HIST_RETENTION || 200000);
-const RETENTION_MS = +(process.env.RETENTION_MS || 60000);
-try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION); } catch (_) {}
-setInterval(() => { try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION); } catch (_) {} }, RETENTION_MS);
+const AUDIT_RETENTION = +(process.env.AUDIT_RETENTION || 200000);
+const METR_RETENTION = +(process.env.METR_RETENTION || 100000);
+const SPC_RETENTION = +(process.env.SPC_RETENTION || 50000);
+const VM_RETENTION = +(process.env.VM_RETENTION || 100000);
+const LOTHIST_RETENTION = +(process.env.LOTHIST_RETENTION || 200000);
+try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION, AUDIT_RETENTION, METR_RETENTION, SPC_RETENTION, VM_RETENTION, LOTHIST_RETENTION); } catch (_) {}
+setInterval(() => { try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION, AUDIT_RETENTION, METR_RETENTION, SPC_RETENTION, VM_RETENTION, LOTHIST_RETENTION); } catch (_) {} }, RETENTION_MS);
 
 // M3 SECS/GEM：3 台演示设备可被 EAP Host 建立 HSMS 会话（id 必须存在于合成工厂 byId）
 const SECS_DEVICES = { 1: 'LITHO-001', 2: 'ETCH-015', 3: 'DEP-060' };

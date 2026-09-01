@@ -314,23 +314,35 @@ class SQLiteStorage extends StorageAdapter {
   eventQueueStats() { return { queued: this._evtQueue ? this._evtQueue.length : 0, dropped: this._evtDropped || 0, cap: 20000 }; }
 
   // 历史数据保留（护栏②：落库表只写不删会无限膨胀→库涨到 GB 级、重启重载卡死）。
-  // 超过上限即裁剪最旧行；events 用自增 seq，tsdb/chamber_hist 用自增 id/rowid。
-  enforceRetention(eventsMax = 200000, tsdbMax = 500000, histMax = 200000) {
+  // 超过上限即裁剪最旧行；各表按自增主键/rowid 截尾。
+  // 2026-09-01 真机教训：仅封 events/tsdb/chamber_hist 不够——audit_log(395万行!)、
+  // metrology、spc_alarm、vm_log、lot_hist、wafers 同样只增不删，DB 照样涨到 2.4GB。
+  // 现扩展为全表封顶；wafers 特殊：只保留在制(WIP/HOLD)批次的晶圆明细。
+  enforceRetention(eventsMax = 200000, tsdbMax = 500000, histMax = 200000,
+                   auditMax = 200000, metrMax = 100000, spcMax = 50000, vmMax = 100000, lotHistMax = 200000) {
     try {
-      const e = this.db.prepare('SELECT COUNT(*) c FROM events').get().c;
-      if (e > eventsMax) {
-        const cut = this.db.prepare('SELECT MAX(seq) m FROM events').get().m - eventsMax;
-        if (cut > 0) this.db.prepare('DELETE FROM events WHERE seq <= ?').run(cut);
-      }
-      const t = this.db.prepare('SELECT COUNT(*) c FROM tsdb').get().c;
-      if (t > tsdbMax) {
-        const cut = this.db.prepare('SELECT MAX(id) m FROM tsdb').get().m - tsdbMax;
-        if (cut > 0) this.db.prepare('DELETE FROM tsdb WHERE id <= ?').run(cut);
-      }
-      const h = this.db.prepare('SELECT COUNT(*) c FROM chamber_hist').get().c;
-      if (h > histMax) {
-        const cut = this.db.prepare('SELECT MAX(rowid) m FROM chamber_hist').get().m - histMax;
-        if (cut > 0) this.db.prepare('DELETE FROM chamber_hist WHERE rowid <= ?').run(cut);
+      // 通用按自增主键截尾的助手：表 → 保留行数
+      const cap = (table, keep, col = 'id') => {
+        const c = this.db.prepare(`SELECT COUNT(*) c FROM ${table}`).get().c;
+        if (c > keep) {
+          const max = this.db.prepare(`SELECT MAX(${col}) m FROM ${table}`).get().m;
+          const cut = max - keep;
+          if (cut > 0) this.db.prepare(`DELETE FROM ${table} WHERE ${col} <= ?`).run(cut);
+        }
+      };
+      cap('events', eventsMax, 'seq');
+      cap('tsdb', tsdbMax);
+      cap('chamber_hist', histMax, 'rowid');
+      cap('audit_log', auditMax);      // 审计链：保留 20 万行（链完整性不依赖行数，仅追溯窗口）
+      cap('metrology', metrMax);       // 量测记录：10 万
+      cap('spc_alarm', spcMax);        // SPC 报警：5 万
+      cap('vm_log', vmMax);            // VM 预测日志：10 万
+      cap('lot_hist', lotHistMax);     // 批次步进历史：20 万
+      // wafers 无自增主键：只保留在制(WIP/HOLD)批次的晶圆明细，完工批次明细随裁剪释放
+      const wKeep = this.db.prepare("SELECT COUNT(*) c FROM wafers WHERE lot IN (SELECT id FROM lots WHERE status IN ('WIP','HOLD'))").get().c;
+      const wAll = this.db.prepare('SELECT COUNT(*) c FROM wafers').get().c;
+      if (wAll > Math.max(wKeep, 200000)) {
+        this.db.prepare("DELETE FROM wafers WHERE lot NOT IN (SELECT id FROM lots WHERE status IN ('WIP','HOLD'))").run();
       }
     } catch (_) { /* 保留裁剪失败不阻断主流程 */ }
   }
