@@ -553,8 +553,21 @@ const SPC_RETENTION = +(process.env.SPC_RETENTION || 50000);
 const VM_RETENTION = +(process.env.VM_RETENTION || 100000);
 const LOTHIST_RETENTION = +(process.env.LOTHIST_RETENTION || 200000);
 const RETENTION_MS = +(process.env.RETENTION_MS || 60000);
-try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION, AUDIT_RETENTION, METR_RETENTION, SPC_RETENTION, VM_RETENTION, LOTHIST_RETENTION); } catch (_) {}
-setInterval(() => { try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION, AUDIT_RETENTION, METR_RETENTION, SPC_RETENTION, VM_RETENTION, LOTHIST_RETENTION); } catch (_) {} }, RETENTION_MS);
+// 时间窗口保留（天）：events 3 / tsdb 7 / chamber_hist 3 / audit 7 / metrology 7 / spc 7 / vm 7 / lot_hist 30
+const RETENTION_DAYS = {
+  events: +(process.env.RETENTION_DAYS_EVENTS || 3),
+  tsdb: +(process.env.RETENTION_DAYS_TSDB || 7),
+  chamber_hist: +(process.env.RETENTION_DAYS_HIST || 3),
+  audit_log: +(process.env.RETENTION_DAYS_AUDIT || 7),
+  metrology: +(process.env.RETENTION_DAYS_METR || 7),
+  spc_alarm: +(process.env.RETENTION_DAYS_SPC || 7),
+  vm_log: +(process.env.RETENTION_DAYS_VM || 7),
+  lot_hist: +(process.env.RETENTION_DAYS_LOTHIST || 30),
+};
+const RETENTION_VACUUM_MB = +(process.env.RETENTION_VACUUM_MB || 800);   // 库文件超此值自动 VACUUM 释放磁盘
+const _retOpts = () => ({ days: RETENTION_DAYS, vacuumThresholdMb: RETENTION_VACUUM_MB });
+try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION, AUDIT_RETENTION, METR_RETENTION, SPC_RETENTION, VM_RETENTION, LOTHIST_RETENTION, _retOpts()); } catch (_) {}
+setInterval(() => { try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION, AUDIT_RETENTION, METR_RETENTION, SPC_RETENTION, VM_RETENTION, LOTHIST_RETENTION, _retOpts()); } catch (_) {} }, RETENTION_MS);
 
 // M3 SECS/GEM：3 台演示设备可被 EAP Host 建立 HSMS 会话（id 必须存在于合成工厂 byId）
 const SECS_DEVICES = { 1: 'LITHO-001', 2: 'ETCH-015', 3: 'DEP-060' };

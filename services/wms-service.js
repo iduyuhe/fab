@@ -661,19 +661,28 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
       }, +(process.env.WMS_REPLENISH_MS || 30000));
       if (autoTimer.unref) autoTimer.unref();
       // WMS 库保留封顶（2026-09-01 真机教训：wms_tx 158万行/tasks 24万行 → fab-wms.db 216MB）。
-      // wms_tx 20万 / tasks 10万 / inventory 5万行，每 60s 截尾（间隔/上限可配）。
+      // 双保险：行数封顶（wms_tx 20万/tasks 10万/inventory 5万）+ 时间窗（7 天）
+      // + 库文件超阈值自动 VACUUM 释放磁盘（DELETE 不缩文件）。每 60s 巡检（可配）。
       const wmsRetention = () => {
         try {
-          const cap = (t, keep) => {
+          const days = (name, def) => +(process.env['WMS_RETENTION_DAYS_' + name.toUpperCase()] || def);
+          const cutoff = d => new Date(Date.now() - d * 86400e3).toISOString();
+          const cap = (t, keep, tDays) => {
             const n = db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
             if (n > keep) {
               const cut = db.prepare(`SELECT MAX(id) m FROM ${t}`).get().m - keep;
               if (cut > 0) db.prepare(`DELETE FROM ${t} WHERE id <= ?`).run(cut);
             }
+            db.prepare(`DELETE FROM ${t} WHERE ts < ?`).run(cutoff(tDays));
           };
-          cap('wms_tx', +(process.env.WMS_TX_RETENTION || 200000));
-          cap('tasks', +(process.env.WMS_TASK_RETENTION || 100000));
-          cap('inventory', +(process.env.WMS_INV_RETENTION || 50000));
+          cap('wms_tx', +(process.env.WMS_TX_RETENTION || 200000), days('tx', 7));
+          cap('tasks', +(process.env.WMS_TASK_RETENTION || 100000), days('task', 7));
+          cap('inventory', +(process.env.WMS_INV_RETENTION || 50000), days('inv', 7));
+          const thMb = +(process.env.WMS_VACUUM_MB || 800);
+          if (thMb > 0) {
+            const sizeMb = fs.statSync(DB_PATH).size / 1048576;
+            if (sizeMb > thMb) db.exec('VACUUM');
+          }
         } catch (_) { /* 裁剪失败不阻断 */ }
       };
       try { wmsRetention(); } catch (_) {}

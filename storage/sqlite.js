@@ -5,6 +5,7 @@
 //  SQL 语义与原 server.js 完全等价，DB 结构向后兼容。
 // ============================================================
 const path = require('path');
+const fs = require('fs');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const { StorageAdapter } = require('./interface');
@@ -314,35 +315,49 @@ class SQLiteStorage extends StorageAdapter {
   eventQueueStats() { return { queued: this._evtQueue ? this._evtQueue.length : 0, dropped: this._evtDropped || 0, cap: 20000 }; }
 
   // 历史数据保留（护栏②：落库表只写不删会无限膨胀→库涨到 GB 级、重启重载卡死）。
-  // 超过上限即裁剪最旧行；各表按自增主键/rowid 截尾。
-  // 2026-09-01 真机教训：仅封 events/tsdb/chamber_hist 不够——audit_log(395万行!)、
-  // metrology、spc_alarm、vm_log、lot_hist、wafers 同样只增不删，DB 照样涨到 2.4GB。
-  // 现扩展为全表封顶；wafers 特殊：只保留在制(WIP/HOLD)批次的晶圆明细。
+  // 双保险（2026-09-01 用户要求，讨论定稿）：
+  //   A. 行数封顶：超上限即裁剪最旧行（防内存/CPU 失控）；
+  //   B. 时间窗口：超过保留天数(ts < cutoff) 的历史行主动清除（语义直观，不留僵尸数据）；
+  //   C. 磁盘释放：库文件超过 vacuumThresholdMb 时执行 VACUUM（DELETE 只标记复用、不缩文件，
+  //      必须压缩才能真正释放磁盘——否则文件保持高位只涨不缩）。
+  // wafers 特殊：只保留在制(WIP/HOLD)批次的晶圆明细。
+  // days: { events:3, tsdb:7, chamber_hist:3, audit_log:7, metrology:7, spc_alarm:7, vm_log:7, lot_hist:30 }
   enforceRetention(eventsMax = 200000, tsdbMax = 500000, histMax = 200000,
-                   auditMax = 200000, metrMax = 100000, spcMax = 50000, vmMax = 100000, lotHistMax = 200000) {
+                   auditMax = 200000, metrMax = 100000, spcMax = 50000, vmMax = 100000, lotHistMax = 200000,
+                   opts = {}) {
     try {
-      // 通用按自增主键截尾的助手：表 → 保留行数
-      const cap = (table, keep, col = 'id') => {
+      const days = opts.days || {};
+      const cutoffOf = d => d ? new Date(Date.now() - d * 86400e3).toISOString() : null;
+      // 通用助手：行数封顶 + 时间窗双保险
+      const cap = (table, keep, col = 'id', tableDays) => {
         const c = this.db.prepare(`SELECT COUNT(*) c FROM ${table}`).get().c;
         if (c > keep) {
           const max = this.db.prepare(`SELECT MAX(${col}) m FROM ${table}`).get().m;
           const cut = max - keep;
           if (cut > 0) this.db.prepare(`DELETE FROM ${table} WHERE ${col} <= ?`).run(cut);
         }
+        const cutoff = cutoffOf(tableDays);
+        if (cutoff) this.db.prepare(`DELETE FROM ${table} WHERE ts < ?`).run(cutoff);
       };
-      cap('events', eventsMax, 'seq');
-      cap('tsdb', tsdbMax);
-      cap('chamber_hist', histMax, 'rowid');
-      cap('audit_log', auditMax);      // 审计链：保留 20 万行（链完整性不依赖行数，仅追溯窗口）
-      cap('metrology', metrMax);       // 量测记录：10 万
-      cap('spc_alarm', spcMax);        // SPC 报警：5 万
-      cap('vm_log', vmMax);            // VM 预测日志：10 万
-      cap('lot_hist', lotHistMax);     // 批次步进历史：20 万
+      cap('events', eventsMax, 'seq', days.events ?? 3);
+      cap('tsdb', tsdbMax, 'id', days.tsdb ?? 7);
+      cap('chamber_hist', histMax, 'rowid', days.chamber_hist ?? 3);
+      cap('audit_log', auditMax, 'id', days.audit_log ?? 7);   // 审计链：追溯窗口 7 天
+      cap('metrology', metrMax, 'id', days.metrology ?? 7);
+      cap('spc_alarm', spcMax, 'id', days.spc_alarm ?? 7);
+      cap('vm_log', vmMax, 'id', days.vm_log ?? 7);
+      cap('lot_hist', lotHistMax, 'id', days.lot_hist ?? 30);  // 批次履历：留 30 天便于追溯
       // wafers 无自增主键：只保留在制(WIP/HOLD)批次的晶圆明细，完工批次明细随裁剪释放
       const wKeep = this.db.prepare("SELECT COUNT(*) c FROM wafers WHERE lot IN (SELECT id FROM lots WHERE status IN ('WIP','HOLD'))").get().c;
       const wAll = this.db.prepare('SELECT COUNT(*) c FROM wafers').get().c;
       if (wAll > Math.max(wKeep, 200000)) {
         this.db.prepare("DELETE FROM wafers WHERE lot NOT IN (SELECT id FROM lots WHERE status IN ('WIP','HOLD'))").run();
+      }
+      // 磁盘释放：库文件超阈值 → VACUUM 压缩（DELETE 不缩文件；阈值默认 800MB）
+      const thMb = +(opts.vacuumThresholdMb || 800);
+      if (thMb > 0) {
+        const sizeMb = fs.statSync(DB_PATH).size / 1048576;
+        if (sizeMb > thMb) this.db.exec('VACUUM');
       }
     } catch (_) { /* 保留裁剪失败不阻断主流程 */ }
   }
