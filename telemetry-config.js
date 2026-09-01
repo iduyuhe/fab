@@ -45,7 +45,9 @@ const LABELS = {
 };
 const NOTE = '单位：毫秒。默认采集时间统一不低于 30 秒（演示省资源、更稳定）；自动化关闭时不采集（这些项不生效）。客户可按演示需要调高/调低，保存即生效。';
 
-const DB_PATH = process.env.FAB_DB_PATH || path.join(__dirname, '..', 'fab-mes.db');
+// 本文件位于项目根目录：DB_PATH 直接用 __dirname 拼接（勿加 '..'——那会指到上级目录孤儿库！
+// 2026-09-01 真机踩坑：写成 .. 后配置读写落到 /opt/fab-mes.db，与 MES 主库 /opt/fab-mes/fab-mes.db 分家）
+const DB_PATH = process.env.FAB_DB_PATH || path.join(__dirname, 'fab-mes.db');
 let _overrides = {};        // DB 覆盖（客户设置）
 let _storage = null;        // 由 server.js 注入（避免循环依赖）
 const _listeners = new Set();
