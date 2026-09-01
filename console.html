@@ -78,6 +78,14 @@
   <button class="btn" id="btn-wo">+ 创建工单</button>
   <button class="btn ghost" id="btn-refresh">刷新</button>
 </header>
+<!-- 演示系统 · 自动化总开关（醒目横幅：一眼可见、一键切换） -->
+<div id="auto-bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2,#0f1626)">
+  <span id="auto-dot" style="width:10px;height:10px;border-radius:50%;background:var(--muted,#6b7a94);flex:none"></span>
+  <b id="auto-title" style="font-size:13px">自动化：读取中…</b>
+  <span id="auto-desc" class="muted" style="font-size:12px">正在连接后端…</span>
+  <span class="spacer" style="flex:1"></span>
+  <button id="auto-btn" class="btn ghost" onclick="toggleAuto()" style="padding:5px 16px">…</button>
+</div>
 <button id="hud-toggle" title="隐藏/显示顶部面板 (H)">🙈 隐藏面板</button>
 
 <div class="grid quick" id="quick-links">
@@ -198,6 +206,48 @@ async function api(path, opts){
   const r = await fetch(path, opts);
   return r.json();
 }
+
+// ---------- 演示系统 · 自动化总开关（横幅） ----------
+async function loadAuto(){
+  try{
+    const j = await api('/api/admin/automation');
+    paintAuto(!!j.enabled);
+  }catch(e){ paintAuto(null); }
+}
+function paintAuto(on){
+  const dot = $('auto-dot'), title = $('auto-title'), desc = $('auto-desc'), btn = $('auto-btn');
+  if(on === true){
+    dot.style.background = 'var(--run,#39d98a)';
+    title.textContent = '自动化：● 实时仿真中';
+    title.style.color = 'var(--run,#39d98a)';
+    desc.textContent = '产线推进 / 自动接单 / 预测告警全速运行';
+    btn.textContent = '■ 停止自动化';
+    btn.style.color = 'var(--down,#ff5c5c)'; btn.style.borderColor = 'var(--down,#ff5c5c)';
+  }else if(on === false){
+    dot.style.background = 'var(--muted,#6b7a94)';
+    title.textContent = '自动化：○ 演示闲置（已冻结）';
+    title.style.color = 'var(--muted,#6b7a94)';
+    desc.textContent = '产线静止、不造数据；给客户演示前点"启动"即可';
+    btn.textContent = '▶ 启动自动化';
+    btn.style.color = 'var(--run,#39d98a)'; btn.style.borderColor = 'var(--run,#39d98a)';
+  }else{
+    dot.style.background = 'var(--down,#ff5c5c)';
+    title.textContent = '自动化：状态未知';
+    title.style.color = 'var(--down,#ff5c5c)';
+    desc.textContent = '后端未响应，请确认服务已启动';
+    btn.textContent = '重试'; btn.style.color = 'var(--muted)'; btn.style.borderColor = 'var(--line)';
+  }
+}
+window.toggleAuto = async () => {
+  const btn = $('auto-btn'); btn.disabled = true;
+  try{
+    const cur = await api('/api/admin/automation');
+    const j = await api('/api/admin/automation', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled: !cur.enabled }) });
+    paintAuto(!!j.enabled);
+  }catch(e){ paintAuto(null); }
+  btn.disabled = false;
+};
+loadAuto(); setInterval(loadAuto, 10000);   // 10s 自检，和后端实际状态保持一致
 
 async function refresh(){
   try{
