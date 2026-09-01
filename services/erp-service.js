@@ -784,6 +784,35 @@ function createErpService({ dbPath, mesHttp, inProc = false } = {}) {
       const autoMs = +(process.env.ERP_AUTO_SO_MS || 0);
       if (autoMs > 0) startAutoOrders(autoMs);
       else if (!inProc) startAutoOrders(20000);   // 独立进程默认开启接单器，驱动 OTD 主轴
+      // ERP 库保留封顶（2026-09-01 真机教训：inv_tx 383万行 → fab-erp.db 290MB）。
+      // 行数封顶 + 时间窗(90 天流水追溯)，每 60s 巡检 + 超阈值 VACUUM（可配）。
+      const erpRetention = () => {
+        try {
+          const cutoff = new Date(Date.now() - (+(process.env.ERP_RETENTION_DAYS || 90)) * 86400e3).toISOString();
+          const cap = (t, keep, col = 'id') => {
+            const n = db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
+            if (n > keep) {
+              const cut = db.prepare(`SELECT MAX(${col}) m FROM ${t}`).get().m - keep;
+              if (cut > 0) db.prepare(`DELETE FROM ${t} WHERE ${col} <= ?`).run(cut);
+            }
+          };
+          cap('inv_tx', +(process.env.ERP_INV_TX_RETENTION || 200000));
+          cap('cost_batches', +(process.env.ERP_COST_BATCH_RETENTION || 10000));
+          cap('voucher_entries', +(process.env.ERP_VOUCHER_ENTRY_RETENTION || 50000));
+          cap('vouchers', +(process.env.ERP_VOUCHER_RETENTION || 20000));
+          for (const t of ['inv_tx', 'cost_batches', 'vouchers', 'arap']) {
+            db.prepare(`DELETE FROM ${t} WHERE ts < ?`).run(cutoff);
+          }
+          const thMb = +(process.env.ERP_VACUUM_MB || 500);
+          if (thMb > 0) {
+            const sizeMb = fs.statSync(DB_PATH).size / 1048576;
+            if (sizeMb > thMb) db.exec('VACUUM');
+          }
+        } catch (_) { /* 裁剪失败不阻断 */ }
+      };
+      try { erpRetention(); } catch (_) {}
+      const retTimer = setInterval(erpRetention, +(process.env.ERP_RETENTION_MS || 60000));
+      if (retTimer.unref) retTimer.unref();
       server.listen(port, () => {
         log(`fab-erp 原生 ERP 已启动 :${port}（${inProc ? 'in-proc 底座模式' : 'standalone 独立进程'}）`);
       });
