@@ -25,7 +25,7 @@ function openConfig(dbPath, readOnly = false) {
     : new DatabaseSync(DB_PATH);
   db.exec(`
     PRAGMA journal_mode=WAL;
-    PRAGMA busy_timeout=3000;
+    PRAGMA busy_timeout=8000;
     CREATE TABLE IF NOT EXISTS products(
       code TEXT PRIMARY KEY, name TEXT, kind TEXT, uom TEXT, std_cycle_h REAL, active INTEGER DEFAULT 1
     );

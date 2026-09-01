@@ -15,9 +15,21 @@ AGENT_PORT="${AGENT_PORT:-8127}"
 WMS_PORT="${WMS_PORT:-8128}"
 ADAPTER_MODE="${ADAPTER_MODE:-all}"
 
-echo ">>> 启动 MES 主进程 :8124 (APC_ENABLED=1 执行级闭环已点亮；ADAPTER_MODE=$ADAPTER_MODE 真实协议适配器已接主轴)"
+echo ">>> 启动 MES 主进程 :${PORT:-8124} (APC_ENABLED=1 执行级闭环已点亮；ADAPTER_MODE=$ADAPTER_MODE 真实协议适配器已接主轴)"
 APC_ENABLED=1 ADAPTER_MODE="$ADAPTER_MODE" MES_WS="$MES_WS" MES_HTTP="$MES_HTTP" "$NODE" server.js &
 MES_PID=$!
+
+# 等待 MES 就绪（健康检查通过）再拉起依赖进程——否则 ERP/WMS 会与 MES 抢共享配置库锁，
+# 出现 "database is locked" 崩溃（2026-09-01 真机实测 WMS 启动竞态）。最多等 60s，不阻塞。
+MES_HEALTH="${MES_HTTP:-http://127.0.0.1:8124}/api/health"
+echo ">>> 等待 MES 就绪 (${MES_HEALTH}) ..."
+for i in $(seq 1 30); do
+  if curl -sf --max-time 2 "$MES_HEALTH" >/dev/null 2>&1; then
+    echo ">>> MES 就绪 (${i}x2s)"
+    break
+  fi
+  sleep 2
+done
 
 echo ">>> 启动 门户静态进程 :8123"
 MES_WS="$MES_WS" MES_HTTP="$MES_HTTP" PORTAL_PORT="${PORTAL_PORT:-8123}" "$NODE" portal.js &
