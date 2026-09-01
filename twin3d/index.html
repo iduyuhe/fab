@@ -1161,6 +1161,25 @@ btnPause.onclick = ()=>{
   else { ds.start(); btnPause.textContent = '暂停'; logEvent('数据馈送已恢复', 0x39d98a); }
 };
 
+// ---------- 演示系统"自动化总开关"联动：总开关关 → 3D 工厂静止 ----------
+let frozen = false;   // 冻结标志：true 时停数据源、天车、信标脉冲（画面静止，仅留静态渲染）
+const frozenBanner = document.createElement('div');
+frozenBanner.id = 'frozen-banner';
+frozenBanner.style.cssText = 'position:absolute;top:calc(16px + var(--nav-h));left:50%;transform:translateX(-50%);z-index:29;padding:8px 16px;border-radius:10px;border:1px solid rgba(154,167,180,0.55);background:rgba(15,22,38,0.92);color:#9aa7b4;font:12px/1.5 system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,0.35);white-space:nowrap;';
+frozenBanner.textContent = '○ 自动化已冻结：3D 工厂静止（演示闲置）· 启动自动化后恢复运行';
+frozenBanner.style.display = 'none';
+document.body.appendChild(frozenBanner);
+async function applyAutoState(){
+  try{
+    const j = await (await fetch('/api/admin/automation')).json();
+    const on = !!j.enabled;
+    if(on && frozen){ frozen = false; ds.start(); frozenBanner.style.display = 'none'; logEvent('自动化已启动：3D 工厂恢复运行', 0x39d98a); }
+    else if(!on && !frozen){ frozen = true; ds.stop(); frozenBanner.style.display = 'block'; logEvent('自动化已冻结：3D 工厂静止', 0x9aa7b4); }
+  }catch(e){ /* 后端不可达：保持现状（模拟源仍可独立演示） */ }
+}
+setInterval(applyAutoState, 5000);
+applyAutoState();
+
 // ---------- 交互：拾取 / 悬停 ----------
 const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
@@ -1456,20 +1475,21 @@ function animate(){
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
   updateCamTween(dt);
-  // SPC 报警设备红色脉冲（emissiveIntensity 呼吸）
+  // SPC 报警设备红色脉冲（emissiveIntensity 呼吸）——冻结时定格不闪
   const tsec = clock.elapsedTime;
   const pulse = 0.45 + 0.45 * Math.sin(tsec * 6);
   spcAlerts.forEach((a, id) => {
     const t = byId.get(id);
     if(t && t._main){
-      t._main.material.emissiveIntensity = pulse;
-      if(t._beaconMat) t._beaconMat.emissiveIntensity = 0.4 + 0.6 * pulse;
+      t._main.material.emissiveIntensity = frozen ? 0.6 : pulse;
+      if(t._beaconMat) t._beaconMat.emissiveIntensity = frozen ? 0.4 : 0.4 + 0.6 * pulse;
     }
   });
-  // 全设备信标脉冲（按状态差异化节奏）
+  // 全设备信标脉冲（按状态差异化节奏）——自动化总开关关：冻结为静态低亮
   const bpulse = Math.sin(tsec * 3) * 0.5 + 0.5; // 0~1 基础相位
   tools.forEach(t => {
     if(!t._beaconMat) return;
+    if(frozen){ t._beaconMat.emissiveIntensity = 0.25; return; }   // 冻结：静态低亮
     if(t.status === 'DOWN'){
       t._beaconMat.emissiveIntensity = 0.5 + 0.5 * Math.sin(tsec * 8); // 快闪报警
     } else if(t.status === 'PM'){
@@ -1480,16 +1500,19 @@ function animate(){
       t._beaconMat.emissiveIntensity = 0.7 + 0.3 * Math.sin(tsec * 1.8); // RUN 稳亮微脉
     }
   });
-  // 工艺步骤进度条：根据真实在制 lot 进度缩放（左对齐增长）
-  tools.forEach(t=>{
-    if(t._progGrp && t._progGrp.visible){
-      const f = Math.max(0.02, t._progFrac||0);
-      t._progFg.scale.x = f;
-      t._progFg.position.x = -1.3 + 1.3*f;
-    }
-  });
-  // AMHS 天车：真实搬运任务优先，空闲时沿环线巡逻（真实模式也不再静止）
+  // 工艺步骤进度条：根据真实在制 lot 进度缩放（左对齐增长）——冻结时保持不动
+  if(!frozen){
+    tools.forEach(t=>{
+      if(t._progGrp && t._progGrp.visible){
+        const f = Math.max(0.02, t._progFrac||0);
+        t._progFg.scale.x = f;
+        t._progFg.position.x = -1.3 + 1.3*f;
+      }
+    });
+  }
+  // AMHS 天车：真实搬运任务优先，空闲时沿环线巡逻（真实模式也不再静止）——冻结时全部静止
   vehicles.forEach(v=>{
+    if(frozen) return;   // 冻结：天车原地不动
     const task = v.userData.task;
     if(task){
       task.t += dt / task.dur;
