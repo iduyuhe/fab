@@ -8,7 +8,12 @@
 // ============================================================
 'use strict';
 const { createErpService } = require('./services/erp-service');
+const { syncFromMes } = require('./automation-flag');
 
 const PORT = process.env.ERP_PORT || 8126;
+const MES_HTTP = process.env.MES_HTTP || 'http://127.0.0.1:8124';
+// 跨进程开关同步：ERP 独立进程跟随 MES 的自动化总开关（轻量 GET，默认 10s），
+// 使"演示开闸/关闸"对 ERP 的自动接单/事件重放一致生效。
+syncFromMes(MES_HTTP, +(process.env.AUTO_SYNC_MS || 10000));
 const svc = createErpService({ inProc: false });
 svc.listen(PORT);

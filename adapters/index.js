@@ -38,7 +38,7 @@ function startAdapters({ emitEv, config = {} } = {}) {
     opc.on('error', e => console.error('[adapter] OPC-UA error:', e.message));
     opc.on('data', dv => { /* 原始 DataValue 钩子（可选：接 MQ / 时序库） */ });
     opc.connect().then(() => opc.subscribeNodes()).then(() => {
-      opc.start(config.opcuaInterval || 2000);
+      opc.start(config.opcuaInterval || +(process.env.ADAPTER_OPCUA_MS || 10000));   // 默认低频 10s（采集频率客户可配）
     });
     instances.push(opc);
     started.push('opcua');
@@ -49,7 +49,7 @@ function startAdapters({ emitEv, config = {} } = {}) {
     eda.on('connected', info => console.log(`[adapter] EDA ${info.real ? 'REAL' : 'stub'} connected`));
     eda.on('data', evt => { /* 原始 EDA 事件钩子（可选：接 MQ / 时序库） */ });
     eda.connect().then(() => eda.subscribeNodes()).then(() => {
-      eda.start(config.edaInterval || 2500);
+      eda.start(config.edaInterval || +(process.env.ADAPTER_EDA_MS || 15000));   // 默认低频 15s
     });
     instances.push(eda);
     started.push('eda');

@@ -24,6 +24,8 @@ const { createWIP, loadAndHydrate } = require('./services/wip');            // �
 const { createGovernor } = require('./governance');                       // 资源治理层：锁死 CPU/内存/队列上限
 const gov = createGovernor();
 const { isAutomationEnabled, setAutomationEnabled, onAutomationChange } = require('./automation-flag');  // 演示系统"自动化总开关"：默认关、每次重启强制关
+const telemetry = require('./telemetry-config');   // 采集频率配置：默认低频、客户可改、重启不丢
+telemetry.loadFromDb();
 
 const PORT = process.env.PORT || 8124;
 const TICK_MS = +(process.env.TICK_MS || 1000);                // 仿真 tick 周期（默认 1s；可配；前端 SimulatedEAP rate 建议同步）
@@ -150,13 +152,13 @@ function startLdaWatcher() {
   if (!LDA_WATCHER) { log('[LDA看门狗] 已禁用 (LDA_WATCHER=0)'); return; }
   // 受"自动化总开关"管制：关闭时仅保活轮询、不导入（避免无人值守时空转造数据）
   if (isAutomationEnabled()) ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; });   // 首轮（可能种子化）
-  // 空闲态拉长轮询到 60s（保活但省资源）；退避由 gov.fetch 保证
+  // 轮询周期客户可配（主数据台→采集频率）；空闲态拉长到 60s；退避由 gov.fetch 保证
   function scheduleLdaWatch() {
-    const iv = gov.isIdle(IDLE_MS) ? Math.max(LDA_WATCH_MS, 60000) : LDA_WATCH_MS;
+    const iv = gov.isIdle(IDLE_MS) ? Math.max(telemetry.get('ldaMs'), 60000) : telemetry.get('ldaMs');
     setTimeout(() => { if (isAutomationEnabled()) ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); scheduleLdaWatch(); }, iv);
   }
   scheduleLdaWatch();
-  log(`[LDA看门狗] 已启动(受自动化总开关管制：关闭时仅保活不导入)：轮询 ${LDA_BASE} 每 ${LDA_WATCH_MS / 1000}s（空闲拉长至60s），单轮突发上限 ${LDA_WATCH_BURST}`);
+  log(`[LDA看门狗] 已启动(受自动化总开关管制：关闭时仅保活不导入)：轮询 ${LDA_BASE} 每 ${telemetry.get('ldaMs') / 1000}s（空闲拉长至60s），单轮突发上限 ${LDA_WATCH_BURST}`);
 }
 
 // ---------- 设备模型（与数字孪生前端完全同构） ----------
@@ -532,8 +534,9 @@ startLdaWatcher();   // LDA 有机衔接常驻看门狗：设计交付自动触�
 // ---- 演示系统"自动化总开关"开机状态播报 ----
 log(`⚙ 自动化总开关：${isAutomationEnabled() ? '【开】实时仿真全速运行' : '【关】演示闲置——仿真心跳与全部自动循环已冻结，仅监控/健康检查/事件持久化运行'}`);
 log('   人工开启方式：① 重启时带环境变量 FAB_AUTOMATION=1（仅本次生效）；② 运行时 POST /api/admin/automation {"enabled":true}。每次重启强制回到【关】。');
-// 事件批量落库：队列 + 定时 flush（无事务；失败丢弃防队列膨胀卡死事件循环）
-setInterval(() => storage.flushEvents(), FLUSH_MS);
+// 事件批量落库：队列 + 定时 flush（无事务；失败丢弃防队列膨胀卡死事件循环）。频率客户可配。
+const flushLoop = () => { setTimeout(flushLoop, telemetry.get('flushMs')); try { storage.flushEvents(); } catch (_) {} };
+flushLoop();
 // 事件循环心跳诊断：延迟 >2s 说明卡死，打印定位
 let hbLast = Date.now();
 setInterval(() => {
@@ -1310,6 +1313,24 @@ function handler(req, res) {
     }
     return json(res, 405, { error: 'GET/POST only' });
   }
+  // ---------- 采集频率配置（客户可设，主数据台→采集频率；自动化关时不采集） ----------
+  if (route === '/api/telemetry/config') {
+    if (req.method === 'GET') return json(res, 200, { items: telemetry.all(), note: telemetry.NOTE, automation: isAutomationEnabled() });
+    if (req.method === 'POST') {
+      const tok = process.env.FAB_ADMIN_TOKEN;
+      if (tok && req.headers['x-fab-admin'] !== tok) return json(res, 401, { error: 'admin token required (header x-fab-admin)' });
+      let body = '';
+      req.on('data', c => body += c);
+      req.on('end', () => {
+        let b = {}; try { b = body ? JSON.parse(body) : {}; } catch (_) {}
+        const r = telemetry.setAll(b.items || b);
+        log(`⚙ 采集频率配置更新：${JSON.stringify(r.changed || r.error || r)}`);
+        return json(res, 200, r);
+      });
+      return;
+    }
+    return json(res, 405, { error: 'GET/POST only' });
+  }
   // ---------- 时序库（TSDB）数据资产接口 ----------
   if (route === '/api/tsdb/stats') {
     return json(res, 200, { total: storage.db.prepare('SELECT COUNT(*) n FROM tsdb').get().n, stats: storage.queryTsdbStats() });
@@ -1406,7 +1427,8 @@ let autoWo_atCap = false;
 let autoWoPaused = false;
 const WIP_CAP = process.env.WIP_CAP ? +process.env.WIP_CAP : 240;   // 在制上限：达到即暂停自动投料，防止内存/CPU 失控
 function log(msg) { gov.logger.log(`[${new Date().toTimeString().slice(0, 8)}] ${msg}`); }
-setInterval(() => {
+const autoWoLoop = () => {
+  setTimeout(autoWoLoop, telemetry.get('autoWoMs'));   // 采集频率客户可配（主数据台→采集频率）
   if (!autoWo || !isAutomationEnabled()) return;   // 受自动化总开关管制：关时不自动投料
   // 空闲降频：仅在自动化已开启、且确实无用户操作超 3 分钟时暂停（满足稳态 CPU ≤10%）。
   // 注意：刚开启自动化时 server 已 gov.touch() 重置空闲计时，不会因"冷启无操作"误判暂停。
@@ -1424,7 +1446,8 @@ setInterval(() => {
   const prod = Math.random() < 0.5 ? 'N2' : 'A16';
   const wo = engine.createWO({ product: prod, qty: 3 + Math.floor(Math.random() * 3), dueHours: 24 + Math.floor(Math.random() * 49) });
   log(`自动投料 ${wo.id} · ${wo.productLabel} × ${wo.qty}（在制 ${engine.stats.wip}/${WIP_CAP}）`);
-}, AUTO_WO_MS);
+};
+autoWoLoop();
 
 server.listen(PORT, () => {
   console.log(`fab-mes (自研 EAP/MES) M3 已启动（MES核心 + SECS/GEM + E10/E58）[阶段0 多进程拆分]`);
@@ -1441,7 +1464,7 @@ function scheduleTick() {
   const noClients = (wss && wss.clients.size === 0);
   // 护栏① 空闲降频：无任何 WS 客户端 或 无操作超阈值 时，tick 放慢到 ≥5s（稳态 CPU 回落）
   const slow = (processing === 0 && (gov.isIdle(TICK_IDLE_MS) || noClients));
-  const iv = slow ? Math.max(TICK_MS, 5000) : TICK_MS;
+  const iv = slow ? Math.max(telemetry.get('tickMs'), 5000) : telemetry.get('tickMs');
   setTimeout(() => { tick(); scheduleTick(); }, iv);
 }
 scheduleTick();
@@ -1460,7 +1483,7 @@ onAutomationChange((on) => {
 const PRED_SCAN_MS = process.env.PRED_SCAN_MS ? +(process.env.PRED_SCAN_MS) : 30000;
 const PRED_IDLE_MS = process.env.PRED_IDLE_MS ? +(process.env.PRED_IDLE_MS) : 60000;
 function schedulePredScan() {
-  if (!isAutomationEnabled()) { setTimeout(schedulePredScan, PRED_SCAN_MS); return; }   // 总开关关：跳过预测扫描（保活，恢复后自动续扫）
+  if (!isAutomationEnabled()) { setTimeout(schedulePredScan, telemetry.get('predScanMs')); return; }   // 总开关关：跳过预测扫描（保活，恢复后自动续扫）
   const idle = gov.isIdle(IDLE_MS);
   setTimeout(() => {
     // 执行前再查一次闸：即使排队期间被人为关闭，也不再启动扫描（杜绝"关后仍跑"尾巴）
@@ -1468,18 +1491,18 @@ function schedulePredScan() {
       gov.runTask('predScan', () => predScan(), []).then(a => { if (a && a.length) log(`[预测告警] 自动扫描发现 ${a.length} 条预测告警`); }).catch(() => {});
     }
     schedulePredScan();
-  }, idle ? Math.max(PRED_SCAN_MS, PRED_IDLE_MS) : PRED_SCAN_MS);
+  }, idle ? Math.max(telemetry.get('predScanMs'), PRED_IDLE_MS) : telemetry.get('predScanMs'));
 }
 setTimeout(schedulePredScan, 20000);
 // P1-4：APS 计划回填（计划→执行闭环）。改为事件驱动：仅当 WIP 指纹变化才重算；
-//       空闲态(>3min 无操作)拉长到 60s。间隔/开关全部 env 可调（护栏①）。
-const APS_RECOMPUTE_MS = process.env.APS_RECOMPUTE_MS ? +(process.env.APS_RECOMPUTE_MS) : 5000;
+//       空闲态(>3min 无操作)拉长到 60s。间隔客户可配；自动化关时彻底不重算（采集停）。
 const APS_IDLE_MS = process.env.APS_IDLE_MS ? +(process.env.APS_IDLE_MS) : 60000;
 let _apsSig = '';
 function _apsSigNow() { return engine.lots.length + '|' + engine.stats.wip + '|' + tools.filter(t => t.status === 'RUN').length; }
 function scheduleAps() {
+  if (!isAutomationEnabled()) { setTimeout(scheduleAps, telemetry.get('apsMs')); return; }   // 自动化关：不重算（省资源）
   const idle = gov.isIdle(IDLE_MS);
-  const interval = idle ? Math.max(APS_RECOMPUTE_MS, APS_IDLE_MS) : APS_RECOMPUTE_MS;
+  const interval = idle ? Math.max(telemetry.get('apsMs'), APS_IDLE_MS) : telemetry.get('apsMs');
   setTimeout(() => {
     try {
       const sig = _apsSigNow();

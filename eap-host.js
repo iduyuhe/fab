@@ -11,11 +11,12 @@ const http = require('http');
 const path = require('path');
 const { WebSocketServer, WebSocket } = require('ws');
 const { enc, dec } = require('./secs-gem');
+const { isAutomationEnabled, syncFromMes } = require('./automation-flag');   // 演示系统自动化总开关（跨进程同步）
 
 const HSMS_HOST = process.env.HSMS_HOST || '127.0.0.1';
 const HSMS_PORT = +(process.env.HSMS_PORT || 5000);
 const REST_PORT = +(process.env.EAP_PORT || 8125);
-const POLL_MS = +(process.env.EAP_POLL_MS || 5000);   // S1F1 轮询周期（可配）
+const POLL_MS = +(process.env.EAP_POLL_MS || 15000);   // S1F1 轮询周期（默认低频 15s，客户可配；自动化关时不轮询）
 const RECONNECT_MS = 5000;
 const DEVICES = [1, 2, 3];                     // 网关的 deviceId
 const DEV_NAME = { 1: 'LITHO-001', 2: 'ETCH-015', 3: 'DEP-060' };
@@ -71,7 +72,7 @@ class HsmsClient {
       this.connected = code === 0; this.online = code === 0;
       log(`${this.name}: Select.rsp ${code === 0 ? '成功 ✓' : '失败(' + code + ')'}`);
       this.pushTraffic('RX', 'Select.rsp', code === 0 ? '会话建立成功' : 'ACK=' + code);
-      if (code === 0) { this.pollS1F1(); this.pollTime(); this._pollTimer = setInterval(() => this.pollS1F1(), POLL_MS); }
+      if (code === 0) { this.pollS1F1(); this.pollTime(); this._pollTimer = setInterval(() => { if (isAutomationEnabled()) this.pollS1F1(); }, POLL_MS); }
     } else if (sType === 0x00) {
       const stream = f[2] & 0x7F, fn = f[3];
       if (stream === 6 && fn === 11) this._onS6F11(f);
@@ -241,3 +242,6 @@ function connectMesBus() {
   } catch (e) { setTimeout(connectMesBus, 5000); }
 }
 connectMesBus();
+// 跨进程开关同步：EAP 独立进程跟随 MES 的自动化总开关（轻量 GET，默认 10s），
+// 使"演示开闸/关闸"对 EAP 的 S1F1 轮询一致生效（关时不轮询设备）。
+syncFromMes(process.env.MES_HTTP || 'http://127.0.0.1:8124', +(process.env.AUTO_SYNC_MS || 10000));

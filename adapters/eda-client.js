@@ -70,9 +70,10 @@ class EdaAdapter extends EventEmitter {
     return this.machines;
   }
 
-  start(intervalMs = +(process.env.ADAPTER_EDA_MS || 2500)) {
+  start(intervalMs = +(process.env.ADAPTER_EDA_MS || 15000)) {
     if (this._timer) return;
-    this._timer = setInterval(() => this._pollStub(), intervalMs);
+    const { isAutomationEnabled } = require('../automation-flag');
+    this._timer = setInterval(() => { if (isAutomationEnabled()) this._pollStub(); }, intervalMs);
   }
 
   stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } }

@@ -87,10 +87,11 @@ class OpcuaAdapter extends EventEmitter {
     return this.nodes;
   }
 
-  // 启动周期采集（stub）
-  start(intervalMs = +(process.env.ADAPTER_OPCUA_MS || 2000)) {
+  // 启动周期采集（stub）；受"自动化总开关"管制：关时不采集（演示闲置零采集）
+  start(intervalMs = +(process.env.ADAPTER_OPCUA_MS || 10000)) {
     if (this._timer) return;
-    this._timer = setInterval(() => this._pollStub(), intervalMs);
+    const { isAutomationEnabled } = require('../automation-flag');
+    this._timer = setInterval(() => { if (isAutomationEnabled()) this._pollStub(); }, intervalMs);
   }
 
   stop() {

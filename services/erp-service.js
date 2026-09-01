@@ -736,7 +736,7 @@ function createErpService({ dbPath, mesHttp, inProc = false } = {}) {
     ws.on('open', () => {
       mesConnected = true; log('已连接 MES 事件流(standalone)');
       reconcileWithMES();
-      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, +(process.env.ERP_REPLAY_MS || 4000)); }   // C4：启动连续重放，闭合断连空窗（间隔可配）
+      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, +(process.env.ERP_REPLAY_MS || 30000)); }   // C4：启动连续重放，闭合断连空窗（默认低频 30s，客户可配）
     });
     ws.on('message', raw => {
       let ev; try { ev = JSON.parse(raw); } catch (e) { return; }

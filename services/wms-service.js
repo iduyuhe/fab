@@ -629,7 +629,7 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
     ws.on('open', () => {
       mesConnected = true; log('已连接 MES 事件流(standalone)');
       reconcileWithMES();
-      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, +(process.env.WMS_REPLAY_MS || 4000)); }   // C4：启动连续重放，闭合断连空窗（间隔可配）
+      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, +(process.env.WMS_REPLAY_MS || 30000)); }   // C4：启动连续重放，闭合断连空窗（默认低频 30s，客户可配）
     });
     ws.on('message', raw => {
       let ev; try { ev = JSON.parse(raw); } catch (e) { return; }
@@ -658,7 +658,7 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
       const autoTimer = setInterval(() => {
         if (!isAutomationEnabled()) return;
         try { checkReplenish(); } catch (e) { /* 忽略瞬时错误 */ }
-      }, +(process.env.WMS_REPLENISH_MS || 30000));
+      }, +(process.env.WMS_REPLENISH_MS || 60000));   // 默认低频 60s，客户可配
       if (autoTimer.unref) autoTimer.unref();
       // WMS 库保留封顶（2026-09-01 真机教训：wms_tx 158万行/tasks 24万行 → fab-wms.db 216MB）。
       // 双保险：行数封顶（wms_tx 20万/tasks 10万/inventory 5万）+ 时间窗（7 天）

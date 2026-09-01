@@ -36,4 +36,27 @@ function onAutomationChange(cb) {
   return () => {};
 }
 
-module.exports = { isAutomationEnabled, setAutomationEnabled, onAutomationChange, FAB_AUTOMATION_ENV: 'FAB_AUTOMATION' };
+// 跨进程开关同步（独立进程：ERP/WMS/EAP/Agent 用）。
+// MES 是开关的权威源（POST /api/admin/automation 只改 MES 进程内状态）；
+// 独立进程每 syncMs 轮询一次 MES 的 /api/admin/automation 并同步到本地，
+// 使"演示开闸/关闸"对整个平台一致生效（2026-09-01 发现：跨进程不同步是隐藏 bug）。
+// 轮询本身极轻（10s 一次 GET），且自动化关时不额外增加采集开销。
+function syncFromMes(mesHttp, syncMs = 10000) {
+  if (!mesHttp) return () => {};
+  let stopped = false;
+  let timer = null;
+  const poll = async () => {
+    if (stopped) return;
+    try {
+      const r = await fetch(`${mesHttp}/api/admin/automation`, { signal: AbortSignal.timeout(5000) });
+      const j = await r.json();
+      if (typeof j.enabled === 'boolean') setAutomationEnabled(j.enabled);
+    } catch (_) { /* MES 未就绪时保持本地状态，下次再试 */ }
+  };
+  poll();
+  timer = setInterval(poll, syncMs);
+  if (timer.unref) timer.unref();
+  return () => { stopped = true; if (timer) clearInterval(timer); };
+}
+
+module.exports = { isAutomationEnabled, setAutomationEnabled, onAutomationChange, syncFromMes, FAB_AUTOMATION_ENV: 'FAB_AUTOMATION' };

@@ -8,7 +8,7 @@ WorkingDirectory=/opt/fab-mes
 Environment=NODE=/opt/node22/bin/node
 Environment=APC_ENABLED=1
 Environment=ADAPTER_MODE=all
-Environment=APS_RECOMPUTE_MS=5000
+Environment=APS_RECOMPUTE_MS=30000
 # 自动化总开关【启动必关】（用户红线：演示系统部署/重启绝不自己跑）。
 # FAB_AUTOMATION=1 仅作"本次启动默认开"的临时手段；不设或=0 即启动即演示闲置。
 # 运行时人工开/关：POST /api/admin/automation {"enabled":true|false}（门户主数据台有按钮）。
@@ -26,7 +26,7 @@ Environment=MES_HTTP=http://127.0.0.1:8204
 Environment=ERP_HTTP=http://127.0.0.1:8206
 Environment=LDA_WATCHER=1
 Environment=LDA_BASE=http://127.0.0.1:3006
-Environment=LDA_WATCH_MS=20000
+Environment=LDA_WATCH_MS=60000
 Environment=LDA_WATCH_BURST=5
 ExecStart=/bin/bash /opt/fab-mes/bin/start-community.sh
 Restart=on-failure

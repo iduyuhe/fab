@@ -59,6 +59,7 @@
 <script>
 const API = '/api/erp/config';
 const TABS = [
+  { key:'telemetry', label:'采集频率' },
   { key:'products',   label:'产品' },
   { key:'materials',  label:'物料' },
   { key:'bom',        label:'BOM' },
@@ -82,6 +83,7 @@ function renderTabs(){
 
 async function render(){
   const v=document.getElementById('view'); v.innerHTML='';
+  if(cur==='telemetry') return renderTelemetry(v);
   if(cur==='products') return renderProducts(v);
   if(cur==='materials') return renderMaterials(v);
   if(cur==='bom') return renderBom(v);
@@ -89,6 +91,52 @@ async function render(){
   if(cur==='suppliers') return renderSuppliers(v);
   if(cur==='customers') return renderCustomers(v);
 }
+
+// ---------- 采集频率（客户可设；自动化关时不采集，这些频率在开闸时生效） ----------
+async function renderTelemetry(v){
+  let j = {};
+  try { j = await (await fetch('/api/telemetry/config')).json(); } catch(e){}
+  const items = j.items || {};
+  const note = j.note || '';
+  const rows = Object.entries(items).map(([k, it]) => `
+    <div class="row" style="margin-bottom:8px;align-items:center">
+      <span style="flex:1">${esc(it.label)}</span>
+      <span class="hint" style="margin-right:8px">默认 ${it.defMs}ms</span>
+      <input id="tel-${k}" type="number" min="100" max="3600000" step="100" value="${it.ms}" style="width:120px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px">
+      <span class="hint" style="margin-left:6px">ms</span>
+    </div>`).join('');
+  v.appendChild(el(`<div class="card"><div class="bar"><b>数据采集频率</b><span class="hint">${esc(note)}</span></div>
+    <div style="margin-bottom:10px;color:var(--muted);font-size:12px">自动化【开】时按此频率采集；自动化【关】时不采集（这些项不生效）。保存立即生效，重启不丢。</div>
+    ${rows}
+    <div class="row" style="margin-top:10px"><button onclick="saveTelemetry()">保存全部</button>
+    <button class="sec" onclick="resetTelemetry()">恢复默认</button></div>
+  </div>`));
+}
+window.saveTelemetry = async () => {
+  const items = {};
+  for (const k of Object.keys((await (await fetch('/api/telemetry/config')).json()).items || {})) {
+    const e = document.getElementById('tel-' + k);
+    if (e) items[k] = { ms: +e.value };
+  }
+  try {
+    const r = await (await fetch('/api/telemetry/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ items }) })).json();
+    msg(r.ok ? '已保存并生效' : ('失败: ' + (r.error||'')), r.ok);
+  } catch(e){ msg('保存失败: ' + e.message, false); }
+};
+window.resetTelemetry = async () => {
+  const items = {};
+  for (const k of Object.keys((await (await fetch('/api/telemetry/config')).json()).items || {})) {
+    items[k] = { ms: null };   // null → 恢复默认（setAll 只接受数字，null 会被跳过——见下）
+  }
+  // 恢复默认：直接重新加载页面默认值（后端 setAll 不处理 null，这里改为提交默认值）
+  try {
+    const cfg = await (await fetch('/api/telemetry/config')).json();
+    for (const k of Object.keys(cfg.items || {})) items[k] = { ms: cfg.items[k].defMs };
+    const r = await (await fetch('/api/telemetry/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ items }) })).json();
+    msg(r.ok ? '已恢复默认并生效' : '失败', r.ok);
+    render();
+  } catch(e){ msg('恢复失败: ' + e.message, false); }
+};
 
 // ---------- 产品 ----------
 async function renderProducts(v){
