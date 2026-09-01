@@ -150,15 +150,19 @@ async function ldaSyncOnce({ force = false, burst = LDA_WATCH_BURST } = {}) {
 function startLdaWatcher() {
   if (ldaImported.size === 0) { try { for (const r of storage.listLdaImported()) ldaImported.add(r.id); } catch (_) {} }  // 启动加载（跨重启幂等）
   if (!LDA_WATCHER) { log('[LDA看门狗] 已禁用 (LDA_WATCHER=0)'); return; }
-  // 受"自动化总开关"管制：关闭时仅保活轮询、不导入（避免无人值守时空转造数据）
+  // 受"自动化总开关"管制：关闭时仅保留低频保活探测、不导入（避免无人值守时空转造数据）
   if (isAutomationEnabled()) ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; });   // 首轮（可能种子化）
   // 轮询周期客户可配（主数据台→采集频率）；空闲态拉长到 60s；退避由 gov.fetch 保证
   function scheduleLdaWatch() {
+    // 自动化关：完全静默——5 分钟才醒一次做空转检查（不导入、不请求 LDA），开闸后立即恢复轮询
+    if (!isAutomationEnabled()) { setTimeout(scheduleLdaWatch, 300000); return; }
     const iv = gov.isIdle(IDLE_MS) ? Math.max(telemetry.get('ldaMs'), 60000) : telemetry.get('ldaMs');
-    setTimeout(() => { if (isAutomationEnabled()) ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); scheduleLdaWatch(); }, iv);
+    setTimeout(() => { ldaSyncOnce({ force: false }).catch(e => { ldaLastError = e.message; }); scheduleLdaWatch(); }, iv);
   }
   scheduleLdaWatch();
-  log(`[LDA看门狗] 已启动(受自动化总开关管制：关闭时仅保活不导入)：轮询 ${LDA_BASE} 每 ${telemetry.get('ldaMs') / 1000}s（空闲拉长至60s），单轮突发上限 ${LDA_WATCH_BURST}`);
+  // 开闸立即恢复 LDA 同步（不等下一轮轮询）；关闸由 scheduleLdaWatch 自动降为 5 分钟静默
+  onAutomationChange((on) => { if (on && LDA_WATCHER) { try { ldaSyncOnce({ force: false }); } catch (e) { ldaLastError = e.message; } } });
+  log(`[LDA看门狗] 已启动(受自动化总开关管制：关=5分钟保活探测/不导入；开=${telemetry.get('ldaMs') / 1000}s轮询)：${LDA_BASE}，单轮突发上限 ${LDA_WATCH_BURST}`);
 }
 
 // ---------- 设备模型（与数字孪生前端完全同构） ----------
