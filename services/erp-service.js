@@ -544,6 +544,24 @@ function createErpService({ dbPath, mesHttp, inProc = false } = {}) {
 
     if (route === '/api/erp/health') return json(res, 200, { ok: true, service: 'fab-erp', mode: inProc ? 'in-proc' : 'standalone', mesConnected, version: 'ERP-3', vatRate: VAT_RATE, uptime: +process.uptime().toFixed(1) });
 
+    // ---------- 一键初始化（清动态流水、保留主数据/科目/库存主档） ----------
+    if (route === '/api/erp/reset-demo' && req.method === 'POST') {
+      return readBody(req).then(b => {
+        if (!(b && b.confirm === true)) return json(res, 400, { error: 'confirm:true required（防误触）' });
+        const cleared = {};
+        try {
+          const dyn = ['inv_tx', 'vouchers', 'voucher_entries', 'sales_orders', 'purchase_orders', 'ar_invoices', 'ap_invoices', 'arap', 'cost_batches'];
+          for (const t of dyn) {
+            try { cleared[t] = db.prepare(`DELETE FROM ${t}`).run().changes; } catch (_) {}
+          }
+          try { db.prepare('UPDATE material_stock SET stock=0, avg_cost=0').run(); cleared.material_stock = 'reset'; } catch (_) {}
+          db.exec('VACUUM');
+          log('🧹 ERP 一键初始化完成：动态流水清空，主数据/科目/库存主档保留');
+          return json(res, 200, { ok: true, cleared });
+        } catch (e) { return json(res, 500, { ok: false, error: e.message }); }
+      });
+    }
+
     // ---------- 总账 G/L ----------
     if (route === '/api/erp/gl/accounts') return json(res, 200, { accounts: qAccts.all() });
     if (route === '/api/erp/gl/trial') return json(res, 200, trialBalance());

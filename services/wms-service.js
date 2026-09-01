@@ -473,6 +473,23 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
 
     if (route === '/api/wms/health') return json(res, 200, { ok: true, service: 'fab-wms', mode: inProc ? 'in-proc' : 'standalone', mesConnected, version: 'WMS-2', uptime: +process.uptime().toFixed(1) });
+
+    // ---------- 一键初始化（清动态库存/任务/流水，保留货位/上架规则） ----------
+    if (route === '/api/wms/reset-demo' && req.method === 'POST') {
+      return readBody(req).then(b => {
+        if (!(b && b.confirm === true)) return json(res, 400, { error: 'confirm:true required（防误触）' });
+        const cleared = {};
+        try {
+          const dyn = ['wms_tx', 'tasks', 'inventory', 'replenish', 'waves', 'wave_tasks', 'stocktaking', 'stocktake_items'];
+          for (const t of dyn) {
+            try { cleared[t] = db.prepare(`DELETE FROM ${t}`).run().changes; } catch (_) {}
+          }
+          db.exec('VACUUM');
+          log('🧹 WMS 一键初始化完成：动态库存/任务/流水清空，货位/上架规则保留');
+          return json(res, 200, { ok: true, cleared });
+        } catch (e) { return json(res, 500, { ok: false, error: e.message }); }
+      });
+    }
     if (route === '/api/wms/locations') {
       const locs = qLoc.all();
       return json(res, 200, { count: locs.length, locations: locs });

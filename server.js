@@ -1313,6 +1313,43 @@ function handler(req, res) {
     }
     return json(res, 405, { error: 'GET/POST only' });
   }
+  // ---------- 一键初始化（演示干净化）：清动态数据、保留主数据 ----------
+  // 动态：批次/工单/批次历史/晶圆/事件/时序/腔室/审计/量测/SPC/VM 全部清空
+  // 静态保留：recipes/meta_*/tools/designs/photomasks/lda_sync/learned_params/telemetry_config
+  if (route === '/api/admin/reset-demo') {
+    if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });
+    const tok = process.env.FAB_ADMIN_TOKEN;
+    if (tok && req.headers['x-fab-admin'] !== tok) return json(res, 401, { error: 'admin token required (header x-fab-admin)' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let b = {}; try { b = body ? JSON.parse(body) : {}; } catch (_) {}
+      if (b.confirm !== true) return json(res, 400, { error: 'confirm:true required（防误触）' });
+      const cleared = {};
+      try {
+        const dynTables = ['events', 'tsdb', 'chamber_hist', 'audit_log', 'metrology', 'spc_alarm', 'vm_log', 'lots', 'wos', 'lot_hist', 'wafers'];
+        for (const t of dynTables) {
+          try { cleared[t] = storage.db.prepare(`DELETE FROM ${t}`).run().changes; } catch (_) {}
+        }
+        // 内存 WIP 引擎重置：清空在制/工单/队列/处理中/停驻/统计
+        try {
+          engine.lots = []; engine.wos = []; engine.byLot.clear();
+          for (const k of Object.keys(engine.queues)) engine.queues[k] = [];
+          engine._processing.clear(); engine._parked = [];
+          engine.stats = { wip: 0, done: 0, cycSumH: 0, moves: 0, releases: 0 };
+          engine.woSeq = 0; engine.lotSeq = 0;
+        } catch (_) {}
+        // 设备状态归位（保留设备主数据，状态回 IDLE 初始）
+        try { for (const t of tools) { t.status = 'IDLE'; t._lot = null; t._hold = false; t.util = 50; t.wafers = 0; t.wph = 60; } } catch (_) {}
+        storage.db.exec('VACUUM');   // 释放磁盘（DELETE 不缩文件）
+        log('🧹 一键初始化完成：动态数据已清空（批次/工单/流水/事件），主数据保留');
+        return json(res, 200, { ok: true, cleared });
+      } catch (e) {
+        return json(res, 500, { ok: false, error: e.message });
+      }
+    });
+    return;
+  }
   // ---------- 采集频率配置（客户可设，主数据台→采集频率；自动化关时不采集） ----------
   if (route === '/api/telemetry/config') {
     if (req.method === 'GET') return json(res, 200, { items: telemetry.all(), note: telemetry.NOTE, automation: isAutomationEnabled() });

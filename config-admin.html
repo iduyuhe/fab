@@ -51,6 +51,13 @@
       <span class="hint">开：产线推进 / LDA 自动接设计 / 自动投料 / 预测扫描 / ERP 自动接单 / WMS 自动补料。关：以上全自动动作全停，监控与健康检查照常；手工导入设计、手工建单任何时候都能用。</span>
     </div>
   </div>
+  <div class="card" style="margin-top:12px;border-color:rgba(242,193,78,0.5)">
+    <div class="bar">
+      <b>🧹 一键初始化（演示干净化）</b>
+      <span class="hint">清空全部<b>动态演示数据</b>（批次/工单/流水/事件/库存/凭证），<b>保留主数据</b>（产品/物料/配方/设备/客户/货位/科目）。用于每场演示前把系统恢复干净。<b>操作不可撤销！</b></span>
+      <button class="sec" id="resetBtn" onclick="resetDemo()" style="color:var(--pm,#f2c14e);border-color:var(--pm,#f2c14e)">一键初始化</button>
+    </div>
+  </div>
 </div>
 
 <div class="tabs" id="tabs"></div>
@@ -292,6 +299,32 @@ window.toggleAuto=async()=>{
   finally{ if(b) b.disabled=false; loadAuto(); }
 };
 loadAuto(); setInterval(loadAuto, 15000);   // 15s 自检一次，和后端实际状态保持一致
+
+// ---------- 一键初始化（演示干净化）：先关自动化 → 依次清 MES/ERP/WMS 动态数据 ----------
+window.resetDemo = async () => {
+  const ok = confirm('⚠️ 一键初始化将【清空全部动态演示数据】（批次/工单/流水/事件/库存/凭证），\n保留主数据（产品/物料/配方/设备/客户/货位/科目）。\n操作不可撤销！确认执行？');
+  if(!ok) return;
+  // 先确保自动化关闭（避免清理过程中又在造数据）
+  try { await fetch('/api/admin/automation', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled:false }) }); } catch(_){}
+  const btn = document.getElementById('resetBtn'); if(btn) btn.disabled = true;
+  const results = [];
+  const targets = [
+    { name:'MES', url:'/api/admin/reset-demo' },
+    { name:'ERP', url:'/api/erp/reset-demo' },
+    { name:'WMS', url:'/api/wms/reset-demo' },
+  ];
+  for(const t of targets){
+    try{
+      const r = await fetch(t.url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ confirm:true }) });
+      const j = await r.json();
+      if(r.ok && j.ok){ const n = Object.values(j.cleared||{}).filter(v=>typeof v==='number').reduce((a,b)=>a+b,0); results.push(`${t.name}: 清 ${n} 条 ✓`); }
+      else results.push(`${t.name}: 失败(${j.error||r.status})`);
+    }catch(e){ results.push(`${t.name}: 异常(${e.message})`); }
+  }
+  if(btn) btn.disabled = false;
+  alert('一键初始化结果：\n' + results.join('\n') + '\n\n页面数据已清空，建议刷新页面查看干净状态。');
+  location.reload();
+};
 renderTabs(); render();
 </script>
 </body>
