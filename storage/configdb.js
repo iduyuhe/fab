@@ -23,9 +23,12 @@ function openConfig(dbPath, readOnly = false) {
   const db = readOnly
     ? new DatabaseSync(DB_PATH, { readOnly: true })
     : new DatabaseSync(DB_PATH);
+  // busy_timeout 必须先于任何可能抢锁的操作生效（WAL 切换/建表都需锁）。
+  // 放在同一多语句 exec 里没用：WAL PRAGMA 抢锁时 busy_timeout 尚未生效 → database is locked。
+  db.exec('PRAGMA busy_timeout=8000;');
+  if (readOnly) return db;   // 只读消费方（如 WMS）：不切 WAL、不建表，避免写只读库报错
   db.exec(`
     PRAGMA journal_mode=WAL;
-    PRAGMA busy_timeout=8000;
     CREATE TABLE IF NOT EXISTS products(
       code TEXT PRIMARY KEY, name TEXT, kind TEXT, uom TEXT, std_cycle_h REAL, active INTEGER DEFAULT 1
     );

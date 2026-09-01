@@ -31,8 +31,9 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
   // MES 连接状态：in-proc 模式经 eventbus 订阅即视为已连；standalone 由 WS open/close 维护
   let mesConnected = !!inProc;
 
-  // 共享配置库（主数据只读消费，ERP 持有写权）；ERP 先于 WMS 启动已 seed
-  const cfgDb = openConfig(path.join(__dirname, '..', 'fab-config.db'));
+  // 共享配置库（主数据只读消费，ERP 持有写权）；WMS 只读打开（readOnly=true），
+  // 避免与 ERP 抢写锁导致 database is locked 崩溃（2026-09-01 真机实测）。
+  const cfgDb = openConfig(path.join(__dirname, '..', 'fab-config.db'), true);
   const cfg = buildStore(cfgDb);
 
   // ---------- SQLite ----------
