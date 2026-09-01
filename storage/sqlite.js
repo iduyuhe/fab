@@ -9,7 +9,7 @@ const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const { StorageAdapter } = require('./interface');
 
-const DB_PATH = path.join(__dirname, '..', 'fab-mes.db');
+const DB_PATH = process.env.FAB_DB_PATH || path.join(__dirname, '..', 'fab-mes.db');
 
 class SQLiteStorage extends StorageAdapter {
   constructor() {
@@ -312,6 +312,28 @@ class SQLiteStorage extends StorageAdapter {
     } catch (e) { /* WAL+busy_timeout 下极少失败；丢弃不重试，防队列膨胀卡死 */ }
   }
   eventQueueStats() { return { queued: this._evtQueue ? this._evtQueue.length : 0, dropped: this._evtDropped || 0, cap: 20000 }; }
+
+  // 历史数据保留（护栏②：落库表只写不删会无限膨胀→库涨到 GB 级、重启重载卡死）。
+  // 超过上限即裁剪最旧行；events 用自增 seq，tsdb/chamber_hist 用自增 id/rowid。
+  enforceRetention(eventsMax = 200000, tsdbMax = 500000, histMax = 200000) {
+    try {
+      const e = this.db.prepare('SELECT COUNT(*) c FROM events').get().c;
+      if (e > eventsMax) {
+        const cut = this.db.prepare('SELECT MAX(seq) m FROM events').get().m - eventsMax;
+        if (cut > 0) this.db.prepare('DELETE FROM events WHERE seq <= ?').run(cut);
+      }
+      const t = this.db.prepare('SELECT COUNT(*) c FROM tsdb').get().c;
+      if (t > tsdbMax) {
+        const cut = this.db.prepare('SELECT MAX(id) m FROM tsdb').get().m - tsdbMax;
+        if (cut > 0) this.db.prepare('DELETE FROM tsdb WHERE id <= ?').run(cut);
+      }
+      const h = this.db.prepare('SELECT COUNT(*) c FROM chamber_hist').get().c;
+      if (h > histMax) {
+        const cut = this.db.prepare('SELECT MAX(rowid) m FROM chamber_hist').get().m - histMax;
+        if (cut > 0) this.db.prepare('DELETE FROM chamber_hist WHERE rowid <= ?').run(cut);
+      }
+    } catch (_) { /* 保留裁剪失败不阻断主流程 */ }
+  }
 
   queryEvents({ after = 0, limit = 100, from, to, type } = {}) {
     if (from || to || type) {

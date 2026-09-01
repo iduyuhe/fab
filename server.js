@@ -25,8 +25,10 @@ const { createGovernor } = require('./governance');                       // 资
 const gov = createGovernor();
 
 const PORT = process.env.PORT || 8124;
-const TICK_MS = 600;                       // 与前端 SimulatedEAP rate 一致
-const AUTO_WO_MS = 8000;                   // M2 自动投料：每 8s 一个工单
+const TICK_MS = +(process.env.TICK_MS || 1000);                // 仿真 tick 周期（默认 1s；可配；前端 SimulatedEAP rate 建议同步）
+const AUTO_WO_MS = +(process.env.AUTO_WO_MS || 8000);          // M2 自动投料：每 8s 一个工单（可配）
+const FLUSH_MS = +(process.env.EVT_FLUSH_MS || 800);           // 事件批量落库周期（可配）
+const HEARTBEAT_MS = +(process.env.HEARTBEAT_MS || 1000);      // 事件循环心跳诊断周期（可配）
 const IDLE_MS = +(process.env.GOV_IDLE_MS || 180000);          // 空闲降频阈值：无用户操作超此值即降频/暂停（默认 3 分钟，可配）
 const TICK_IDLE_MS = +(process.env.GOV_TICK_IDLE_MS || 60000); // tick 空闲放慢阈值（默认 1 分钟，可配）
 
@@ -526,14 +528,22 @@ storage.backfillTsdb();
 applyLearnedParams();
 startLdaWatcher();   // LDA 有机衔接常驻看门狗：设计交付自动触发 NPI 投放
 // 事件批量落库：队列 + 定时 flush（无事务；失败丢弃防队列膨胀卡死事件循环）
-setInterval(() => storage.flushEvents(), 800);
+setInterval(() => storage.flushEvents(), FLUSH_MS);
 // 事件循环心跳诊断：延迟 >2s 说明卡死，打印定位
 let hbLast = Date.now();
 setInterval(() => {
-  const now = Date.now(), lag = now - hbLast - 1000;
+  const now = Date.now(), lag = now - hbLast - HEARTBEAT_MS;
   if (lag > 2000) log(`⚠ 事件循环延迟 ${lag}ms`);
   hbLast = now;
-}, 1000);
+}, HEARTBEAT_MS);
+// 历史数据保留：落库表（events/tsdb/chamber_hist）封顶裁剪，防无限膨胀（护栏②）。
+// 默认 events 20万 / tsdb 50万 / chamber_hist 20万行，每 60s 巡检一次（间隔可配）。
+const EVENTS_RETENTION = +(process.env.EVENTS_RETENTION || 200000);
+const TSDB_RETENTION = +(process.env.TSDB_RETENTION || 500000);
+const HIST_RETENTION = +(process.env.HIST_RETENTION || 200000);
+const RETENTION_MS = +(process.env.RETENTION_MS || 60000);
+try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION); } catch (_) {}
+setInterval(() => { try { storage.enforceRetention(EVENTS_RETENTION, TSDB_RETENTION, HIST_RETENTION); } catch (_) {} }, RETENTION_MS);
 
 // M3 SECS/GEM：3 台演示设备可被 EAP Host 建立 HSMS 会话（id 必须存在于合成工厂 byId）
 const SECS_DEVICES = { 1: 'LITHO-001', 2: 'ETCH-015', 3: 'DEP-060' };
@@ -707,37 +717,41 @@ function tickChambers(dt) {
   for (const t of tools) {
     const cm = chambers.get(t.id);
     if (!cm) continue;
+    const isRun = t.status === 'RUN';
     cm.setToolDown(t.status === 'DOWN');
-    cm.tick(dt, t.status === 'RUN');
+    // 护栏① 降频：仅运行设备演进腔室模型；空闲/停机设备不空转（稳态 CPU 回落）
+    if (isRun) cm.tick(dt, true);
 
     // —— ① 腔室遥测上事件总线（主轴） ——
-    if (emitBatch && t.status === 'RUN') {
+    if (isRun && emitBatch) {
       emitEv({ type: 'chamberUpdate', id: t.id, module: t.module, status: t.status, chambers: cm.snapshot() });
     }
 
-    // —— ② 腔室漂移 → FDC 判异（主轴下一环）——
-    const drifts = cm.driftChambers();
-    if (drifts.length) {
-      const last = _chamberFdcCd.get(t.id) || 0;
-      if (now - last > 45000) {                 // 每台 45s 内至多一条，避免刷屏
-        _chamberFdcCd.set(t.id, now);
-        const worst = drifts.sort((a, b) => b.dev - a.dev)[0];
-        const a = {
-          ts: now, tool: t.id, module: t.module, type: 'chamberDrift',
-          chamber: worst.ch, fault: worst.fault,
-          temp: worst.temp, rf: worst.rf, gas: worst.gas, press: worst.press,
-          devPct: worst.dev,
-          wph: t.wph || 0, avgWph: 0, util: t.util || 0,
-          score: worst.dev, contrib: [{ var: 'chamberDrift:' + worst.ch, weight: worst.dev }],
-        };
-        fdc.alarms.push(a);
-        if (fdc.alarms.length > 100) fdc.alarms.shift();
-        emitEv({ type: 'fdcAlarm', ...a });
+    // —— ② 腔室漂移 → FDC 判异（仅运行设备有意义）——
+    if (isRun) {
+      const drifts = cm.driftChambers();
+      if (drifts.length) {
+        const last = _chamberFdcCd.get(t.id) || 0;
+        if (now - last > 45000) {                 // 每台 45s 内至多一条，避免刷屏
+          _chamberFdcCd.set(t.id, now);
+          const worst = drifts.sort((a, b) => b.dev - a.dev)[0];
+          const a = {
+            ts: now, tool: t.id, module: t.module, type: 'chamberDrift',
+            chamber: worst.ch, fault: worst.fault,
+            temp: worst.temp, rf: worst.rf, gas: worst.gas, press: worst.press,
+            devPct: worst.dev,
+            wph: t.wph || 0, avgWph: 0, util: t.util || 0,
+            score: worst.dev, contrib: [{ var: 'chamberDrift:' + worst.ch, weight: worst.dev }],
+          };
+          fdc.alarms.push(a);
+          if (fdc.alarms.length > 100) fdc.alarms.shift();
+          emitEv({ type: 'fdcAlarm', ...a });
+        }
       }
     }
 
     // —— ③ 腔室时序归档（trace historian，供趋势/回放/FDC 回溯）——
-    if (histBatch && t.status === 'RUN') {
+    if (isRun && histBatch) {
       cm.snapshot().forEach(c => histRows.push({ ts: nowISO(), tool: t.id, chamber: c.ch, temp: c.temp, rf: c.rf, gas: c.gas, press: c.press }));
     }
   }
@@ -1313,6 +1327,9 @@ wss.on('connection', ws => {
 
 // ---------- M2 WIP 引擎（工单/派工/lot 追踪），经 services/wip 注入（C9/C10） ----------
 const { engine } = createWIP({ byId, tools, emitEv, storage });
+// 在制/工单上限可配（护栏②：队列封顶防内存无界增长）；默认 2000 lots / 500 wos
+engine.maxLots = +(process.env.WIP_MAX_LOTS || 2000);
+engine.maxWos = +(process.env.WIP_MAX_WOS || 500);
 loadAndHydrate(engine, storage);   // C1：重启从 fab-mes.db 重建在制 WIP，主轴对账基础不丢
 
 // 重启自愈：把遗留的 SPC 自动 Hold 批次重新挂 12s 兜底放行，避免重启后旧 Hold 永久卡死。
@@ -1372,7 +1389,10 @@ server.listen(PORT, () => {
 // 主仿真心跳：空闲(无在制加工且无操作>60s)时放慢到 5s，省 CPU；有活则满速 600ms。曲线呈锯齿（有升有降），杜绝阶梯单调上升。
 function scheduleTick() {
   const processing = engine._processing ? engine._processing.size : 0;
-  const iv = (processing === 0 && gov.isIdle(TICK_IDLE_MS)) ? Math.max(TICK_MS, 5000) : TICK_MS;
+  const noClients = (wss && wss.clients.size === 0);
+  // 护栏① 空闲降频：无任何 WS 客户端 或 无操作超阈值 时，tick 放慢到 ≥5s（稳态 CPU 回落）
+  const slow = (processing === 0 && (gov.isIdle(TICK_IDLE_MS) || noClients));
+  const iv = slow ? Math.max(TICK_MS, 5000) : TICK_MS;
   setTimeout(() => { tick(); scheduleTick(); }, iv);
 }
 scheduleTick();

@@ -733,7 +733,7 @@ function createErpService({ dbPath, mesHttp, inProc = false } = {}) {
     ws.on('open', () => {
       mesConnected = true; log('已连接 MES 事件流(standalone)');
       reconcileWithMES();
-      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, 4000); }   // C4：启动连续重放，闭合断连空窗
+      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, +(process.env.ERP_REPLAY_MS || 4000)); }   // C4：启动连续重放，闭合断连空窗（间隔可配）
     });
     ws.on('message', raw => {
       let ev; try { ev = JSON.parse(raw); } catch (e) { return; }
@@ -747,7 +747,7 @@ function createErpService({ dbPath, mesHttp, inProc = false } = {}) {
   // ERP 自动接单器（P0-1 主轴驱动）：周期性生成真实 SO → 向 MES 投料(WO)，使整条 OTD 主轴自驱动、可持续验收
   let autoOrderPaused = false; // 复现/演示期间可暂停，避免拥堵单张样品 SO
   function startAutoOrders(ms) {
-    const interval = Math.max(5000, ms || 20000);
+    const interval = Math.max(5000, ms || +(process.env.ERP_AUTO_ORDER_MS || 20000));
     log(`🤖 ERP 自动接单器已启动（每 ${(interval / 1000)}s 一张 SO）`);
     setInterval(() => {
       if (autoOrderPaused) return;

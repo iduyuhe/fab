@@ -88,7 +88,7 @@ class OpcuaAdapter extends EventEmitter {
   }
 
   // 启动周期采集（stub）
-  start(intervalMs = 2000) {
+  start(intervalMs = +(process.env.ADAPTER_OPCUA_MS || 2000)) {
     if (this._timer) return;
     this._timer = setInterval(() => this._pollStub(), intervalMs);
   }

@@ -34,3 +34,10 @@ tmp/
 
 # ===== 临时校验/探针脚本（点前缀 scratch） =====
 .*.cjs
+
+# ===== 压力/资源审计 临时产物（禁止入库） =====
+*.polluted-bak
+_dbtest.cjs
+test_*.db
+test_*.db-shm
+test_*.db-wal

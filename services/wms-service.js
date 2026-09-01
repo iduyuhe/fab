@@ -625,7 +625,7 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
     ws.on('open', () => {
       mesConnected = true; log('已连接 MES 事件流(standalone)');
       reconcileWithMES();
-      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, 4000); }   // C4：启动连续重放，闭合断连空窗
+      if (!replayStarted) { replayStarted = true; setInterval(pollReplay, +(process.env.WMS_REPLAY_MS || 4000)); }   // C4：启动连续重放，闭合断连空窗（间隔可配）
     });
     ws.on('message', raw => {
       let ev; try { ev = JSON.parse(raw); } catch (e) { return; }
@@ -650,7 +650,7 @@ function createWmsService({ dbPath, mesHttp, erpHttp, inProc = false } = {}) {
         log(`fab-wms 仓储执行域已启动 :${port}（${inProc ? 'in-proc 底座模式' : 'standalone 独立进程'}）`);
       });
       // 安全库存联动补货：周期性自动检查（每 30s），低于安全库存自动生成补货建议
-      const autoTimer = setInterval(() => { try { checkReplenish(); } catch (e) { /* 忽略瞬时错误 */ } }, 30000);
+      const autoTimer = setInterval(() => { try { checkReplenish(); } catch (e) { /* 忽略瞬时错误 */ } }, +(process.env.WMS_REPLENISH_MS || 30000));
       if (autoTimer.unref) autoTimer.unref();
       return server;
     },

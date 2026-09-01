@@ -70,7 +70,7 @@ class EdaAdapter extends EventEmitter {
     return this.machines;
   }
 
-  start(intervalMs = 2500) {
+  start(intervalMs = +(process.env.ADAPTER_EDA_MS || 2500)) {
     if (this._timer) return;
     this._timer = setInterval(() => this._pollStub(), intervalMs);
   }
